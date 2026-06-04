@@ -12,9 +12,9 @@
 
 use std::hint::black_box;
 
+use criterion::{criterion_group, criterion_main, Criterion};
 use smashq_lib::session::diff::{parse_name_status, parse_numstat};
 use smashq_lib::validation::validate_session_id;
-use criterion::{criterion_group, criterion_main, Criterion};
 
 /// Builds `n` lines of `git diff --name-status` output, cycling through the
 /// four status kinds (modified / added / deleted / renamed).

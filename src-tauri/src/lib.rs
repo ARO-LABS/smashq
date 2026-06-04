@@ -29,11 +29,7 @@ fn open_log_file_lazy() -> Option<Mutex<std::fs::File>> {
     {
         Ok(f) => Some(Mutex::new(f)),
         Err(e) => {
-            eprintln!(
-                "[smashq] Failed to open log file {}: {}",
-                path.display(),
-                e
-            );
+            eprintln!("[smashq] Failed to open log file {}: {}", path.display(), e);
             None
         }
     }
