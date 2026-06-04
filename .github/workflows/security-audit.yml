@@ -1,0 +1,53 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [master]
+  schedule:
+    # Wöchentlich Montag 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  npm-audit:
+    name: npm audit (frontend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run npm audit (high severity)
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
+  cargo-audit:
+    name: cargo audit (rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95.0"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run cargo audit
+        continue-on-error: true
+        working-directory: src-tauri
+        run: cargo audit

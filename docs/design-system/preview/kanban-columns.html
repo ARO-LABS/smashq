@@ -1,0 +1,21 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+body{margin:0;padding:16px;background:var(--surface-base);color:var(--neutral-200);font-family:var(--font-body);display:flex;gap:12px;}
+.col{flex:1;background:var(--surface-base);border:1px solid var(--neutral-700);}
+.hdr{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--neutral-700);border-top:2px solid;}
+.t1{border-top-color:var(--color-accent);}
+.t2{border-top-color:var(--color-success);}
+.t3{border-top-color:var(--color-warning);}
+.n{font-family:var(--font-display);font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--neutral-300);}
+.c{font-family:var(--font-mono);font-size:10px;color:var(--neutral-500);}
+.card{margin:6px;background:var(--surface-raised);border:1px solid var(--neutral-700);border-radius:2px;padding:8px;display:flex;flex-direction:column;gap:6px;}
+.ttl{font-family:var(--font-body);font-size:11px;color:var(--neutral-200);font-weight:500;line-height:1.35;}
+.tags{display:flex;gap:4px;}
+.tag{font-family:var(--font-mono);font-size:9px;padding:1px 5px;border-radius:2px;border:1px solid;}
+.bug{color:var(--color-error);border-color:var(--color-error);}
+.feat{color:var(--color-accent);border-color:var(--color-accent);}
+</style></head><body class="dark">
+<div class="col"><div class="hdr t1"><span class="n">Active</span><span class="c">2</span></div><div class="card"><div class="ttl">PTY handshake Windows regression</div><div class="tags"><span class="tag bug">bug</span></div></div></div>
+<div class="col"><div class="hdr t2"><span class="n">Done</span><span class="c">8</span></div><div class="card"><div class="ttl">StatusBadge centralization</div><div class="tags"><span class="tag feat">feat</span></div></div></div>
+<div class="col"><div class="hdr t3"><span class="n">Review</span><span class="c">1</span></div></div>
+</body></html>

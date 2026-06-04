@@ -1,0 +1,46 @@
+Rust Performance Baseline — criterion
+Quelle: cd src-tauri && cargo bench --bench parsers
+Profil: bench (optimized, lto=true, codegen-units=1)
+
+Datum      : 2026-05-19
+App-Version: 1.6.28
+
+Benchmark                        median time
+-------------------------------- ------------
+parse_name_status/50 files          4.49 µs
+parse_name_status/500 files        44.51 µs
+parse_numstat/50 files              7.57 µs
+parse_numstat/500 files            84.41 µs
+validate_session_id/valid          43.6 ns
+validate_session_id/rejected       70.6 ns
+
+Mess-Historie
+-------------
+2026-05-19  parse_numstat optimiert: per-Zeile-`Vec<&str>`-collect() durch
+            Split-Iterator (3x .next()) ersetzt — verhaltensgleich, von den
+            Diff-Tests abgedeckt.
+            Drift-resistenter Vergleich (Verhaeltnis zur UNVERAENDERTEN
+            Anker-Funktion parse_name_status/500 im selben Lauf):
+              vor  Optimierung: 111.59 / 43.40 = 2.57x
+              nach Optimierung:  84.41 / 44.51 = 1.90x   (~-26 %)
+            Absolute Rohwerte zum Quervergleich: parse_numstat/500 von
+            111.59 µs auf 84.41 µs, parse_numstat/50 von 9.50 µs auf 7.57 µs.
+
+WICHTIG — Run-to-Run-Varianz
+----------------------------
+Diese Maschine zeigt je nach Hintergrundlast ~10 % Streuung zwischen Laeufen.
+Die absoluten µs-Werte oben sind daher nur grobe Anker. Fuer eine verlaessliche
+Regressions-Aussage zaehlt:
+  a) criterions eigenes Run-to-Run-Delta (zwei `cargo bench` kurz
+     hintereinander auf derselben Maschine), ODER
+  b) das Verhaeltnis zur unveraenderten Anker-Funktion parse_name_status —
+     driftet die ganze Maschine, bleibt das Verhaeltnis stabil.
+
+validate_session_id ist reine CPU-Arbeit (Char-Scan, kein I/O) und entsprechend
+stabil im Nanosekunden-Bereich. Der rejected-Pfad ist langsamer als valid, weil
+er die `format!`-Allokation der Fehlermeldung zahlt.
+
+Neu messen / vergleichen
+------------------------
+  cd src-tauri && cargo bench --bench parsers
+criterion zeigt beim Folgelauf automatisch das Delta zum letzten Lauf.

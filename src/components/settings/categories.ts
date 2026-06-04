@@ -1,0 +1,55 @@
+import type { ComponentType, LazyExoticComponent } from "react";
+import { lazy } from "react";
+import { Palette, Monitor, Terminal as TerminalIcon, Bell, Workflow, Bug } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+export interface SettingsCategory {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  Panel: LazyExoticComponent<ComponentType>;
+}
+
+/**
+ * Single-source schema for the categorized Settings view (Concept B Phase 6).
+ * Order here = order in CategoryNav. New categories: add a new entry; existing
+ * panels are imported via lazy() so the settings bundle stays split per panel.
+ */
+export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
+  {
+    id: "appearance",
+    label: "Darstellung",
+    icon: Palette,
+    Panel: lazy(() => import("./panels/ThemePanel").then((m) => ({ default: m.ThemePanel }))),
+  },
+  {
+    id: "sessions",
+    label: "Sessions",
+    icon: Monitor,
+    Panel: lazy(() => import("./NewSessionDefaultsPanel").then((m) => ({ default: m.NewSessionDefaultsPanel }))),
+  },
+  {
+    id: "terminal",
+    label: "Terminal",
+    icon: TerminalIcon,
+    Panel: lazy(() => import("./TerminalScrollbackPanel").then((m) => ({ default: m.TerminalScrollbackPanel }))),
+  },
+  {
+    id: "notifications",
+    label: "Benachrichtigungen",
+    icon: Bell,
+    Panel: lazy(() => import("./panels/NotificationsPanel").then((m) => ({ default: m.NotificationsPanel }))),
+  },
+  {
+    id: "sidebar",
+    label: "Sidebar",
+    icon: Workflow,
+    Panel: lazy(() => import("./SidebarTogglesPanel").then((m) => ({ default: m.SidebarTogglesPanel }))),
+  },
+  {
+    id: "advanced",
+    label: "Erweitert",
+    icon: Bug,
+    Panel: lazy(() => import("./DebugLoggingPanel").then((m) => ({ default: m.DebugLoggingPanel }))),
+  },
+] as const;

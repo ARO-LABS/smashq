@@ -1,0 +1,1468 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AgenticExplorer — Developer Documentation</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <style>
+      :root {
+        /* Helles Theme — Default */
+        --bg: #ffffff;
+        --surface: #f4f6f7;
+        --surface-2: #e9edee;
+        --border: #d4dadc;
+        --text: #1a1d1e;
+        --text-dim: #5b6266;
+        --text-faint: #8b9296;
+        --accent: #0d9488;
+        --accent-dim: #d5efec;
+        --overlay-bg: rgba(244, 246, 247, 0.97);
+        --mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+        --sans: "Inter", "Segoe UI", system-ui, sans-serif;
+      }
+      [data-theme="dark"] {
+        --bg: #0e1011;
+        --surface: #16191b;
+        --surface-2: #1c2023;
+        --border: #2b3236;
+        --text: #d4d8da;
+        --text-dim: #8b9296;
+        --text-faint: #5b6266;
+        --accent: #2dd4bf;
+        --accent-dim: #143a36;
+        --overlay-bg: rgba(8, 9, 10, 0.94);
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        font-size: 15px;
+        line-height: 1.65;
+      }
+      .layout { display: flex; max-width: 1400px; margin: 0 auto; }
+      nav.toc {
+        position: sticky;
+        top: 0;
+        align-self: flex-start;
+        width: 250px;
+        height: 100vh;
+        overflow-y: auto;
+        padding: 24px 16px;
+        border-right: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+      nav.toc h2 {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--accent);
+        margin: 0 0 12px;
+      }
+      nav.toc a {
+        display: block;
+        padding: 4px 8px;
+        color: var(--text-dim);
+        text-decoration: none;
+        font-size: 13px;
+        border-left: 2px solid transparent;
+      }
+      nav.toc a:hover { color: var(--text); border-left-color: var(--border); }
+      nav.toc a.sub { padding-left: 20px; font-size: 12px; color: var(--text-faint); }
+      main { flex: 1; min-width: 0; padding: 32px 48px 120px; }
+      header.hero { border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 8px; }
+      header.hero h1 { font-size: 30px; margin: 0 0 4px; letter-spacing: -0.01em; }
+      header.hero .accent { color: var(--accent); }
+      header.hero p { color: var(--text-dim); margin: 4px 0 0; }
+      .meta { font-family: var(--mono); font-size: 12px; color: var(--text-faint); margin-top: 12px; }
+      section { margin-top: 48px; scroll-margin-top: 16px; }
+      h2.section {
+        font-size: 20px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 8px;
+        margin-bottom: 4px;
+      }
+      h2.section .num { color: var(--accent); font-family: var(--mono); font-size: 15px; margin-right: 10px; }
+      h3 { font-size: 16px; color: var(--text); margin-top: 28px; }
+      p { color: var(--text-dim); }
+      p strong, li strong { color: var(--text); }
+      code {
+        font-family: var(--mono);
+        font-size: 0.86em;
+        background: var(--surface-2);
+        color: var(--accent);
+        padding: 1px 5px;
+        border-radius: 2px;
+      }
+      .diagram {
+        position: relative;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 2px;
+        padding: 20px;
+        margin: 18px 0;
+        overflow-x: auto;
+        cursor: zoom-in;
+      }
+      .diagram-title {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-faint);
+        margin-bottom: 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0;
+        font-size: 13.5px;
+      }
+      th, td {
+        text-align: left;
+        padding: 7px 12px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      th {
+        color: var(--accent);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+      td:first-child code { white-space: nowrap; }
+      tr:hover td { background: var(--surface); }
+      ul { color: var(--text-dim); padding-left: 22px; }
+      li { margin: 3px 0; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin: 16px 0; }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-left: 2px solid var(--accent);
+        border-radius: 3px;
+        padding: 12px 14px;
+      }
+      .card h4 { margin: 0 0 4px; font-size: 14px; color: var(--text); }
+      .card p { margin: 0; font-size: 12.5px; }
+      .tag {
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 11px;
+        background: var(--accent-dim);
+        color: var(--accent);
+        padding: 1px 7px;
+        border-radius: 2px;
+        margin-right: 4px;
+      }
+      .note {
+        background: var(--surface);
+        border-left: 2px solid var(--accent);
+        padding: 10px 14px;
+        margin: 14px 0;
+        font-size: 13.5px;
+      }
+      /* ---- Theme-Umschalter ---- */
+      .theme-toggle {
+        position: fixed;
+        top: 14px;
+        right: 18px;
+        z-index: 60;
+        font-family: var(--mono);
+        font-size: 11px;
+        background: var(--surface-2);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 2px;
+        padding: 5px 11px;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+      /* ---- Zoomable Charts ---- */
+      .zoom-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        font-family: var(--mono);
+        font-size: 11px;
+        background: var(--surface-2);
+        color: var(--accent);
+        border: 1px solid var(--border);
+        border-radius: 2px;
+        padding: 3px 9px;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+      }
+      .diagram:hover .zoom-btn { opacity: 1; }
+      .zoom-btn:hover { border-color: var(--accent); }
+      #zoom-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        background: var(--overlay-bg);
+        display: none;
+        overflow: hidden;
+        cursor: grab;
+      }
+      #zoom-overlay.open { display: block; }
+      #zoom-overlay.grabbing { cursor: grabbing; }
+      #zoom-stage {
+        position: absolute;
+        left: 0;
+        top: 0;
+      }
+      #zoom-stage svg { display: block; }
+      .zoom-close {
+        position: fixed;
+        top: 16px;
+        right: 20px;
+        z-index: 101;
+        background: var(--surface-2);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 2px;
+        font-family: var(--mono);
+        font-size: 12px;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      .zoom-close:hover { border-color: var(--accent); color: var(--accent); }
+      .zoom-hint {
+        position: fixed;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 101;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-faint);
+        pointer-events: none;
+      }
+      footer {
+        margin-top: 64px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border);
+        color: var(--text-faint);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <button class="theme-toggle" id="theme-toggle" type="button">Dunkel</button>
+    <div class="layout">
+      <nav class="toc">
+        <h2>Inhalt</h2>
+        <a href="#overview">1 · Überblick</a>
+        <a href="#architecture">2 · Architektur</a>
+        <a href="#components" class="sub">2.1 Komponentendiagramm</a>
+        <a href="#stack" class="sub">2.2 Tech-Stack</a>
+        <a href="#frontend">3 · Frontend</a>
+        <a href="#stores" class="sub">3.1 Stores</a>
+        <a href="#views" class="sub">3.2 Views &amp; Komponenten</a>
+        <a href="#hooks" class="sub">3.3 Hooks</a>
+        <a href="#backend">4 · Rust-Backend</a>
+        <a href="#modules" class="sub">4.1 Module</a>
+        <a href="#ipc" class="sub">4.2 IPC-Commands</a>
+        <a href="#uiflow">5 · UI-Flow-Referenz</a>
+        <a href="#flow-sessions" class="sub">5.1 Session-Manager</a>
+        <a href="#flow-terminal" class="sub">5.2 Terminal &amp; Config-Panel</a>
+        <a href="#flow-kanban" class="sub">5.3 Kanban</a>
+        <a href="#flow-library" class="sub">5.4 Library</a>
+        <a href="#flow-editor" class="sub">5.5 Editor</a>
+        <a href="#flow-logs" class="sub">5.6 Logs &amp; Diff-Fenster</a>
+        <a href="#flow-shell" class="sub">5.7 Navigation &amp; Einstellungen</a>
+        <a href="#runtime">6 · Laufzeit-Diagramme</a>
+        <a href="#seq-session" class="sub">6.1 Session-Lifecycle</a>
+        <a href="#seq-persist" class="sub">6.2 Settings-Persistenz</a>
+        <a href="#seq-config" class="sub">6.3 Config-Discovery</a>
+        <a href="#seq-github" class="sub">6.4 GitHub / Kanban</a>
+        <a href="#seq-update" class="sub">6.5 Auto-Updater</a>
+        <a href="#seq-save" class="sub">6.6 Config-Datei speichern</a>
+        <a href="#seq-diff" class="sub">6.7 Session-Diff berechnen</a>
+        <a href="#seq-broadcast" class="sub">6.8 Cross-Window-Broadcast</a>
+        <a href="#seq-claudeid" class="sub">6.9 Claude-ID-Auflösung</a>
+        <a href="#uml">7 · UML / Datenmodell</a>
+        <a href="#uml-stores" class="sub">7.1 Store-Klassen</a>
+        <a href="#uml-rust" class="sub">7.2 Rust-Strukturen</a>
+        <a href="#build">8 · Build &amp; CI</a>
+      </nav>
+
+      <main>
+        <header class="hero">
+          <h1><span class="accent">Agentic</span>Explorer — Developer Documentation</h1>
+          <p>Desktop-App zum Verwalten und Überwachen von Claude-CLI-Sessions. Multi-Session-Terminal mit Projekt-Kontext, Kanban, Library und Notizen.</p>
+          <div class="meta">
+            Tauri v2 + React 18 + TypeScript &nbsp;·&nbsp; 74 Komponenten · 12 Stores · 9 Hooks · 23 Rust-Module · 47 IPC-Commands
+          </div>
+        </header>
+
+        <!-- ============ 1 ÜBERBLICK ============ -->
+        <section id="overview">
+          <h2 class="section"><span class="num">01</span>Überblick</h2>
+          <p>
+            <strong>AgenticExplorer</strong> ist eine Tauri-v2-Desktop-App. Das <strong>Frontend</strong>
+            (React 18 + TypeScript + Vite) rendert die UI und hält State in Zustand-Stores. Das
+            <strong>Backend</strong> (Rust) spawnt PTY-Sessions, liest Dateien sandboxed, und kapselt
+            <code>git</code> / <code>gh</code>. Beide Seiten kommunizieren ausschliesslich über die
+            Tauri-IPC-Bridge — das Frontend ruft <code>invoke()</code>, das Backend pusht
+            <code>emit()</code>-Events.
+          </p>
+          <div class="grid">
+            <div class="card"><h4>Multi-Session-Terminal</h4><p>Mehrere Claude-CLI-Sessions parallel in xterm.js-Terminals, gespawnt als PTYs.</p></div>
+            <div class="card"><h4>Projekt-Kontext</h4><p>Config-Panel zeigt CLAUDE.md, Skills, Agents, Hooks, Settings, Worktrees pro Projekt.</p></div>
+            <div class="card"><h4>Kanban</h4><p>GitHub Projects v2 Board — Issues per Drag &amp; Drop zwischen Lanes.</p></div>
+            <div class="card"><h4>Library</h4><p>Wiederverwendbare Skills/Agents/Hooks/Templates, an Projekte anheftbar.</p></div>
+            <div class="card"><h4>Session-Diff</h4><p>Pre-Spawn-Git-Snapshot pro Session — zeigt was die Session geändert hat.</p></div>
+            <div class="card"><h4>Favoriten &amp; Notizen</h4><p>Persistierte Projekt-Favoriten, globale + projektbezogene Notizen.</p></div>
+          </div>
+          <div class="note">
+            <strong>Multi-Window:</strong> Neben dem Hauptfenster (<code>main</code>) öffnet die App
+            separate Tauri-Fenster — Log-Viewer, Session-Diff und abgekoppelte Config-Viewer
+            (Commands <code>open_log_window</code>, <code>open_session_diff_window</code>,
+            <code>open_detached_window</code>). Beim Schliessen des <code>main</code>-Fensters
+            werden alle laufenden Sessions sauber beendet. Wird eine einzelne Session
+            geschlossen, emittiert das Backend den Kanal <code>session-deleted/{id}</code> —
+            ein offenes Diff-Fenster friert daraufhin seinen Snapshot ein
+            (<code>DiffWindowView</code>).
+          </div>
+        </section>
+
+        <!-- ============ 2 ARCHITEKTUR ============ -->
+        <section id="architecture">
+          <h2 class="section"><span class="num">02</span>Architektur</h2>
+          <p>
+            Strikte Zwei-Schichten-Trennung: das Frontend kennt keine OS-Primitiven, das Backend
+            kennt kein DOM. Die einzige Brücke ist die typisierte IPC-Schicht.
+          </p>
+
+          <h3 id="components">2.1 Komponentendiagramm</h3>
+          <div class="diagram">
+            <div class="diagram-title">Komponenten- &amp; Schichtendiagramm</div>
+            <pre class="mermaid">
+flowchart TB
+  subgraph FE["FRONTEND — React 18 / TypeScript / Vite"]
+    direction TB
+    APP["App.tsx<br/>AppShell"]
+    subgraph VIEWS["Views (lazy)"]
+      SMV["SessionManagerView"]
+      KAN["KanbanDashboardView"]
+      LIBV["LibraryView"]
+      EDV["MarkdownEditorView"]
+    end
+    subgraph STORES["Zustand Stores (10) + Helpers"]
+      SS["sessionStore<br/>(ephemer)"]
+      SETT["settingsStore<br/>(persist v4)"]
+      UIS["uiStore"]
+      MISC["configDiscovery · library · logViewer<br/>editor · project · projectConfig · sessionHistory"]
+      HELP["tauriStorage · sessionRestoreSync"]
+    end
+    subgraph HOOKS["Hooks"]
+      GH_H["Global: useNowTick · useGitBranch<br/>useAutoUpdate · useSessionRestore<br/>useDraggableWindow · useThemeEffect"]
+      SH_H["Session: useSessionCreation<br/>useSessionEvents · useResizeHandle"]
+    end
+    XTERM["xterm.js<br/>(SessionTerminal.tsx)"]
+    APP --> SMV
+    APP --> KAN
+    APP --> LIBV
+    APP --> EDV
+    APP --> GH_H
+    SMV --> XTERM
+    SMV --> SH_H
+    SMV --> SS
+    KAN --> MISC
+    LIBV --> MISC
+    EDV --> MISC
+  end
+
+  subgraph IPC["TAURI IPC-BRIDGE"]
+    INV["invoke()<br/>47 Commands"]
+    EMIT["emit() Channels<br/>session-output · -status · -exit<br/>-claude-id-resolved · -deleted/&lt;id&gt;<br/>adp-event · preferences-changed"]
+  end
+
+  subgraph BE["RUST-BACKEND — Tauri v2"]
+    direction TB
+    subgraph CORE["core (top-level)"]
+      LIBRS["lib.rs<br/>App-Builder + Command-Registry"]
+      ERR["error.rs · util.rs<br/>validation.rs"]
+      SETTRS["settings.rs"]
+      LOGR["log_reader.rs"]
+    end
+    subgraph SESS["session/"]
+      SCMD["commands.rs"]
+      MGR["manager.rs<br/>SessionManager + PTY"]
+      FR["file_reader.rs<br/>(sandboxed FS)"]
+      FOLD["folder_actions.rs"]
+      DIFF["diff.rs · worktree.rs"]
+      WJ["win_job.rs<br/>(Win Job-Object)"]
+    end
+    subgraph GH["github/"]
+      GHC["commands.rs<br/>(gh-CLI Wrapper)"]
+      GHP["project.rs<br/>(Projects v2)"]
+    end
+    subgraph LIBM["library/"]
+      LIBC["commands.rs"]
+    end
+    subgraph ADP["adp/ (Event-Protokoll)"]
+      EMITR["emitter.rs"]
+      ENV["envelope.rs"]
+    end
+  end
+
+  OS["OS: PTY (portable-pty)<br/>Dateisystem · git · gh CLI"]
+
+  SS -->|invoke| INV
+  MISC -->|invoke| INV
+  SETT -->|invoke| INV
+  SH_H -->|listen| EMIT
+  GH_H -->|listen| EMIT
+
+  INV --> LIBRS
+  LIBRS --> SCMD
+  LIBRS --> GHC
+  LIBRS --> LIBC
+  LIBRS --> SETTRS
+  LIBRS --> LOGR
+  SCMD --> MGR
+  SCMD --> FR
+  SCMD --> FOLD
+  SCMD --> DIFF
+  MGR --> WJ
+  MGR --> EMITR
+  EMITR --> ENV
+  EMITR -->|emit adp-event| EMIT
+  MGR -->|emit session-*| EMIT
+  GHC --> GHP
+
+  MGR --> OS
+  FR --> OS
+  FOLD --> OS
+  DIFF --> OS
+  GHC --> OS
+  WJ --> OS
+            </pre>
+          </div>
+          <div class="note">
+            <strong>Datenfluss-Kernregel:</strong> User-Aktion → React-Komponente → Store-Action /
+            <code>invoke()</code> → Rust-Command → OS. Rückkanal: Rust <code>emit()</code> →
+            <code>listen()</code> im Hook → Store-Update → Re-Render.
+          </div>
+
+          <h3 id="stack">2.2 Tech-Stack</h3>
+          <table>
+            <tr><th>Schicht</th><th>Technologie</th></tr>
+            <tr><td>UI</td><td>React 18, TypeScript, Vite, Tailwind CSS, Framer Motion</td></tr>
+            <tr><td>State</td><td>Zustand (mit <code>persist</code>-Middleware für settingsStore)</td></tr>
+            <tr><td>Terminal</td><td>xterm.js (<code>@xterm/xterm</code>, addon-fit, addon-web-links)</td></tr>
+            <tr><td>Editor</td><td>CodeMirror (<code>@uiw/react-codemirror</code>, lang-markdown, merge)</td></tr>
+            <tr><td>Markdown</td><td>markdown-it + DOMPurify (XSS-sanitized rendering)</td></tr>
+            <tr><td>Backend</td><td>Tauri v2, Rust, portable-pty, <code>windows-sys</code> (Job-Objects)</td></tr>
+            <tr><td>Tauri-Plugins</td><td><code>shell</code> (gh-CLI), <code>updater</code> (signierte App-Updates), <code>dialog</code> (Datei-/Ordner-Picker), <code>process</code> (Restart-after-Update), <code>clipboard-manager</code> (Terminal Ctrl+C/V)</td></tr>
+            <tr><td>Externe Tools</td><td><code>git</code> (Diff, Worktrees), <code>gh</code> CLI (GitHub, Projects v2)</td></tr>
+            <tr><td>Tests</td><td>Vitest + Testing-Library (Frontend), <code>cargo test</code> (Rust), Playwright (E2E)</td></tr>
+          </table>
+        </section>
+
+        <!-- ============ 3 FRONTEND ============ -->
+        <section id="frontend">
+          <h2 class="section"><span class="num">03</span>Frontend</h2>
+
+          <h3 id="stores">3.1 Zustand-Stores</h3>
+          <p>State ist in 12 fokussierte Stores aufgeteilt. <code>settingsStore</code> ist persistiert
+            (über den <code>tauriStorage</code>-Adapter ins Dateisystem), die übrigen sind ephemer.</p>
+          <table>
+            <tr><th>Store</th><th>Lebensdauer</th><th>Verantwortung</th></tr>
+            <tr><td><code>sessionStore</code></td><td>ephemer</td><td>Laufende Sessions: Status, Exit-Code, Output-Snippet, Claude-Session-ID. Max 8 Sessions. Single- oder Grid-Layout (mehrere Terminals nebeneinander).</td></tr>
+            <tr><td><code>settingsStore</code></td><td>persistiert (v4)</td><td>Favoriten, Favorite-Gruppen (mit DnD-Reorder), Notizen (global + projekt), Theme, Preferences, Pinned Docs, API-Key-Metadaten, Session-Restore, Session-Title-Overrides, Notes-Fenster-Grösse. Persist + Migrate + Rehydrate-Validation.</td></tr>
+            <tr><td><code>uiStore</code></td><td>ephemer (Toggle-Flags persist via localStorage)</td><td>Aktiver Tab + Config-Panel-Sub-Tab (inkl. <code>pin:&lt;id&gt;</code>), Panel-Open/Width, Preview-/Detail-Panel, Library-Scope-/Section-Open, Toast-Ring (max 10), Dirty-Editor-Flag.</td></tr>
+            <tr><td><code>configDiscoveryStore</code></td><td>ephemer</td><td>Entdeckte Skills/Agents/Hooks/Rules/Knowledge/Memory für global + Projekte.</td></tr>
+            <tr><td><code>libraryStore</code></td><td>ephemer</td><td>Library-Items (Skills/Agents/Templates), Usage-Mapping, Projekt-Verknüpfung.</td></tr>
+            <tr><td><code>logViewerStore</code></td><td>ephemer</td><td>Vereinheitlichte Frontend- + Backend-Logs, dedupliziert, gefiltert.</td></tr>
+            <tr><td><code>editorStore</code></td><td>ephemer</td><td>Markdown-Editor: offene Tabs, Inhalte, Recent-Files.</td></tr>
+            <tr><td><code>projectStore</code></td><td>ephemer</td><td>Gewähltes GitHub-Projekt pro Folder / global (Kanban).</td></tr>
+            <tr><td><code>projectConfigStore</code></td><td>ephemer</td><td>Tab-Bar-Konfiguration pro Projekt.</td></tr>
+            <tr><td><code>sessionHistoryStore</code></td><td>ephemer</td><td>Abgeschlossene Sessions (Outcome, Exit-Code) für den History-Tab.</td></tr>
+            <tr><td><code>tauriStorage</code></td><td>Adapter</td><td>Zustand-<code>persist</code>-StateStorage → Tauri-Dateisystem (kein localStorage).</td></tr>
+            <tr><td><code>sessionRestoreSync</code></td><td>Sync-Modul</td><td>Spiegelt offene Sessions in settingsStore für Restore beim Neustart.</td></tr>
+          </table>
+
+          <h3 id="views">3.2 Views &amp; Komponenten</h3>
+          <p>74 Komponenten (non-test <code>.tsx</code>), nach Feature-Bereich gruppiert unter <code>src/components/</code>:</p>
+          <table>
+            <tr><th>Bereich</th><th>Schlüssel-Komponenten</th></tr>
+            <tr><td><code>layout/</code></td><td>AppShell, SideNav — App-Rahmen &amp; Navigation</td></tr>
+            <tr><td><code>sessions/</code></td><td>SessionManagerView (Haupt-View), SessionTerminal, SessionCard, GridCell, ConfigPanel + Viewer (ClaudeMd, Skills, Hooks, Settings, Agents, Worktree, GitHub, History, Library, PinnedDoc)</td></tr>
+            <tr><td><code>kanban/</code></td><td>KanbanDashboardView, KanbanBoard, KanbanCard, KanbanDetailModal, Issue* (Body, Comments, LinkedPRs, Sidebar)</td></tr>
+            <tr><td><code>library/</code></td><td>LibraryView, LibraryDetailModal, LibraryDetailContent, KnowledgeSection, RulesSection, InstancePanel, SkillArgBadge</td></tr>
+            <tr><td><code>editor/</code></td><td>MarkdownEditorView, CodeMirrorEditor, MarkdownPreview, EditorToolbar</td></tr>
+            <tr><td><code>diff/</code></td><td>DiffMergeView, DiffFileList, DiffActionButton, DiffWindowFooter — Session-Diff-Fenster</td></tr>
+            <tr><td><code>logs/</code></td><td>LogViewer, LogEntry — vereinheitlichter Log-Viewer</td></tr>
+            <tr><td><code>settings/</code> · <code>shared/</code> · <code>ui/</code></td><td>PreferencesView, Toast, ErrorBoundary, NotesPanel, Modal, Button, Input, IconButton</td></tr>
+          </table>
+
+          <h3 id="hooks">3.3 Hooks</h3>
+          <p>10 Hooks — 6 unter <code>src/hooks/</code>, 4 session-spezifische unter <code>src/components/sessions/hooks/</code>.</p>
+          <table>
+            <tr><th>Hook</th><th>Zweck</th></tr>
+            <tr><td><code>useSessionEvents</code></td><td>Abonniert die vier Session-Events (<code>session-output</code>, <code>-status</code>, <code>-exit</code>, <code>-claude-id-resolved</code>), schreibt in xterm + sessionStore.</td></tr>
+            <tr><td><code>useSessionCreation</code></td><td>Kapselt Session-Spawn (Resume, Quick-Start, New-from-Defaults).</td></tr>
+            <tr><td><code>useSessionRestore</code></td><td>Stellt beim App-Start zuvor offene Sessions wieder her.</td></tr>
+            <tr><td><code>useSidebarDnd</code></td><td>Drag-and-Drop in der Favoriten-Sidebar: Favoriten zwischen Gruppen verschieben, Gruppen reordern, Session-Liste reordern (@dnd-kit).</td></tr>
+            <tr><td><code>useAutoUpdate</code></td><td>Tauri-Updater: prüft, lädt, installiert App-Updates.</td></tr>
+            <tr><td><code>useGitBranch</code> · <code>useNowTick</code> · <code>useThemeEffect</code> · <code>useResizeHandle</code> · <code>useDraggableWindow</code></td><td>Git-Branch-Polling · Sekunden-Tick · Theme-Anwendung · Panel-Resize · Drag-Logik für das floatende NotesPanel.</td></tr>
+          </table>
+        </section>
+
+        <!-- ============ 4 BACKEND ============ -->
+        <section id="backend">
+          <h2 class="section"><span class="num">04</span>Rust-Backend</h2>
+
+          <h3 id="modules">4.1 Module</h3>
+          <table>
+            <tr><th>Modul</th><th>Verantwortung</th></tr>
+            <tr><td><code>lib.rs</code> / <code>main.rs</code></td><td>Tauri-App-Builder, Command-Registry (<code>generate_handler!</code>), Fenster-Lifecycle, Logging-Init.</td></tr>
+            <tr><td><code>session/manager.rs</code></td><td><strong>SessionManager</strong> — spawnt PTYs, Reader-/Waiter-Threads, emittiert Session-Events. Kern des Multi-Session-Terminals.</td></tr>
+            <tr><td><code>session/commands.rs</code></td><td>Tauri-Commands: create/write/resize/close_session, get_session_diff, Diff-Fenster.</td></tr>
+            <tr><td><code>session/file_reader.rs</code></td><td>Sandboxed Datei-IO — Pfad-Canonicalization + Containment-Check gegen Path-Traversal.</td></tr>
+            <tr><td><code>session/folder_actions.rs</code></td><td>Ordner im Explorer / Terminal öffnen.</td></tr>
+            <tr><td><code>session/diff.rs</code></td><td>Pre-Spawn-Git-Snapshot &amp; Diff-Berechnung pro Session.</td></tr>
+            <tr><td><code>session/worktree.rs</code></td><td>Git-Worktree-Scan (<code>git worktree list --porcelain</code>).</td></tr>
+            <tr><td><code>session/win_job.rs</code></td><td>Windows-Job-Object-Wrapper — bindet PTY-Child-Prozesse an die App, sodass beim App-Crash alle Sessions vom OS aufgeräumt werden (verhindert verwaiste PowerShell-/Claude-Prozesse).</td></tr>
+            <tr><td><code>github/commands.rs</code> · <code>project.rs</code></td><td><code>gh</code>-CLI-Wrapper: Git-Info, PRs, Issues, Checks, Kommentare, Projects-v2-Board.</td></tr>
+            <tr><td><code>library/commands.rs</code></td><td>Library-Items lesen/schreiben/indexieren, an Projekte anheften.</td></tr>
+            <tr><td><code>settings.rs</code></td><td>User-Settings / Favoriten / Notizen — Datei-IO in <code>Documents/AgenticExplorer/</code>.</td></tr>
+            <tr><td><code>log_reader.rs</code></td><td>Liest das On-Disk-Backend-Log für den Log-Viewer.</td></tr>
+            <tr><td><code>adp/</code> (emitter, envelope)</td><td>ADP — strukturiertes Error-/Event-Protokoll. Alle Envelopes gehen über den separaten Kanal <code>adp-event</code> (typisiert), getrennt von den Session-Lifecycle-Events.</td></tr>
+            <tr><td><code>util.rs</code></td><td><code>timed_output</code> (Prozess mit Timeout, Pipe-Drain), <code>silent_command</code> (kein Konsolen-Flash auf Windows).</td></tr>
+            <tr><td><code>validation.rs</code> · <code>error.rs</code></td><td>Input-Validierung (Session-IDs, Repos, Pfade) · <code>ADPError</code>-Typ.</td></tr>
+          </table>
+          <div class="note">
+            <strong>Tauri-Plugins (v2):</strong> <code>tauri-plugin-shell</code> (kapselt <code>gh</code>-CLI-Aufrufe),
+            <code>tauri-plugin-updater</code> (App-Updates via GitHub-Releases-JSON, minisign-Signaturprüfung im Frontend
+            über <code>useAutoUpdate</code>), <code>tauri-plugin-dialog</code> (Datei-/Ordner-Picker für Session-Spawn
+            und Editor), <code>tauri-plugin-process</code> (Restart-Trigger nach Update),
+            <code>tauri-plugin-clipboard-manager</code> (Terminal-Clipboard-Bridge für <kbd>Ctrl+C</kbd>/<kbd>Ctrl+V</kbd>
+            in <code>SessionTerminal</code>).
+          </div>
+          <div class="note">
+            <strong>Unified Logging:</strong> <code>logViewerStore</code> führt Frontend- und
+            Backend-Logs in einem <code>UnifiedLogEntry</code>-Strom zusammen (max. 1000 Einträge).
+            Backend-Zeilen liest <code>log_reader.rs</code> aus dem On-Disk-Log;
+            <code>parseBackendLogLine</code> parst das Format
+            <code>[Zeit] [LEVEL] [Modul] Nachricht</code>. Da dieselbe Datei bei jedem Refresh
+            neu eingelesen wird, dedupliziert der Store über <code>timestamp + source + message</code>.
+            <code>NOISE_PATTERNS</code> stufen bekanntes Rauschen (Updater-Timeouts,
+            Windows-Ctrl+C-Codes) auf <code>info</code> herab; <code>groupConsecutiveEntries</code>
+            faltet identische Folge-Einträge zu einem Eintrag mit Zähler.
+          </div>
+
+          <h3 id="ipc">4.2 IPC-Commands (47)</h3>
+          <p>Alle in <code>lib.rs</code> via <code>tauri::generate_handler!</code> registriert. Das Frontend ruft sie über <code>invoke("&lt;name&gt;", args)</code>.</p>
+          <table>
+            <tr><th>Gruppe</th><th>Commands</th></tr>
+            <tr><td>Fenster</td><td><code>open_log_window</code>, <code>open_detached_window</code>, <code>set_file_logging_enabled</code></td></tr>
+            <tr><td>Session</td><td><code>create_session</code>, <code>write_session</code>, <code>resize_session</code>, <code>close_session</code></td></tr>
+            <tr><td>Folder</td><td><code>open_folder_in_explorer</code>, <code>open_terminal_in_folder</code></td></tr>
+            <tr><td>File-Reader</td><td><code>read_project_file</code>, <code>write_project_file</code>, <code>list_project_dir</code>, <code>read_user_claude_file</code>, <code>list_user_claude_dir</code>, <code>list_skill_dirs</code>, <code>scan_claude_sessions</code>, <code>delete_claude_session</code>, <code>resolve_project_root</code></td></tr>
+            <tr><td>Diff / Worktree</td><td><code>scan_worktrees</code>, <code>get_session_diff</code>, <code>session_has_diff</code>, <code>open_session_diff_window</code></td></tr>
+            <tr><td>GitHub</td><td><code>get_git_info</code>, <code>check_project_presence</code>, <code>get_github_prs</code>, <code>get_github_issues</code>, <code>get_issue_detail</code>, <code>get_issue_checks</code>, <code>post_issue_comment</code></td></tr>
+            <tr><td>Projects v2</td><td><code>list_user_projects</code>, <code>get_project_board</code>, <code>move_project_item</code></td></tr>
+            <tr><td>Library</td><td><code>list_library_items</code>, <code>read_library_item</code>, <code>save_library_item</code>, <code>delete_library_item</code>, <code>rebuild_library_index</code>, <code>attach_library_item</code>, <code>detach_library_item</code>, <code>get_library_item_path</code></td></tr>
+            <tr><td>Log / Settings</td><td><code>read_backend_log</code>, <code>load_user_settings</code>, <code>save_user_settings</code>, <code>load_favorites_file</code>, <code>save_favorites_file</code>, <code>load_notes</code>, <code>save_note_file</code></td></tr>
+          </table>
+        </section>
+
+        <!-- ============ 5 UI-FLOW-REFERENZ ============ -->
+        <section id="uiflow">
+          <h2 class="section"><span class="num">05</span>UI-Flow-Referenz</h2>
+          <p>
+            Diese Sektion ist nach der <strong>sichtbaren Oberfläche</strong> indexiert: navigiert man die
+            App, findet man hier zu jedem Bedienelement den dahinterliegenden Code-Fluss. Jede Zeile zeigt
+            den Pfad <em>DOM-Event → Handler → Hook → Store-Action → <code>invoke()</code> → Rust-Command →
+            <code>emit()</code>-Rückkanal</em>, die konkreten Methodennamen sowie den Querverweis ins
+            Komponenten-, Laufzeit- oder UML-Diagramm.
+          </p>
+          <div class="note">
+            <strong>Lesehilfe:</strong> Spalte <em>Flow &amp; Methoden</em> nennt die Aufrufkette mit
+            konkreten Funktionen; <em>IPC → Rust</em> den <code>invoke()</code>-Command und das Rust-Modul;
+            <em>Diagramm</em> verweist auf das passende Diagramm in Sektion 6 / 7 bzw. das
+            Komponentendiagramm (2.1). „— (FE)“ = reiner Frontend-Flow ohne Backend-Aufruf.
+          </div>
+
+          <h3 id="flow-sessions">5.1 Session-Manager</h3>
+          <p>Haupt-View <code>SessionManagerView</code> — Sidebar-Liste, Terminal-Render-Baum, Session-Karten,
+            Grid-Layout. Drei Spawn-Pfade laufen über <code>useSessionCreation</code>; vier Backend-Events
+            über <code>useSessionEvents</code>.</p>
+          <table>
+            <tr><th>UI-Element</th><th>Aktion</th><th>Flow &amp; Methoden</th><th>IPC → Rust</th><th>Diagramm</th></tr>
+            <tr><td>„Neue Session“ (<code>+</code> / EmptyState)</td><td>Klick</td><td><code>onNewSession</code> → <code>handleNewSessionFromDefaults</code> → ohne Default-Pfad: Dialog <code>open({directory})</code>, dann <code>wrapInvoke("create_session")</code> → <code>sessionStore.addSession</code></td><td><code>create_session</code> → <code>session/commands.rs</code></td><td>6.1</td></tr>
+            <tr><td>Favoriten-Karte (Play)</td><td>Klick</td><td><code>onQuickStart</code> → <code>handleQuickStart</code> → <code>wrapInvoke("create_session")</code> → <code>addSession</code> + <code>updateFavoriteLastUsed</code> + <code>closePreview</code></td><td><code>create_session</code> → <code>session/commands.rs</code></td><td>6.1</td></tr>
+            <tr><td>„Resume“ (Preview / Config-Panel)</td><td>Klick</td><td><code>onResumeSession</code> → <code>handleResumeSession</code> → <code>generateSessionId</code> → <code>wrapInvoke("create_session",{resumeSessionId})</code> → <code>addSession</code></td><td><code>create_session</code> (Resume-Param) → <code>session/commands.rs</code></td><td>6.1</td></tr>
+            <tr><td>Session-Karte (Body)</td><td>Klick</td><td><code>SessionList.handleClick</code> → Single: <code>setActiveSession</code> + <code>uiStore.closePreview</code>; Grid: <code>addToGrid</code> / <code>setFocusedGridSession</code> / <code>maximizeGridSession</code></td><td>— (FE)</td><td>UML 7.1 <code>sessionStore</code></td></tr>
+            <tr><td>Session-Titel</td><td>Doppelklick</td><td><code>startRename</code> → Edit-Modus; Enter/Blur → <code>commitRename</code> → <code>renameSession</code> (+ <code>settingsStore.setSessionTitleOverride</code> falls Claude-ID bekannt)</td><td>— (FE + Persist)</td><td>6.2</td></tr>
+            <tr><td>Schliessen-Button (Karte)</td><td>Klick</td><td><code>onClose</code> → <code>SessionList.handleClose</code> → <code>removeSession</code> (optimistisch, sofort) ∥ <code>invoke("close_session")</code> (fire-and-forget)</td><td><code>close_session</code> → <code>session/commands.rs</code></td><td>6.1</td></tr>
+            <tr><td>Diff-Button (Karte / Grid)</td><td>Klick</td><td><code>DiffActionButton</code> → <code>invoke("open_session_diff_window",{sessionId})</code> — öffnet eigenes Diff-Fenster</td><td><code>open_session_diff_window</code> → <code>session/commands.rs</code></td><td>6.7</td></tr>
+            <tr><td>Ordner-/Terminal-Button</td><td>Klick</td><td><code>stopPropagation</code> → <code>invoke(...)</code> fire-and-forget</td><td><code>open_folder_in_explorer</code> / <code>open_terminal_in_folder</code> → <code>session/folder_actions.rs</code></td><td>Komp. 2.1</td></tr>
+            <tr><td>Layout-Umschalter (Toolbar)</td><td>Klick</td><td><code>onLayoutChange</code> → <code>sessionStore.setLayoutMode("single"|"grid")</code> — Terminals bleiben gemountet (xterm-Scrollback erhalten)</td><td>— (FE)</td><td>UML 7.1 <code>sessionStore</code></td></tr>
+            <tr><td>Grid-Zelle: Maximieren / Entfernen / Fokus</td><td>Klick</td><td><code>maximizeGridSession</code> / <code>removeFromGrid</code> (Auto-Fallback <code>single</code> bei leerem Grid) / <code>setFocusedGridSession</code></td><td>— (FE)</td><td>UML 7.1 <code>sessionStore</code></td></tr>
+            <tr><td>Terminal-Tastatureingabe</td><td>Tippen</td><td><code>term.onData</code> → Paste-Dedup-Guard → <code>wrapInvoke("write_session")</code> → PTY-stdin</td><td><code>write_session</code> → <code>session/commands.rs</code></td><td>6.1</td></tr>
+            <tr><td>Terminal-Resize</td><td>Fenster/Panel</td><td><code>ResizeObserver</code> → <code>debouncedFit</code> (100&nbsp;ms) → <code>fitAddon.fit()</code> → <code>wrapInvoke("resize_session")</code></td><td><code>resize_session</code> → <code>session/commands.rs</code></td><td>6.1</td></tr>
+            <tr><td>(Rückkanal) PTY-Ausgabe / Status / Exit / Claude-ID</td><td>Backend-Push</td><td><code>useSessionEvents</code> abonniert <code>session-status|-exit|-claude-id-resolved</code> → <code>updateLastOutput</code> (Karten-Preview) / <code>updateStatus</code> / <code>setExitCode</code> / <code>setClaudeSessionId</code>; <code>SessionTerminal</code> hat einen eigenen <code>session-output</code>-Listener → <code>term.write</code></td><td><code>emit()</code> ← <code>session/manager.rs</code></td><td>6.1 · 6.9</td></tr>
+          </table>
+
+          <h3 id="flow-terminal">5.2 Terminal &amp; Config-Panel</h3>
+          <p>Das Config-Panel zeigt projektbezogene Konfiguration in lazy geladenen Tabs. Jeder Viewer folgt
+            demselben Muster: <code>useEffect([folder])</code> → <code>invoke()</code> → lokaler
+            <code>useState</code> (kein Zustand-Store). Einzige Store-Berührungen: <code>uiStore</code> und
+            <code>settingsStore</code>.</p>
+          <table>
+            <tr><th>UI-Element</th><th>Aktion</th><th>Flow &amp; Methoden</th><th>IPC → Rust</th><th>Diagramm</th></tr>
+            <tr><td>Config-Panel-Tabs (Sichtbarkeit)</td><td>Mount / Folder-Wechsel</td><td><code>ConfigPanelTabList</code> useEffect → <code>invoke("resolve_project_root")</code> → <code>Promise.all</code> [<code>read_project_file</code>×2, <code>list_skill_dirs</code>, <code>list_project_dir</code>, <code>check_project_presence</code>] → <code>setPresence</code> filtert <code>visibleTabs</code></td><td>5× File-Reader / GitHub → <code>file_reader.rs</code>, <code>github/</code></td><td>6.3</td></tr>
+            <tr><td>Tab-Button</td><td>Klick</td><td><code>setConfigSubTab</code> → Dirty-Guard (<code>window.confirm</code> falls <code>hasDirtyEditor</code>) → <code>uiStore.setConfigSubTabRaw</code> → lazy Viewer-Chunk</td><td>— (FE)</td><td>UML 7.1 <code>uiStore</code></td></tr>
+            <tr><td>Pin hinzufügen (<code>+</code>)</td><td>Klick</td><td><code>handleAddPin</code> → Dialog <code>open()</code> → Pfad-Prefix-Validierung → <code>settingsStore.addPinnedDoc</code> → <code>setConfigSubTab("pin:"+id)</code></td><td>— (FE + Persist)</td><td>6.2</td></tr>
+            <tr><td>ClaudeMd- / PinnedDoc-Viewer: Laden</td><td>Mount / Refresh</td><td><code>load()</code> → <code>invoke("resolve_project_root")</code> → <code>invoke("read_project_file")</code> → Gen-Counter-Check → <code>setContent</code></td><td><code>read_project_file</code> → <code>file_reader.rs</code></td><td>6.3</td></tr>
+            <tr><td>ClaudeMd- / PinnedDoc-Viewer: Speichern</td><td>Klick „Speichern“ / Ctrl+S</td><td><code>saveFile</code> → <code>invoke("write_project_file")</code> → <code>setContent</code> → <code>uiStore.addToast</code></td><td><code>write_project_file</code> → <code>file_reader.rs</code></td><td>6.6</td></tr>
+            <tr><td>Skills- / Agents-Viewer: Laden</td><td>Mount / Refresh</td><td><code>loadSkills</code>/<code>loadAgents</code> → <code>invoke("list_skill_dirs")</code> bzw. <code>list_project_dir</code> + <code>read_project_file</code>×N → <code>parseSkillFrontmatter</code>/<code>parseAgentFrontmatter</code></td><td><code>list_skill_dirs</code> / <code>list_project_dir</code> / <code>read_project_file</code> → <code>file_reader.rs</code></td><td>6.3</td></tr>
+            <tr><td>Hooks- / Settings-Viewer: Laden</td><td>Mount / Refresh</td><td><code>useClaudeSettingsRaws</code> → <code>Promise.allSettled</code> [<code>read_project_file</code>×2, <code>read_user_claude_file</code>] → <code>buildEventGroups</code>/<code>buildSettingsSections</code></td><td><code>read_project_file</code>, <code>read_user_claude_file</code> → <code>file_reader.rs</code></td><td>6.3</td></tr>
+            <tr><td>Worktree-Viewer: Laden</td><td>Mount / Refresh</td><td><code>load()</code> → Modul-Cache (TTL 60&nbsp;s) → bei Miss <code>invoke("scan_worktrees")</code></td><td><code>scan_worktrees</code> → <code>session/commands.rs</code> (Logik: <code>worktree.rs</code>)</td><td>Komp. 2.1</td></tr>
+            <tr><td>History-Viewer: Resume</td><td>Klick „Play“</td><td><code>onResumeSession(id,cwd,title)</code> → Parent <code>handleResumeSession</code> → neue PTY-Session</td><td><code>create_session</code> (Resume) → <code>session/commands.rs</code></td><td>6.1</td></tr>
+            <tr><td>History-Viewer: Löschen</td><td>Klick „Trash“</td><td><code>handleDelete</code> → optimistisches <code>setSessions</code> → <code>invoke("delete_claude_session")</code> → bei Fehler Rollback; Toast</td><td><code>delete_claude_session</code> → <code>file_reader.rs</code></td><td>6.3</td></tr>
+            <tr><td>Editor (CodeMirror): Tippen / Ctrl+S</td><td>Eingabe</td><td><code>onChange</code> → <code>setEditContent</code> (<code>isDirty</code>); Ctrl+S (capture) → <code>saveFile</code></td><td><code>write_project_file</code> → <code>file_reader.rs</code></td><td>6.6</td></tr>
+          </table>
+
+          <h3 id="flow-kanban">5.3 Kanban</h3>
+          <p><code>KanbanDashboardView</code> wählt Board-Modus (global/folder) und Projekt; <code>KanbanBoard</code>
+            lädt das Projects-v2-Board über <code>gh</code> und behandelt Drag&amp;Drop optimistisch. Zwei
+            In-Memory-Caches (Projektliste 30&nbsp;s, Board 60&nbsp;s).</p>
+          <table>
+            <tr><th>UI-Element</th><th>Aktion</th><th>Flow &amp; Methoden</th><th>IPC → Rust</th><th>Diagramm</th></tr>
+            <tr><td>Modus-Toggle global/Projekt</td><td>Klick</td><td><code>setBoardMode</code> → conditional <code>&lt;KanbanBoard folder={null|path}/&gt;</code></td><td>— (FE)</td><td>Komp. 2.1</td></tr>
+            <tr><td>Board laden</td><td>Mount / Projektwahl</td><td><code>resolveProject</code> → <code>loadProjects</code> (<code>list_user_projects</code>) → Auto-Select → <code>loadBoard</code> (<code>get_project_board</code>)</td><td><code>list_user_projects</code>, <code>get_project_board</code> → <code>github/project.rs</code></td><td>6.4</td></tr>
+            <tr><td>Projekt-Picker-Dropdown</td><td>Klick</td><td><code>handleSelectProject</code> → <code>projectStore.setGlobalProject</code>/<code>setFolderProject</code> → useEffect → <code>loadBoard</code></td><td><code>get_project_board</code> → <code>github/project.rs</code></td><td>6.4 · UML 7.1 <code>projectStore</code></td></tr>
+            <tr><td>Refresh-Button</td><td>Klick</td><td><code>loadBoard(signal, forceRefresh=true)</code> — Cache umgangen</td><td><code>get_project_board</code> → <code>github/project.rs</code></td><td>6.4</td></tr>
+            <tr><td>Karte in andere Lane ziehen</td><td>Drag &amp; Drop</td><td><code>handleDropLane</code> → optimistisches <code>setBoard</code> → <code>invoke("move_project_item")</code> → Erfolg: Cache-Invalidate; Fehler: Rollback + <code>moveError</code>-Toast</td><td><code>move_project_item</code> → <code>github/project.rs</code></td><td>6.4</td></tr>
+            <tr><td>Karte (Body)</td><td>Klick (kein Drag)</td><td>5&nbsp;px-Threshold unterscheidet Klick/Drag → <code>setSelectedIssue</code> → <code>KanbanDetailModal</code></td><td>— (FE)</td><td>6.4</td></tr>
+            <tr><td>Detail-Modal öffnen</td><td>(Folge Karten-Klick)</td><td><code>loadDetail</code> → <code>Promise.all</code> [<code>get_issue_detail</code>, <code>get_issue_checks</code>] → <code>setDetail</code> + <code>setLinkedPRs</code></td><td><code>get_issue_detail</code>, <code>get_issue_checks</code> → <code>github/commands.rs</code></td><td>6.4</td></tr>
+            <tr><td>Kommentar abschicken</td><td>Klick / Ctrl+Enter</td><td><code>submitComment</code> → <code>invoke("post_issue_comment")</code> → <code>onCommentPosted</code> → <code>loadDetail</code> + <code>onIssueChanged</code> → Board-Reload</td><td><code>post_issue_comment</code> → <code>github/commands.rs</code></td><td>6.4</td></tr>
+            <tr><td>PR-/Issue-Link</td><td>Klick</td><td><code>open(url)</code> (Plugin <code>shell</code>) — Browser</td><td>Plugin <code>shell.open</code></td><td>—</td></tr>
+          </table>
+
+          <h3 id="flow-library">5.4 Library</h3>
+          <p>Zwei getrennte Implementierungen: <code>LibraryView</code> (read-only Config-Scanner über
+            <code>configDiscoveryStore</code>) und <code>LibraryViewer</code> (CRUD über <code>libraryStore</code>,
+            Dateien unter <code>~/.claude/library/items/</code>).</p>
+          <table>
+            <tr><th>UI-Element</th><th>Aktion</th><th>Flow &amp; Methoden</th><th>IPC → Rust</th><th>Diagramm</th></tr>
+            <tr><td>LibraryView: Konfiguration scannen</td><td>Mount / Refresh</td><td><code>discoverGlobal</code> + <code>discoverProject</code> + <code>discoverFavorites</code> → <code>Promise.allSettled</code> über viele <code>read_user_claude_file</code>/<code>list_user_claude_dir</code></td><td><code>read_user_claude_file</code>, <code>list_user_claude_dir</code> → <code>file_reader.rs</code></td><td>6.3</td></tr>
+            <tr><td>Skill-/Memory-Karte</td><td>Klick / Expand</td><td><code>openDetail</code> → <code>LibraryDetailModal</code>; Memory-Expand → <code>loadContent</code> → <code>invoke("read_user_claude_file")</code></td><td><code>read_user_claude_file</code> → <code>file_reader.rs</code></td><td>UML 7.1 <code>configDiscoveryStore</code></td></tr>
+            <tr><td>LibraryViewer: Items laden</td><td>Mount</td><td><code>fetchItems</code> (TTL 30&nbsp;s) → <code>wrapInvoke("list_library_items")</code> + <code>invoke("rebuild_library_index")</code></td><td><code>list_library_items</code>, <code>rebuild_library_index</code> → <code>library/commands.rs</code></td><td>Komp. 2.1</td></tr>
+            <tr><td>Item-Karte</td><td>Klick</td><td><code>selectItem</code> → useEffect → <code>loadItemContent</code> → <code>invoke("read_library_item")</code></td><td><code>read_library_item</code> → <code>library/commands.rs</code></td><td>UML 7.1 <code>libraryStore</code></td></tr>
+            <tr><td>„Erstellen“ (NewItemForm)</td><td>Klick</td><td><code>handleSave</code> → Frontmatter bauen → <code>saveItem</code> → <code>invoke("save_library_item")</code> → Toast + <code>selectItem</code></td><td><code>save_library_item</code> → <code>library/commands.rs</code></td><td>6.6</td></tr>
+            <tr><td>„Verknüpfen“ / „Trennen“</td><td>Klick</td><td><code>handleToggleAttach</code> → <code>attachToProject</code>/<code>detachFromProject</code> → <code>invoke(...)</code> → Usage-Update</td><td><code>attach_library_item</code> / <code>detach_library_item</code> → <code>library/commands.rs</code></td><td>UML 7.1 <code>libraryStore</code></td></tr>
+            <tr><td>„Löschen“</td><td>2× Klick (Confirm)</td><td>1. Klick <code>setConfirmDelete(true)</code>; 2. Klick <code>deleteItem</code> → <code>invoke("delete_library_item")</code></td><td><code>delete_library_item</code> → <code>library/commands.rs</code></td><td>UML 7.1 <code>libraryStore</code></td></tr>
+            <tr><td>„Copy Path“</td><td>Klick</td><td><code>handleCopyPath</code> → <code>invoke("get_library_item_path")</code> → <code>clipboard.writeText</code> → Toast</td><td><code>get_library_item_path</code> → <code>library/commands.rs</code></td><td>—</td></tr>
+          </table>
+
+          <h3 id="flow-editor">5.5 Editor</h3>
+          <p>Markdown-Editor (<code>editorStore</code>): CodeMirror links, sanitisierte Preview rechts.
+            Zwei Save-Trigger (CodeMirror-Keymap + globaler <code>window</code>-Listener) konvergieren auf
+            <code>saveFile</code>.</p>
+          <table>
+            <tr><th>UI-Element</th><th>Aktion</th><th>Flow &amp; Methoden</th><th>IPC → Rust</th><th>Diagramm</th></tr>
+            <tr><td>„Öffnen“ / EmptyState</td><td>Klick</td><td><code>openFileFromDialog</code> → Dialog <code>open()</code> → Pfad zerlegen → <code>openFileFromProject</code> → <code>invoke("read_project_file")</code> → <code>addToRecent</code></td><td><code>read_project_file</code> → <code>file_reader.rs</code></td><td>6.3</td></tr>
+            <tr><td>Text-Eingabe (CodeMirror)</td><td>Tippen</td><td><code>handleChange</code> → <code>updateContent</code> → <code>openFile.content</code> (<code>isDirty</code>)</td><td>— (FE)</td><td>UML 7.1 <code>editorStore</code></td></tr>
+            <tr><td>„Speichern“ / Ctrl+S</td><td>Klick / Tastatur</td><td><code>saveFile</code> → <code>wrapInvoke("write_project_file")</code> → <code>savedContent</code>-Sync → Success-Toast</td><td><code>write_project_file</code> → <code>file_reader.rs</code></td><td>6.6</td></tr>
+            <tr><td>Preview-Toggle (Auge)</td><td>Klick</td><td><code>togglePreview</code> → <code>isPreviewVisible</code></td><td>— (FE)</td><td>UML 7.1 <code>editorStore</code></td></tr>
+            <tr><td>„Schliessen“ (X)</td><td>Klick</td><td><code>closeFile</code> → <code>openFile = null</code> <em>(kein Dirty-Guard — ungespeicherte Änderung verfällt)</em></td><td>— (FE)</td><td>UML 7.1 <code>editorStore</code></td></tr>
+            <tr><td>Split-Resize-Griff</td><td>Drag / Pfeiltasten</td><td><code>onPointerDown</code> → rAF-gedrosselt <code>setSplitRatio</code> (Clamp 0.2–0.8)</td><td>— (FE)</td><td>—</td></tr>
+            <tr><td>Preview-Render</td><td>(Content-Änderung)</td><td>300&nbsp;ms-Debounce → <code>renderMarkdown</code> → <code>markdown-it</code> → <code>DOMPurify.sanitize</code> → <code>dangerouslySetInnerHTML</code></td><td>— (FE)</td><td>—</td></tr>
+          </table>
+
+          <h3 id="flow-logs">5.6 Logs &amp; Diff-Fenster</h3>
+          <p>Log-Viewer und Diff-View leben auch in <strong>eigenständigen Tauri-Fenstern</strong> (eigener
+            React-Root, <code>?view=</code>-Pivot in <code>main.tsx</code>). Frontend-Logs fliessen über
+            <code>errorLogger</code> direkt in <code>logViewerStore</code>, Backend-Logs werden von Disk gelesen.</p>
+          <table>
+            <tr><th>UI-Element</th><th>Aktion</th><th>Flow &amp; Methoden</th><th>IPC → Rust</th><th>Diagramm</th></tr>
+            <tr><td>Log: Severity-/Source-Filter, Suche</td><td>Klick / Eingabe</td><td>Komponenten-Handler <code>toggleSeverity</code>/<code>toggleSource</code> → Store-Actions <code>logViewerStore.setSeverityFilter</code>/<code>setSourceFilter</code>/<code>setSearchText</code> → <code>useMemo grouped</code> re-filtert</td><td>— (FE)</td><td>UML 7.1 <code>logViewerStore</code></td></tr>
+            <tr><td>Log: Refresh</td><td>Klick</td><td><code>loadBackendLogs</code> → <code>invoke("read_backend_log",{maxLines:500})</code> → <code>parseBackendLogLine</code> → <code>addEntries</code> (Dedup, Noise-Downgrade, FIFO-1000)</td><td><code>read_backend_log</code> → <code>log_reader.rs</code></td><td>UML 7.1 <code>logViewerStore</code></td></tr>
+            <tr><td>Log: Live-Tail / Leeren</td><td>Klick</td><td><code>toggleLiveTail</code> → Auto-Scroll; <code>clearEntries</code> → <code>entries = []</code></td><td>— (FE)</td><td>—</td></tr>
+            <tr><td>Log-Fenster öffnen</td><td>Klick</td><td><code>invoke("open_log_window")</code> — existiert → Fokus; sonst neues <code>WebviewWindow</code> <code>index.html?view=logs</code></td><td><code>open_log_window</code> → <code>lib.rs</code></td><td>Komp. 2.1</td></tr>
+            <tr><td>Diff-Fenster: Laden</td><td>Mount / Fokus</td><td><code>loadDiff</code> → <code>invoke("get_session_diff",{sessionId})</code> → <code>setDiff</code>; <code>tauri://focus</code> löst Re-Load aus (ausser <code>frozen</code>)</td><td><code>get_session_diff</code> → <code>session/commands.rs</code> + <code>session/diff.rs</code></td><td>6.7</td></tr>
+            <tr><td>Diff: Datei wählen</td><td>Klick</td><td><code>DiffFileList.onSelect</code> → <code>setSelectedFileIndex</code> → <code>DiffMergeView</code> rendert <code>MergeView</code></td><td>— (FE)</td><td>—</td></tr>
+            <tr><td>Diff: Side/Inline + Refresh</td><td>Klick</td><td><code>onModeChange</code> → <code>setViewMode</code>; <code>onRefresh</code> → <code>loadDiff</code> (deaktiviert bei <code>frozen</code>)</td><td><code>get_session_diff</code> → <code>session/commands.rs</code></td><td>6.7</td></tr>
+            <tr><td>(Rückkanal) Session beendet</td><td>Backend-Push</td><td><code>listen("session-deleted/&lt;id&gt;")</code> → <code>frozen = true</code> → Diff eingefroren, Refresh deaktiviert</td><td><code>emit()</code> ← <code>session/commands.rs</code></td><td>6.7</td></tr>
+          </table>
+
+          <h3 id="flow-shell">5.7 Navigation &amp; Einstellungen</h3>
+          <p>App-Rahmen <code>AppShell</code> (View-Router) + <code>SideNav</code>. Einstellungen schreiben über
+            <code>settingsStore.setPreferences</code>, das persistiert <em>und</em> per
+            <code>emit("preferences-changed")</code> an alle Fenster broadcastet.</p>
+          <table>
+            <tr><th>UI-Element</th><th>Aktion</th><th>Flow &amp; Methoden</th><th>IPC → Rust</th><th>Diagramm</th></tr>
+            <tr><td>SideNav-Tab (Sitzungen/Kanban/…)</td><td>Klick</td><td><code>setActiveTab(id)</code> → <code>uiStore.setActiveTab</code> → <code>AppShell</code> rendert lazy View</td><td>— (FE)</td><td>Komp. 2.1</td></tr>
+            <tr><td>Tab-Rechtsklick → „In eigenem Fenster“</td><td>Kontextmenü</td><td><code>handleDetachFromMenu</code> → <code>invoke("open_detached_window",{view,title})</code> → Rust spawnt Webview (<code>DetachedViewApp</code>)</td><td><code>open_detached_window</code> → <code>lib.rs</code></td><td>Komp. 2.1</td></tr>
+            <tr><td>Theme-Toggle (Sonne/Mond)</td><td>Klick</td><td><code>setTheme</code> → <code>settingsStore</code> → <code>useThemeEffect</code> → <code>&lt;html&gt;.classList</code> <code>dark</code></td><td>— (FE + Persist)</td><td>6.2</td></tr>
+            <tr><td>Versions-Badge</td><td>Klick</td><td><code>handleVersionClick</code> — status-abhängig: <code>checkForUpdate</code> / Installations-Toast / Restart-Toast</td><td>Plugin <code>updater.check</code></td><td>6.5</td></tr>
+            <tr><td>Favorit hinzufügen</td><td>Klick</td><td><code>handleAddFavorite</code> → Dialog <code>open()</code> → <code>addFavorite</code> → <code>saveFavoritesFile</code> → <code>invoke("save_favorites_file")</code></td><td><code>save_favorites_file</code> → <code>settings.rs</code></td><td>6.2</td></tr>
+            <tr><td>Notiz bearbeiten (NotesPanel)</td><td>Eingabe</td><td><code>setProjectNotes</code>/<code>setGlobalNotes</code> → <code>set(...)</code> + <code>debouncedSaveNoteFile</code> (800&nbsp;ms) → <code>invoke("save_note_file")</code></td><td><code>save_note_file</code> → <code>settings.rs</code></td><td>6.2</td></tr>
+            <tr><td>Einstellung ändern (Preferences-Panels)</td><td>Select / Checkbox</td><td><code>setPreferences(partial)</code> → <code>settingsStore</code> → Persist + <code>broadcastPreferencesChange</code> → <code>emit("preferences-changed")</code></td><td>ggf. <code>set_file_logging_enabled</code> → <code>lib.rs</code></td><td>6.8</td></tr>
+            <tr><td>Default-Projektordner wählen</td><td>Klick</td><td><code>handlePickFolder</code> → Dialog <code>open({directory})</code> → <code>setDefaultProjectPath</code></td><td>Plugin <code>dialog.open</code></td><td>6.2</td></tr>
+            <tr><td>GitHub-Viewer: Laden</td><td>Mount / Refresh</td><td><code>load()</code> → Cache (60&nbsp;s) → <code>Promise.allSettled</code> [<code>get_git_info</code>, <code>Promise.all</code>[<code>get_github_prs</code>, <code>get_github_issues</code>]]</td><td>3× → <code>github/commands.rs</code></td><td>6.4</td></tr>
+            <tr><td>(Rückkanal) Fenster schliessen</td><td>OS-Event</td><td><code>onCloseRequested</code> → <code>flushPendingSaves</code> → sofortiges Schreiben pendenter Debounces (Settings + Notizen). Favoriten werden ohnehin synchron gespeichert.</td><td><code>save_user_settings</code>, <code>save_note_file</code> → <code>settings.rs</code></td><td>6.2</td></tr>
+          </table>
+          <div class="note">
+            <strong>Muster-Befund aus der Trace-Analyse:</strong> Config-Panel-Viewer halten ihren State
+            <em>lokal</em> (<code>useState</code>), nicht in Zustand-Stores — nur <code>uiStore</code> und
+            <code>settingsStore</code> werden geteilt. <code>configDiscoveryStore</code> versorgt
+            ausschliesslich die Library-Seite (inkl. Favoriten-Config-Scan via <code>discoverFavorites</code>);
+            <code>projectConfigStore</code> hat aktuell keinen Produktiv-Consumer. Drei Flows haben keinen UI-Auslöser,
+            sondern sind Backend→Frontend-Push: Session-Events (6.1), <code>session-deleted</code>-Freeze (6.7)
+            und der Preferences-Broadcast zwischen Fenstern (6.8).
+          </div>
+        </section>
+
+        <!-- ============ 6 LAUFZEIT ============ -->
+        <section id="runtime">
+          <h2 class="section"><span class="num">06</span>Laufzeit-Diagramme</h2>
+          <p>Sequenzdiagramme der wichtigsten Laufzeit-Flüsse — sie zeigen den genauen Nachrichtenaustausch zwischen Frontend, IPC und Rust-Backend.</p>
+
+          <h3 id="seq-session">6.1 Session-Lifecycle (Spawn → Output → Exit)</h3>
+          <div class="diagram">
+            <div class="diagram-title">Laufzeit — Session erstellen und betreiben</div>
+            <pre class="mermaid">
+sequenceDiagram
+  actor User
+  participant V as SessionManagerView
+  participant H as useSessionEvents
+  participant IPC as Tauri IPC
+  participant SM as SessionManager (Rust)
+  participant PTY as PTY / Shell
+  participant Term as xterm.js
+
+  User->>V: "Neue Session" klicken
+  V->>IPC: invoke("create_session", {folder, shell, cols, rows})
+  IPC->>SM: create_session(...)
+  SM->>SM: Pre-Spawn-Git-Snapshot
+  SM->>PTY: openpty() + spawn(shell)
+  SM->>SM: Reader- + Waiter- + Watcher-Thread starten
+  SM-->>IPC: SessionInfo
+  IPC-->>V: SessionInfo → sessionStore.addSession()
+
+  loop Terminal-Ausgabe (Reader-Thread)
+    PTY-->>SM: Bytes
+    SM-->>H: emit("session-output", {id, data})
+    H->>Term: term.write(data)
+    SM-->>H: emit("session-status", {id, status, snippet})
+    Note over SM,H: session-status nur bei Status-Wechsel<br/>(Debounce: ~200/s → ~1-5/s)
+    H->>H: sessionStore.updateStatus() + updateLastOutput()
+  end
+
+  Note over SM,H: Watcher-Thread: emit("session-claude-id-resolved")<br/>sobald die jsonl-Datei der Session erscheint
+
+  User->>Term: Tastatureingabe
+  Term->>IPC: invoke("write_session", {id, data})
+  IPC->>PTY: stdin schreiben
+
+  PTY-->>SM: Prozess beendet (Waiter-Thread)
+  SM-->>H: emit("session-exit", {id, exit_code})
+  H->>H: sessionStore.updateStatus("done")
+  Note over SM,H: Bei delete_session: emit("session-deleted/&lt;id&gt;")<br/>(per-session-Channel, friert Diff-Fenster ein — siehe 6.7)
+            </pre>
+          </div>
+          <div class="note">
+            Pro Session laufen drei Threads: Der <strong>Reader-Thread</strong> liest PTY-Output und
+            emittiert <code>session-output</code> sowie — nur bei Status-Wechsel — <code>session-status</code>
+            (Debounce spart ~99&nbsp;% der Events). Der <strong>Waiter-Thread</strong> blockiert auf dem
+            Kindprozess und emittiert <code>session-exit</code>. Der <strong>Watcher-Thread</strong>
+            beobachtet <code>~/.claude/projects/</code> und emittiert <code>session-claude-id-resolved</code>,
+            sobald die jsonl-Datei der Session erscheint — deterministische ID-Zuordnung statt
+            <code>started_at</code>-Heuristik.
+          </div>
+
+          <h3 id="seq-persist">6.2 Settings-Persistenz</h3>
+          <div class="diagram">
+            <div class="diagram-title">Laufzeit — persistierten State speichern</div>
+            <pre class="mermaid">
+sequenceDiagram
+  actor User
+  participant C as Komponente
+  participant ST as settingsStore
+  participant PM as zustand persist
+  participant TS as tauriStorage-Adapter
+  participant IPC as Tauri IPC
+  participant FS as settings.rs (Rust)
+
+  Note over C,FS: Preferences — via persist-Middleware (settings.json)
+  User->>C: Theme umschalten / Preference ändern
+  C->>ST: setTheme() / setPreferences()
+  ST->>PM: State-Update
+  PM->>TS: setItem(key, json) — 300 ms-Debounce
+  TS->>IPC: invoke("save_user_settings")
+  IPC->>FS: settings.json schreiben (Documents/AgenticExplorer/)
+
+  Note over C,FS: Favoriten — direkter Pfad (umgeht persist, eigene Datei)
+  User->>C: Favorit hinzufügen
+  C->>ST: addFavorite()
+  ST->>IPC: invoke("save_favorites_file", {data: JSON})
+  IPC->>FS: favorites.json schreiben
+
+  Note over C,FS: Notizen — direkter, debounced Pfad (umgeht persist)
+  User->>C: Notiz ändern
+  C->>ST: setGlobalNotes() / setProjectNotes()
+  ST->>IPC: invoke("save_note_file", {noteKey, content})
+  IPC->>FS: Notiz-Datei schreiben
+
+  Note over ST,FS: Beim Start: initTauriStorage() lädt parallel<br/>load_user_settings + load_favorites_file + load_notes;<br/>danach getItem (sync, aus Cache) → migrate() + onRehydrateStorage()
+  Note over TS: Beim App-Close: flushPendingSaves() leert die Debounce-Queue
+            </pre>
+          </div>
+
+          <h3 id="seq-config">6.3 Config-Discovery</h3>
+          <div class="diagram">
+            <div class="diagram-title">Laufzeit — Projekt-Konfiguration entdecken</div>
+            <pre class="mermaid">
+sequenceDiagram
+  participant CP as ConfigPanel
+  participant CD as configDiscoveryStore
+  participant IPC as Tauri IPC
+  participant FR as file_reader.rs
+
+  CP->>CD: discoverProject(folder)
+  CD->>IPC: Promise.allSettled([...])
+  par Parallele Reads
+    IPC->>FR: read_project_file("CLAUDE.md")
+    IPC->>FR: list_skill_dirs(folder)
+    IPC->>FR: read_project_file(".claude/settings.json")
+    IPC->>FR: read_project_file(".claude/settings.local.json")
+  end
+  FR-->>CD: Rohdaten
+  CD->>CD: parse Skills · Agents · Hooks + settingsRaw bewahren
+  CD->>CP: ScopeConfig → Render
+  Note over CD: Orthogonale Flows: discoverGlobal() liest via<br/>read_user_claude_file + list_user_claude_dir aus ~/.claude/;<br/>discoverFavorites(folders[]) scannt mehrere Projekte parallel
+            </pre>
+          </div>
+
+          <h3 id="seq-github">6.4 GitHub / Kanban (Drag &amp; Drop)</h3>
+          <div class="diagram">
+            <div class="diagram-title">Laufzeit — Kanban-Item verschieben</div>
+            <pre class="mermaid">
+sequenceDiagram
+  actor User
+  participant KB as KanbanBoard
+  participant IPC as Tauri IPC
+  participant GP as github/project.rs
+  participant GH as gh CLI
+
+  KB->>IPC: invoke("get_project_board", {projectNumber})
+  IPC->>GP: get_project_board(...)
+  GP->>GH: gh api graphql (Projects v2)
+  GH-->>KB: ProjectBoard {lanes, items}
+
+  User->>KB: Karte in andere Lane ziehen
+  KB->>KB: Optimistic Update (setBoard)
+  KB->>IPC: invoke("move_project_item", {projectId, itemId, fieldId, optionId, folder})
+  IPC->>GP: move_project_item(...)
+  GP->>GH: gh api graphql mutation
+  alt Erfolg
+    GH-->>KB: ok → Cache invalidieren
+  else Fehler
+    GH-->>KB: Err → Rollback (functional setBoard)
+  end
+            </pre>
+          </div>
+
+          <h3 id="seq-update">6.5 Auto-Updater</h3>
+          <div class="diagram">
+            <div class="diagram-title">Laufzeit — App-Update prüfen, laden, installieren</div>
+            <pre class="mermaid">
+sequenceDiagram
+  actor User
+  participant H as useAutoUpdate
+  participant UP as plugin-updater
+  participant PR as plugin-process
+  participant EP as Update-Endpoint
+  participant N as UpdateNotification
+
+  Note over H: Mount → 15 s Delay, danach alle 30 min
+  H->>UP: Promise.all([check(), getVersion()])
+  UP->>EP: latest.json + Signatur abrufen
+  UP-->>H: Update? + currentVersion
+  H->>H: Vergleich result.version !== currentVersion<br/>(+ dismissedVersionRef gegen Echo)
+  alt Neue, nicht-verworfene Version
+    H->>N: status "available"
+    User->>N: "Herunterladen"
+    H->>UP: update.downloadAndInstall(onProgress) — lädt nur
+    UP-->>H: Progress-Events → status "downloading"
+    UP-->>H: Finished → status "ready"
+    User->>N: "Jetzt neu starten" (confirmRelaunch)
+    H->>UP: update.install()
+    H->>PR: relaunch()
+  else User schliesst Notification
+    User->>N: dismiss()
+    N->>H: dismissedVersionRef.current = version
+  else Aktuell oder Netzwerkfehler
+    EP-->>H: keine neue Version / Fehler
+    H->>H: status "upToDate" → idle<br/>(benigne Netzwerkfehler still verworfen)
+  end
+            </pre>
+          </div>
+          <div class="note">
+            Der Updater trennt <strong>Download</strong> und <strong>Installation</strong>:
+            <code>download()</code> lädt nur herunter (Status <code>ready</code>) —
+            <code>install()</code> + <code>relaunch()</code> laufen erst nach expliziter
+            Bestätigung. Die Status-Maschine kennt sieben Zustände
+            (<code>idle · checking · available · downloading · ready · upToDate · error</code>);
+            ein verworfenes Update wird pro Version gemerkt und nicht erneut angeboten.
+          </div>
+
+          <h3 id="seq-save">6.6 Config-Datei speichern</h3>
+          <div class="diagram">
+            <div class="diagram-title">Laufzeit — Projekt-Datei schreiben (CLAUDE.md, Pinned Docs, Editor)</div>
+            <pre class="mermaid">
+sequenceDiagram
+  actor User
+  participant V as Viewer / Editor
+  participant IPC as Tauri IPC
+  participant FR as file_reader.rs
+  participant FS as Dateisystem
+
+  User->>V: "Speichern" klicken / Ctrl+S (CodeMirror-Keymap oder window-Listener)
+  V->>V: isDirty-Check + isSaving-Guard (sonst No-Op)
+  opt Nur ClaudeMdViewer / PinnedDocViewer
+    V->>IPC: invoke("resolve_project_root", {folder})
+    IPC->>FR: Pfad-Canonicalization
+    FR-->>V: aufgelöster Projekt-Root
+  end
+  V->>IPC: invoke("write_project_file", {folder, relativePath, content})
+  IPC->>FR: write_project_file(...)
+  FR->>FR: Containment-Check (Schutz gegen Path-Traversal)
+  alt Pfad innerhalb des Projekts
+    FR->>FS: Datei schreiben
+    FR-->>V: Ok
+    V->>V: setContent(neu) + uiStore.addToast("Gespeichert")
+  else Pfad ausserhalb (Sandbox-Verletzung)
+    FR-->>V: ADPError
+    V->>V: uiStore.addToast(Fehler) — bleibt im Edit-Modus
+  end
+            </pre>
+          </div>
+          <div class="note">
+            Schreibender Gegenpart zu Config-Discovery (6.3). <code>ClaudeMdViewer</code> und
+            <code>PinnedDocViewer</code> nutzen exakt diesen Pfad inkl. <code>resolve_project_root</code>;
+            der Markdown-Editor (<code>editorStore.saveFile</code>) ruft <code>write_project_file</code>
+            direkt mit dem gespeicherten Ordner — ohne den Root-Resolve-Schritt. Der
+            <code>file_reader.rs</code>-Containment-Check stellt in beiden Fällen sicher, dass nur Dateien
+            innerhalb des Projektordners beschrieben werden.
+          </div>
+
+          <h3 id="seq-diff">6.7 Session-Diff berechnen</h3>
+          <div class="diagram">
+            <div class="diagram-title">Laufzeit — Diff-Fenster öffnen und Diff berechnen</div>
+            <pre class="mermaid">
+sequenceDiagram
+  actor User
+  participant DB as DiffActionButton
+  participant IPC as Tauri IPC
+  participant SC as session/commands.rs
+  participant DW as DiffWindowView
+  participant DF as session/diff.rs
+  participant GIT as git
+
+  User->>DB: "Diff anzeigen" klicken
+  DB->>IPC: invoke("open_session_diff_window", {sessionId})
+  IPC->>SC: validate_session_id + WebviewWindow "diff-&lt;id&gt;"
+  Note over DW: Eigenes Fenster, eigener React-Root (?view=diff)
+
+  DW->>IPC: invoke("get_session_diff", {sessionId})
+  IPC->>SC: get_session_diff(...)
+  SC->>SC: Git-Repo-Check + Pre-Spawn-Snapshot-Commit lesen
+  SC->>DF: compute_session_diff(folder, commit, snapshot_at)
+  DF->>GIT: git diff (Snapshot-Commit ↔ Working-Tree)
+  GIT-->>DF: geänderte Dateien + Patches
+  DF->>DF: Budget-Truncation (500 KB/Datei, 5 MB gesamt)
+  DF-->>DW: SessionDiff {files, truncated, computeMs}
+
+  Note over DW: tauri://focus → erneut get_session_diff
+  Note over DW: session-deleted/&lt;id&gt; → frozen = true (Refresh aus)
+            </pre>
+          </div>
+
+          <h3 id="seq-broadcast">6.8 Cross-Window Preferences-Broadcast</h3>
+          <div class="diagram">
+            <div class="diagram-title">Laufzeit — Einstellung über alle Fenster synchronisieren</div>
+            <pre class="mermaid">
+sequenceDiagram
+  actor User
+  participant P as Preferences-Panel
+  participant ST as settingsStore
+  participant TS as tauriStorage
+  participant IPC as Tauri IPC
+  participant W2 as Weitere Fenster
+
+  User->>P: Einstellung ändern (Select / Checkbox)
+  P->>ST: setPreferences(partial)
+  ST->>TS: Persist (settings.json)
+  ST->>IPC: emit("preferences-changed", {partial, sourceWindow})
+  IPC-->>W2: listen("preferences-changed")
+  W2->>W2: Echo-Filter — sourceWindow == eigenes Label?
+  alt Fremdes Fenster
+    W2->>W2: applyRemotePartial → raw setState
+    Note over W2: KEIN setPreferences → kein Re-Broadcast
+  else Eigenes Fenster
+    W2->>W2: ignorieren (Echo-Loop-Schutz)
+  end
+            </pre>
+          </div>
+          <div class="note">
+            Jedes Fenster mountet einen eigenen React-Root mit eigenem <code>settingsStore</code>. Der
+            Broadcast hält sie konsistent; der Echo-Filter über <code>sourceWindow</code> verhindert eine
+            Endlosschleife. <strong>Ausnahme Theme:</strong> <code>theme</code> ist nicht Teil von
+            <code>AppPreferencesSettings</code> — es wird nur über den persistierten Store geteilt, nicht
+            über diesen Broadcast.
+          </div>
+
+          <h3 id="seq-claudeid">6.9 Claude-Session-ID-Auflösung</h3>
+          <div class="diagram">
+            <div class="diagram-title">Laufzeit — UUID einer Session deterministisch zuordnen</div>
+            <pre class="mermaid">
+sequenceDiagram
+  participant WT as Watcher-Thread (Rust)
+  participant H as useSessionEvents
+  participant IPC as Tauri IPC
+  participant FR as file_reader.rs
+
+  Note over WT: Beobachtet ~/.claude/projects/&lt;slug&gt;/
+  WT->>WT: Neue jsonl-Datei der Session erscheint
+  WT-->>H: emit("session-claude-id-resolved", {id, claude_session_id})
+  H->>H: sessionStore.setClaudeSessionId()
+  Note over H: Deterministisch — keine Heuristik
+
+  alt Watcher liefert nicht (Fallback nach 3 s, max. 5 Retries)
+    H->>IPC: invoke("scan_claude_sessions", {folder})
+    IPC->>FR: ~/.claude/projects/* JSONL parsen
+    FR-->>H: ClaudeSessionSummary[]
+    H->>H: pickBestHistoryMatch — kleinste |started_at − createdAt| (Toleranz 10 s)
+    H->>H: setClaudeSessionId (nur unbeanspruchte UUID)
+  end
+            </pre>
+          </div>
+          <div class="note">
+            Der <strong>Watcher-Thread</strong> ist der bevorzugte, deterministische Pfad — er meldet die
+            UUID, sobald die jsonl-Datei physisch erscheint. Nur falls er ausbleibt, greift die
+            heuristische <code>scan_claude_sessions</code>-Suche mit <code>started_at</code>-Matching.
+            Diese darf eine UUID nicht doppelt vergeben — siehe Lessons-Learned zum Session-Title-Swap-Bug.
+          </div>
+        </section>
+
+        <!-- ============ 7 UML ============ -->
+        <section id="uml">
+          <h2 class="section"><span class="num">07</span>UML / Datenmodell</h2>
+
+          <h3 id="uml-stores">7.1 Store-Klassendiagramm (Frontend)</h3>
+          <div class="diagram">
+            <div class="diagram-title">UML — zentrale Zustand-Stores</div>
+            <pre class="mermaid">
+classDiagram
+  class sessionStore {
+    +Session[] sessions
+    +string activeSessionId
+    +string layoutMode
+    +string[] gridSessionIds
+    +addSession(s)
+    +updateStatus(id, status)
+    +setExitCode(id, code)
+    +setClaudeSessionId(id, uuid)
+    +updateLastOutput(id, snippet)
+    +renameSession(id, title)
+    +removeSession(id)
+    +setLayoutMode(mode)
+    +addToGrid(id)
+  }
+  class Session {
+    +string id
+    +string title
+    +string folder
+    +string shell
+    +string status
+    +int exitCode
+  }
+  class settingsStore {
+    +FavoriteFolder[] favorites
+    +string globalNotes
+    +Record projectNotes
+    +AppPreferences preferences
+    +PinnedDoc[] pinnedDocs
+    +addFavorite()
+    +setProjectNotes()
+    +setPreferences()
+  }
+  class uiStore {
+    +string activeTab
+    +Toast[] toasts
+    +int configPanelWidth
+    +bool hasDirtyEditor
+    +addToast()
+    +setActiveTab()
+  }
+  class configDiscoveryStore {
+    +ScopeConfig globalConfig
+    +ScopeConfig projectConfig
+    +discoverGlobal()
+    +discoverProject(folder)
+  }
+  class logViewerStore {
+    +UnifiedLogEntry[] entries
+    +addEntries()
+    +clearEntries()
+  }
+  class libraryStore {
+    +LibraryItem[] items
+    +string selectedItemId
+    +fetchItems()
+    +saveItem(id, content)
+    +deleteItem(id)
+    +attachToProject(id, folder)
+    +detachFromProject(id, folder)
+  }
+  class editorStore {
+    +OpenFile openFile
+    +RecentFile[] recentFiles
+    +bool isPreviewVisible
+    +openFileFromProject(folder, path)
+    +updateContent(content)
+    +saveFile()
+    +togglePreview()
+  }
+  class projectStore {
+    +Record projectByFolder
+    +FolderProject globalProject
+    +setFolderProject(folder, p)
+    +setGlobalProject(p)
+  }
+  class sessionHistoryStore {
+    +SessionHistoryEntry[] entries
+    +addEntry(entry)
+    +getEntriesForProject(folder)
+  }
+  sessionStore "1" o-- "*" Session
+  settingsStore ..> tauriStorage : persist
+  class tauriStorage {
+    +getItem(key)
+    +setItem(key, value)
+  }
+            </pre>
+          </div>
+
+          <h3 id="uml-rust">7.2 Rust-Strukturen (Backend)</h3>
+          <div class="diagram">
+            <div class="diagram-title">UML — SessionManager &amp; Event-Typen</div>
+            <pre class="mermaid">
+classDiagram
+  class SessionManager {
+    -Mutex~HashMap~ sessions
+    +create_session(...) Result~SessionInfo~
+    +write_to_session(id, data) Result
+    +resize_session(id, cols, rows) Result
+    +close_session(id) Result
+    +list_sessions() Vec~SessionInfo~
+  }
+  class SessionHandle {
+    +SessionInfo info
+    +Box~Write~ writer
+    +Box~MasterPty~ master
+  }
+  class SessionInfo {
+    +String id
+    +String title
+    +String folder
+    +String shell
+    +String status
+    +Option~i32~ exit_code
+    +bool is_git_repo
+    +Option~String~ snapshot_commit
+    +Option~DateTime~ snapshot_at
+  }
+  class SessionOutputEvent {
+    +String id
+    +String data
+  }
+  class SessionExitEvent {
+    +String id
+    +i32 exit_code
+  }
+  class SessionStatusEvent {
+    +String id
+    +String status
+    +String snippet
+  }
+  class SessionClaudeIdEvent {
+    +String id
+    +String claude_session_id
+  }
+  class ADPError {
+    +ADPErrorCode code
+    +String message
+  }
+  SessionManager "1" o-- "*" SessionHandle
+  SessionHandle *-- SessionInfo
+  SessionManager ..> SessionOutputEvent : emit
+  SessionManager ..> SessionStatusEvent : emit
+  SessionManager ..> SessionExitEvent : emit
+  SessionManager ..> SessionClaudeIdEvent : emit
+  SessionManager ..> ADPError : Result Err
+            </pre>
+          </div>
+        </section>
+
+        <!-- ============ 8 BUILD ============ -->
+        <section id="build">
+          <h2 class="section"><span class="num">08</span>Build &amp; CI</h2>
+          <table>
+            <tr><th>Befehl</th><th>Wirkung</th></tr>
+            <tr><td><code>npm run dev</code></td><td>Vite-Dev-Server (Port 5173, Web-Modus ohne Rust)</td></tr>
+            <tr><td><code>npm run tauri dev</code></td><td>Tauri-Desktop-App im Dev-Modus (Frontend + Rust)</td></tr>
+            <tr><td><code>npm run build</code></td><td><code>tsc &amp;&amp; vite build</code> — Typecheck + Production-Bundle</td></tr>
+            <tr><td><code>npm run tauri build</code></td><td>Kompletter Desktop-Build (Installer)</td></tr>
+            <tr><td><code>npm run test</code> / <code>test:coverage</code></td><td>Vitest (jsdom, Testing-Library)</td></tr>
+            <tr><td><code>npm run lint</code></td><td>ESLint über das gesamte Repo</td></tr>
+            <tr><td><code>cargo test</code> / <code>cargo clippy</code></td><td>Rust-Tests &amp; Lints (in <code>src-tauri/</code>)</td></tr>
+          </table>
+          <p><strong>Quality Gates:</strong> Pre-Commit (Husky + lint-staged) führt <code>tsc --noEmit</code> + <code>eslint</code>
+            für TS sowie <code>cargo fmt --check</code> + <code>cargo check</code> für Rust aus. Die GitHub-Actions-CI
+            (<code>ci.yml</code>) läuft Lint, Frontend-Build (inkl. Typecheck), Vitest-Coverage, <code>cargo clippy</code>,
+            <code>cargo fmt</code> und <code>cargo test</code>. <code>release.yml</code> baut signierte Installer auf Tag-Push.</p>
+        </section>
+
+        <footer>
+          AgenticExplorer Developer Documentation · App-Version 1.6.32 · Stand 2026-05-27 ·
+          8 Sektionen inkl. UI-Flow-Referenz (5) &amp; 9 Laufzeit-Diagrammen (6) ·
+          Diagramme: Mermaid.js · Diese Datei ist self-contained — einfach im Browser öffnen.
+        </footer>
+      </main>
+    </div>
+
+    <div id="zoom-overlay">
+      <button class="zoom-close" type="button">Schliessen · ESC</button>
+      <div id="zoom-stage"></div>
+      <div class="zoom-hint">Mausrad: Zoom &nbsp;·&nbsp; Ziehen: Verschieben &nbsp;·&nbsp; Doppelklick: Zuruecksetzen</div>
+    </div>
+
+    <script>
+      // Diagramm-Quelltexte sichern — nötig, um beim Theme-Wechsel neu zu rendern.
+      const SOURCES = [...document.querySelectorAll(".diagram .mermaid")].map(
+        (el) => el.textContent
+      );
+
+      const darkVars = {
+        background: "#16191b",
+        primaryColor: "#1c2023",
+        primaryBorderColor: "#2dd4bf",
+        primaryTextColor: "#d4d8da",
+        lineColor: "#5b6266",
+        secondaryColor: "#143a36",
+        tertiaryColor: "#16191b",
+        clusterBkg: "#16191b",
+        clusterBorder: "#2b3236",
+        fontFamily: "JetBrains Mono, Consolas, monospace",
+      };
+      const lightVars = {
+        background: "#f4f6f7",
+        primaryColor: "#ffffff",
+        primaryBorderColor: "#0d9488",
+        primaryTextColor: "#1a1d1e",
+        lineColor: "#7a8186",
+        secondaryColor: "#d5efec",
+        tertiaryColor: "#eef1f2",
+        clusterBkg: "#eef1f2",
+        clusterBorder: "#d4dadc",
+        noteBkgColor: "#d5efec",
+        noteTextColor: "#1a1d1e",
+        noteBorderColor: "#0d9488",
+        actorBkg: "#ffffff",
+        actorBorder: "#0d9488",
+        actorTextColor: "#1a1d1e",
+        signalColor: "#5b6266",
+        signalTextColor: "#1a1d1e",
+        labelBoxBkgColor: "#ffffff",
+        labelBoxBorderColor: "#0d9488",
+        labelTextColor: "#1a1d1e",
+        fontFamily: "JetBrains Mono, Consolas, monospace",
+      };
+
+      function isDark() {
+        return document.documentElement.dataset.theme === "dark";
+      }
+
+      // Diagramme passend zum aktuellen Theme (neu) rendern.
+      function renderDiagrams() {
+        const dark = isDark();
+        document.querySelectorAll(".diagram .mermaid").forEach((el, i) => {
+          el.removeAttribute("data-processed");
+          el.textContent = SOURCES[i];
+        });
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: dark ? "dark" : "default",
+          themeVariables: dark ? darkVars : lightVars,
+          sequence: { useMaxWidth: true },
+          flowchart: { useMaxWidth: true, htmlLabels: true },
+        });
+        return mermaid.run();
+      }
+
+      function applyTheme(theme) {
+        document.documentElement.dataset.theme = theme;
+        try {
+          localStorage.setItem("ae-doc-theme", theme);
+        } catch (e) {
+          /* localStorage bei file:// evtl. gesperrt — ignorieren */
+        }
+        document.getElementById("theme-toggle").textContent =
+          theme === "dark" ? "Hell" : "Dunkel";
+      }
+
+      // Default: hell. Eine gespeicherte Wahl gewinnt.
+      let savedTheme = "light";
+      try {
+        savedTheme = localStorage.getItem("ae-doc-theme") || "light";
+      } catch (e) {
+        /* ignorieren */
+      }
+      applyTheme(savedTheme);
+
+      document.getElementById("theme-toggle").addEventListener("click", () => {
+        closeZoom();
+        applyTheme(isDark() ? "light" : "dark");
+        renderDiagrams();
+      });
+
+      renderDiagrams().then(setupZoom);
+
+      /* ---- Zoom: SVG-Resize statt CSS-scale → gestochen scharfer Text ---- */
+      const overlay = document.getElementById("zoom-overlay");
+      const stage = document.getElementById("zoom-stage");
+      let activeSvg = null;
+      let activeHome = null;
+      let baseW = 0;
+      let baseH = 0;
+      let scale = 1;
+      let tx = 0;
+      let ty = 0;
+      let dragging = false;
+      let startX = 0;
+      let startY = 0;
+
+      function apply() {
+        stage.style.transform = "translate(" + tx + "px," + ty + "px)";
+        // Zoom = echte SVG-Breite ändern → Vektor wird neu gerastert, kein Pixelmatsch.
+        if (activeSvg) activeSvg.style.width = baseW * scale + "px";
+      }
+
+      function openZoom(diagram) {
+        if (activeSvg) return; // bereits ein Diagramm offen
+        const svg = diagram.querySelector("svg");
+        if (!svg) return;
+        // Original-SVG verschieben (kein Klon) — bewahrt Mermaids id-skopierte Styles.
+        activeSvg = svg;
+        activeHome = svg.parentElement;
+        svg.dataset.prevMaxWidth = svg.style.maxWidth || "";
+        svg.dataset.prevWidth = svg.style.width || "";
+        svg.dataset.prevHeight = svg.style.height || "";
+        const r = svg.getBoundingClientRect();
+        baseW = r.width;
+        baseH = r.height;
+        scale = 1;
+        svg.style.maxWidth = "none";
+        svg.style.height = "auto";
+        stage.appendChild(svg);
+        overlay.classList.add("open");
+        tx = (overlay.clientWidth - baseW) / 2;
+        ty = (overlay.clientHeight - baseH) / 2;
+        apply();
+      }
+
+      function closeZoom() {
+        if (activeSvg) {
+          activeSvg.style.maxWidth = activeSvg.dataset.prevMaxWidth || "";
+          activeSvg.style.width = activeSvg.dataset.prevWidth || "";
+          activeSvg.style.height = activeSvg.dataset.prevHeight || "";
+          activeHome.appendChild(activeSvg);
+          activeSvg = null;
+          activeHome = null;
+        }
+        overlay.classList.remove("open");
+      }
+
+      function resetZoom() {
+        if (!activeSvg) return;
+        scale = 1;
+        tx = (overlay.clientWidth - baseW) / 2;
+        ty = (overlay.clientHeight - baseH) / 2;
+        apply();
+      }
+
+      function setupZoom() {
+        document.querySelectorAll(".diagram").forEach((d) => {
+          const btn = document.createElement("button");
+          btn.className = "zoom-btn";
+          btn.type = "button";
+          btn.textContent = "Vergroessern";
+          d.appendChild(btn);
+          d.addEventListener("click", () => openZoom(d));
+        });
+
+        overlay.addEventListener(
+          "wheel",
+          (e) => {
+            if (!activeSvg) return;
+            e.preventDefault();
+            const next = Math.min(
+              8,
+              Math.max(0.3, scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15))
+            );
+            const k = next / scale;
+            // Zoom zum Cursor: Punkt unter der Maus bleibt fix.
+            tx = e.clientX * (1 - k) + k * tx;
+            ty = e.clientY * (1 - k) + k * ty;
+            scale = next;
+            apply();
+          },
+          { passive: false }
+        );
+
+        overlay.addEventListener("mousedown", (e) => {
+          if (e.target.closest(".zoom-close")) return;
+          dragging = true;
+          startX = e.clientX - tx;
+          startY = e.clientY - ty;
+          overlay.classList.add("grabbing");
+        });
+        window.addEventListener("mousemove", (e) => {
+          if (!dragging) return;
+          tx = e.clientX - startX;
+          ty = e.clientY - startY;
+          apply();
+        });
+        window.addEventListener("mouseup", () => {
+          dragging = false;
+          overlay.classList.remove("grabbing");
+        });
+        stage.addEventListener("dblclick", resetZoom);
+        overlay
+          .querySelector(".zoom-close")
+          .addEventListener("click", closeZoom);
+        overlay.addEventListener("click", (e) => {
+          if (e.target === overlay) closeZoom();
+        });
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape" && overlay.classList.contains("open"))
+            closeZoom();
+        });
+      }
+    </script>
+  </body>
+</html>

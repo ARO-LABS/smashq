@@ -1,0 +1,96 @@
+# implement-feature Workflow
+# Deklarative Version des /implement Skills
+# Issue -> Analyse -> Branch -> Implement -> Test -> Review -> PR
+
+name: implement-feature
+description: "Issue analysieren, implementieren, testen und PR erstellen"
+version: 1
+
+inputs:
+  - name: issue_id
+    type: string
+    required: true
+    description: "GitHub Issue Nummer (z.B. 151)"
+  - name: branch_prefix
+    type: select
+    default: feat
+    options:
+      - feat
+      - fix
+      - chore
+      - refactor
+
+steps:
+  - id: analyze
+    type: agent
+    model: opus
+    prompt: "Analysiere Issue #{issue_id}. Lies den Issue-Body, verstehe Kontext und Akzeptanzkriterien. Erstelle einen Implementierungsplan mit konkreten Dateien und Aenderungen."
+    read_only: true
+    output: plan
+
+  - id: implement
+    type: agent
+    model: sonnet
+    prompt: "Implementiere nach Plan: {plan}. Halte dich an die Coding Conventions aus CLAUDE.md."
+    worktree: true
+    depends_on:
+      - analyze
+
+  - id: test
+    type: agent
+    model: sonnet
+    prompt: "Schreibe Tests fuer die Aenderungen. Mindestens 1 Happy-Path + 1 Edge-Case pro Feature."
+    worktree: true
+    depends_on:
+      - implement
+
+  - id: typecheck-gate
+    type: gate
+    command: "npx tsc --noEmit"
+    on_failure: fail
+    timeout_secs: 120
+    depends_on:
+      - test
+
+  - id: test-gate
+    type: gate
+    command: "npm run test"
+    on_failure: retry
+    max_retries: 2
+    timeout_secs: 300
+    depends_on:
+      - test
+
+  - id: build-gate
+    type: gate
+    command: "npm run build"
+    on_failure: fail
+    timeout_secs: 180
+    depends_on:
+      - typecheck-gate
+      - test-gate
+
+  - id: review
+    type: agent
+    model: opus
+    prompt: "Review der Aenderungen: Code Quality, Security, Conventions. Pruefe die 5-Fragen-Checkliste fuer neue Tauri Commands."
+    read_only: true
+    depends_on:
+      - build-gate
+
+  - id: create-pr
+    type: action
+    command: "gh pr create --title '{branch_prefix}(pipeline): {title}' --body '{summary}'"
+    capture_output: true
+    output: pr_url
+    timeout_secs: 60
+    depends_on:
+      - review
+    condition: "review.approved == true"
+
+metadata:
+  author: hossoOG
+  tags:
+    - feature
+    - implementation
+  estimated_duration_mins: 45

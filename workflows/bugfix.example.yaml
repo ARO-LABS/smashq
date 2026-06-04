@@ -1,0 +1,75 @@
+# bugfix Workflow
+# Deklarative Version des /bugfix Skills
+# Bug-Report -> Investigate -> Regression-Test -> Fix -> QA -> PR
+
+name: bugfix
+description: "Bug untersuchen, Regression-Test schreiben, fixen und PR erstellen"
+version: 1
+
+inputs:
+  - name: issue_id
+    type: string
+    required: true
+    description: "GitHub Issue Nummer des Bug-Reports"
+  - name: severity
+    type: select
+    default: "medium"
+    options:
+      - critical
+      - high
+      - medium
+      - low
+
+steps:
+  - id: investigate
+    type: agent
+    model: opus
+    prompt: "Untersuche Bug #{issue_id}. Lies Logs, finde die Root Cause. Keine temporaeren Fixes."
+    read_only: true
+    output: analysis
+
+  - id: regression-test
+    type: agent
+    model: sonnet
+    prompt: "Schreibe einen Regression-Test der den Bug reproduziert. Test MUSS fehlschlagen bevor der Fix."
+    depends_on:
+      - investigate
+
+  - id: fix
+    type: agent
+    model: sonnet
+    prompt: "Fixe den Bug basierend auf Analyse: {analysis}. Root Cause beheben, nicht Symptom."
+    depends_on:
+      - regression-test
+
+  - id: test-gate
+    type: gate
+    command: "npm run test"
+    on_failure: retry
+    max_retries: 2
+    timeout_secs: 300
+    depends_on:
+      - fix
+
+  - id: build-gate
+    type: gate
+    command: "npm run build"
+    on_failure: fail
+    timeout_secs: 180
+    depends_on:
+      - test-gate
+
+  - id: create-pr
+    type: action
+    command: "gh pr create --title 'fix: {title} (#{issue_id})' --body '{summary}'"
+    capture_output: true
+    output: pr_url
+    timeout_secs: 60
+    depends_on:
+      - build-gate
+
+metadata:
+  author: hossoOG
+  tags:
+    - bugfix
+  estimated_duration_mins: 30

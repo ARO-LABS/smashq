@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  # Windows ist der kritische Pfad: baut die .exe, signiert und schreibt
+  # latest.json. Verhaelt sich identisch zur bisherigen Single-Job-Version und
+  # exponiert nur zusaetzlich die releaseId, damit der Mac-Job DASSELBE Release
+  # wiederverwendet (kein paralleler create-release-Race mehr).
+  build-windows:
+    runs-on: windows-latest
+    outputs:
+      release_id: ${{ steps.tauri.outputs.releaseId }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95.0"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Build Windows app and create release
+        id: tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          UPDATER_GITHUB_TOKEN: ${{ secrets.UPDATER_GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Smashq ${{ github.ref_name }}"
+          releaseBody: |
+            Siehe CHANGELOG.md fuer Details.
+
+            ---
+            macOS (unsigniert): Falls beim ersten Start "App ist beschaedigt"
+            erscheint, im Terminal die Quarantaene entfernen:
+            xattr -dr com.apple.quarantine /Applications/Smashq.app
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
+
+  # Mac ist best-effort: laeuft NACH Windows (needs:), laedt die universal DMG in
+  # dasselbe Release. Schlaegt er fehl, fehlt nur die DMG - das Windows-Release
+  # plus Updater sind da bereits publiziert und voellig unberuehrt.
+  build-macos:
+    needs: build-windows
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95.0"
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Build macOS universal DMG
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Mac haengt sich an das von build-windows erzeugte Release.
+          releaseId: ${{ needs.build-windows.outputs.release_id }}
+          # --bundles dmg: nur der Installer. --config: createUpdaterArtifacts hart
+          # auf false (tauri.conf.json bleibt unangetastet) -> der Mac-Job
+          # produziert garantiert KEINE Updater-Artefakte. Zusammen mit dem
+          # fehlenden TAURI_SIGNING_*-env ist das doppelte Absicherung.
+          args: '--target universal-apple-darwin --bundles dmg --config {"bundle":{"createUpdaterArtifacts":false}}'
+          includeUpdaterJson: false

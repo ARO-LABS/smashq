@@ -1,0 +1,56 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Smashq",
+  "version": "1.0.0",
+  "identifier": "de.aj-labs.smashq",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Smashq",
+        "width": 1440,
+        "height": 900,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' ipc: http://ipc.localhost https://api.github.com https://api.anthropic.com https://api.openai.com https://www.googleapis.com https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "displayLanguageSelector": false,
+        "installMode": "currentUser",
+        "startMenuFolder": "Smashq"
+      }
+    },
+    "createUpdaterArtifacts": true,
+    "shortDescription": "Smashq - Manage and monitor Claude CLI sessions"
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcyMDQ0N0NBMzE5ODBDODIKUldTQ0RKZ3h5a2NFY3FmRWhOU2I2eXBTK3BXTnZ6OGdyZjZiQ2hFSVc1a0dCOFMyYlBlNGtJUi8K",
+      "endpoints": [
+        "https://github.com/ARO-LABS/smashq/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

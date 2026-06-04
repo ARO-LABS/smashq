@@ -1,0 +1,133 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { NewSessionDefaultsPanel } from "./NewSessionDefaultsPanel";
+import { useSettingsStore } from "../../store/settingsStore";
+
+const openMock = vi.fn();
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: (...args: unknown[]) => openMock(...args),
+}));
+
+describe("NewSessionDefaultsPanel", () => {
+  beforeEach(() => {
+    openMock.mockReset();
+    useSettingsStore.setState({
+      defaultShell: "auto",
+      defaultProjectPath: "",
+    });
+  });
+
+  it("persists the shell selection when changed", () => {
+    render(<NewSessionDefaultsPanel />);
+    const select = screen.getByLabelText(/Standard-Shell/i) as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "powershell" } });
+    expect(useSettingsStore.getState().defaultShell).toBe("powershell");
+  });
+
+  it("writes the picked folder to defaultProjectPath", async () => {
+    openMock.mockResolvedValue("C:/work/repo");
+    render(<NewSessionDefaultsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: /Wählen/i }));
+    await waitFor(() => {
+      expect(useSettingsStore.getState().defaultProjectPath).toBe("C:/work/repo");
+    });
+  });
+
+  it("does nothing when the picker is cancelled", async () => {
+    openMock.mockResolvedValue(null);
+    render(<NewSessionDefaultsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: /Wählen/i }));
+    await waitFor(() => {
+      expect(openMock).toHaveBeenCalled();
+    });
+    expect(useSettingsStore.getState().defaultProjectPath).toBe("");
+  });
+
+  it("offers a Leeren button when a default is set", () => {
+    useSettingsStore.setState({ defaultProjectPath: "C:/old/path" });
+    render(<NewSessionDefaultsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: /Leeren/i }));
+    expect(useSettingsStore.getState().defaultProjectPath).toBe("");
+  });
+
+  it("renders all shell options", () => {
+    render(<NewSessionDefaultsPanel />);
+    const select = screen.getByLabelText(/Standard-Shell/i) as HTMLSelectElement;
+    const values = Array.from(select.options).map((o) => o.value);
+    expect(values).toEqual(["auto", "powershell", "cmd", "bash", "zsh"]);
+  });
+
+  it("reflects the stored shell value in the select", () => {
+    useSettingsStore.setState({ defaultShell: "zsh" });
+    render(<NewSessionDefaultsPanel />);
+    const select = screen.getByLabelText(/Standard-Shell/i) as HTMLSelectElement;
+    expect(select.value).toBe("zsh");
+  });
+
+  it("shows placeholder text when no default path is set", () => {
+    render(<NewSessionDefaultsPanel />);
+    expect(screen.getByText("Kein Ordner gesetzt")).toBeTruthy();
+  });
+
+  it("shows the hint paragraph when no default path is set", () => {
+    render(<NewSessionDefaultsPanel />);
+    expect(
+      screen.getByText(/Ohne Default öffnet der Button beim ersten Klick/i),
+    ).toBeTruthy();
+  });
+
+  it("shows Leeren button and hides hint when a default path is set", () => {
+    useSettingsStore.setState({ defaultProjectPath: "C:/work/repo" });
+    render(<NewSessionDefaultsPanel />);
+    expect(screen.getByRole("button", { name: /Leeren/i })).toBeTruthy();
+    expect(screen.queryByText(/Ohne Default öffnet der Button/i)).toBeNull();
+  });
+
+  it("displays the configured default path", () => {
+    useSettingsStore.setState({ defaultProjectPath: "C:/projects/myapp" });
+    render(<NewSessionDefaultsPanel />);
+    expect(screen.getByText("C:/projects/myapp")).toBeTruthy();
+  });
+
+  it("passes directory:true to the folder picker", async () => {
+    openMock.mockResolvedValue("C:/some/dir");
+    render(<NewSessionDefaultsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: /Wählen/i }));
+    await waitFor(() => {
+      expect(openMock).toHaveBeenCalledWith(
+        expect.objectContaining({ directory: true, multiple: false }),
+      );
+    });
+  });
+
+  it("ignores a non-string picker result", async () => {
+    openMock.mockResolvedValue(["C:/a", "C:/b"]);
+    render(<NewSessionDefaultsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: /Wählen/i }));
+    await waitFor(() => {
+      expect(openMock).toHaveBeenCalled();
+    });
+    expect(useSettingsStore.getState().defaultProjectPath).toBe("");
+  });
+
+  it("does not crash when the picker rejects", async () => {
+    openMock.mockRejectedValue(new Error("dialog failed"));
+    render(<NewSessionDefaultsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: /Wählen/i }));
+    await waitFor(() => {
+      expect(openMock).toHaveBeenCalled();
+    });
+    expect(useSettingsStore.getState().defaultProjectPath).toBe("");
+  });
+
+  it("re-enables the Wählen button after a successful pick", async () => {
+    openMock.mockResolvedValue("C:/done");
+    render(<NewSessionDefaultsPanel />);
+    const btn = screen.getByRole("button", { name: /Wählen/i }) as HTMLButtonElement;
+    fireEvent.click(btn);
+    await waitFor(() => {
+      expect(useSettingsStore.getState().defaultProjectPath).toBe("C:/done");
+    });
+    expect(btn.disabled).toBe(false);
+  });
+});

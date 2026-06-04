@@ -1,0 +1,513 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { SessionCard } from "./SessionCard";
+import { useSessionStore } from "../../store/sessionStore";
+import type { ClaudeSession } from "../../store/sessionStore";
+import { invoke } from "@tauri-apps/api/core";
+
+// ── Mocks ─────────────────────────────────────────────────────────────
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn(),
+}));
+
+const mockedInvoke = vi.mocked(invoke);
+
+// ── Helpers ───────────────────────────────────────────────────────────
+
+function makeSession(overrides: Partial<ClaudeSession> = {}): ClaudeSession {
+  const now = Date.now();
+  return {
+    id: "session-1",
+    title: "Test Session",
+    folder: "C:/Projects/foo/bar/baz",
+    shell: "powershell",
+    status: "running",
+    createdAt: now - 65_000, // 1:05
+    finishedAt: null,
+    exitCode: null,
+    lastOutputAt: now - 2_000, // recent → active
+    lastOutputSnippet: "hello output",
+    ...overrides,
+  };
+}
+
+function renderCard(
+  session: ClaudeSession,
+  overrides: {
+    isActive?: boolean;
+    onClick?: (id: string) => void;
+    onClose?: (id: string) => void;
+  } = {},
+) {
+  return render(
+    <SessionCard
+      session={session}
+      isActive={overrides.isActive ?? false}
+      onClick={overrides.onClick ?? vi.fn()}
+      onClose={overrides.onClose ?? vi.fn()}
+    />,
+  );
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────
+
+describe("SessionCard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders title and shortened folder path (status-dot removed per user request)", () => {
+    const session = makeSession({
+      title: "My Session",
+      folder: "C:/Projects/foo/bar/baz",
+    });
+    renderCard(session);
+
+    expect(screen.getByText("My Session")).toBeTruthy();
+    // folderLabel("C:/Projects/foo/bar/baz") → "baz" (last segment, quiet-rail suffix)
+    expect(screen.getByText("baz")).toBeTruthy();
+    // Full path must NOT appear as a text node
+    expect(screen.queryByText("C:/Projects/foo/bar/baz")).toBeNull();
+  });
+
+  it("hides time-chip for running+active (no sidebar signal by design — P7.5)", () => {
+    renderCard(makeSession({ status: "running" }));
+    // Active sessions: sidebar intentionally signal-less per P7.5 — status comes
+    // from the terminal content itself, not from a redundant chip/dot.
+    expect(screen.queryByText(/Läuft seit/)).toBeNull();
+  });
+
+  it("renders no status text chip for done status (quiet-rail row has no time display)", () => {
+    const now = Date.now();
+    const { container } = renderCard(
+      makeSession({
+        status: "done",
+        createdAt: now - 120_000,
+        finishedAt: now - 60_000,
+      }),
+    );
+    // Quiet-rail row: no status text chips — the dot + title carry all identity.
+    expect(screen.queryByText(/Fertig/)).toBeNull();
+    expect(container.querySelector("svg.text-success")).toBeNull();
+  });
+
+  it("renders no status text chip for error status (quiet-rail row has no time display)", () => {
+    const { container } = renderCard(
+      makeSession({ status: "error", exitCode: 42 }),
+    );
+    // Quiet-rail row: no status text chips.
+    expect(screen.queryByText(/Fehler/)).toBeNull();
+    expect(container.querySelector("svg.text-error")).toBeNull();
+  });
+
+  it("calls onClick with id on card click and onClose on close button", () => {
+    const onClick = vi.fn();
+    const onClose = vi.fn();
+    renderCard(makeSession({ id: "sess-99" }), { onClick, onClose });
+
+    // Click card body (title) — should trigger onClick
+    fireEvent.click(screen.getByText("Test Session"));
+    expect(onClick).toHaveBeenCalledWith("sess-99");
+    expect(onClose).not.toHaveBeenCalled();
+
+    // Click close button — should trigger onClose, NOT re-trigger onClick
+    // (stopPropagation verified via call count unchanged)
+    const closeBtn = screen.getByLabelText("Session schließen");
+    fireEvent.click(closeBtn);
+    expect(onClose).toHaveBeenCalledWith("sess-99");
+    expect(onClick).toHaveBeenCalledTimes(1); // still 1, not 2
+  });
+
+  it("renders no dot for starting status (status-dot removed in P7.5 cleanup)", () => {
+    const { container } = renderCard(makeSession({ status: "starting" }));
+    expect(container.querySelector(".status-breathe-animation")).toBeNull();
+  });
+
+  // ── Rename Tests ─────────────────────────────────────────────────────
+
+  it("enters edit mode on double-click and commits on Enter", () => {
+    const session = makeSession({ id: "sess-rename", title: "Old Title" });
+    useSessionStore.getState().addSession({
+      id: session.id,
+      title: session.title,
+      folder: session.folder,
+      shell: session.shell,
+    });
+
+    renderCard(session);
+
+    // Double-click title to enter edit mode
+    fireEvent.doubleClick(screen.getByText("Old Title"));
+    const input = screen.getByLabelText("Session umbenennen");
+    expect(input).toBeTruthy();
+    expect((input as HTMLInputElement).value).toBe("Old Title");
+
+    // Type new name and press Enter
+    fireEvent.change(input, { target: { value: "New Title" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    // Input should disappear, store should be updated
+    expect(screen.queryByLabelText("Session umbenennen")).toBeNull();
+    const updated = useSessionStore.getState().sessions.find((s) => s.id === "sess-rename");
+    expect(updated?.title).toBe("New Title");
+  });
+
+  it("cancels rename on Escape without changing title", () => {
+    const session = makeSession({ id: "sess-esc", title: "Keep This" });
+    useSessionStore.getState().addSession({
+      id: session.id,
+      title: session.title,
+      folder: session.folder,
+      shell: session.shell,
+    });
+
+    renderCard(session);
+
+    fireEvent.doubleClick(screen.getByText("Keep This"));
+    const input = screen.getByLabelText("Session umbenennen");
+    fireEvent.change(input, { target: { value: "Changed" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    // Input gone, title unchanged in store
+    expect(screen.queryByLabelText("Session umbenennen")).toBeNull();
+    const stored = useSessionStore.getState().sessions.find((s) => s.id === "sess-esc");
+    expect(stored?.title).toBe("Keep This");
+  });
+
+  // ── Diff-Button visibility / invoke ─────────────────────────────────
+
+  describe("Diff button", () => {
+    // Seit Option-3-Reloaded (2026-05-27) ist der Sichtbarkeits-Vertrag des
+    // DiffActionButton: Git-Repo ja → immer da; Farbe spiegelt hasDiff. Non-
+    // Git → Komponente rendert null. Die Click-Strategie wird in
+    // DiffActionButton.test.tsx getestet — hier nur Card-Integration.
+
+    it("renders Diff button on git repos regardless of hasDiff state", () => {
+      // Session muss im Store sein, damit DiffActionButton sie ueber den
+      // Selector findet (kein Prop-Drilling — er liest direkt aus dem Store).
+      const sessionDirty = makeSession({ id: "sess-dirty", isGitRepo: true, hasDiff: true });
+      useSessionStore.setState({ sessions: [sessionDirty] });
+      const { unmount: u1 } = renderCard(sessionDirty);
+      expect(screen.getByLabelText("Diff anzeigen")).toBeTruthy();
+      u1();
+
+      const sessionClean = makeSession({ id: "sess-clean", isGitRepo: true, hasDiff: false });
+      useSessionStore.setState({ sessions: [sessionClean] });
+      const { unmount: u2 } = renderCard(sessionClean);
+      expect(screen.getByLabelText("Diff anzeigen")).toBeTruthy();
+      u2();
+
+      const sessionUnknown = makeSession({ id: "sess-unknown", isGitRepo: true });
+      useSessionStore.setState({ sessions: [sessionUnknown] });
+      renderCard(sessionUnknown);
+      expect(screen.getByLabelText("Diff anzeigen")).toBeTruthy();
+    });
+
+    it("omits Diff button on non-git sessions (no click target, no toast)", () => {
+      const session = makeSession({ id: "sess-non-git", isGitRepo: false });
+      useSessionStore.setState({ sessions: [session] });
+      renderCard(session);
+      expect(screen.queryByLabelText("Diff anzeigen")).toBeNull();
+    });
+
+    it("on click with hasDiff=true: invokes open_session_diff_window directly (1 IPC)", () => {
+      const session = makeSession({ id: "sess-known-dirty", isGitRepo: true, hasDiff: true });
+      useSessionStore.setState({ sessions: [session] });
+      mockedInvoke.mockResolvedValueOnce(undefined);
+      renderCard(session);
+      fireEvent.click(screen.getByLabelText("Diff anzeigen"));
+      expect(mockedInvoke).toHaveBeenCalledTimes(1);
+      expect(mockedInvoke).toHaveBeenCalledWith("open_session_diff_window", {
+        sessionId: "sess-known-dirty",
+      });
+    });
+  });
+
+  describe("displayId rendering", () => {
+    it("does not render the #displayId suffix (user-irrelevant internal id)", () => {
+      const session = makeSession({
+        title: "Foo",
+        displayId: "3K2X",
+      });
+      renderCard(session);
+
+      // Title visible, internal displayId suffix never shown to the user
+      expect(screen.getByText("Foo")).toBeInTheDocument();
+      expect(screen.queryByText(/#3K2X/)).toBeNull();
+    });
+
+    it("omits suffix when displayId is absent (backward-compat for legacy sessions)", () => {
+      const session = makeSession({
+        title: "old-session",
+        // displayId intentionally undefined
+      });
+      renderCard(session);
+
+      expect(screen.getByText("old-session")).toBeTruthy();
+      // No # marker present in DOM at all
+      expect(screen.queryByText(/#/)).toBeNull();
+    });
+
+    it("inline-edit pre-fills just the plain title (no #displayId suffix)", () => {
+      const session = makeSession({
+        id: "sess-edit-id",
+        title: "agentic-dashboard",
+        displayId: "3K2X",
+      });
+      useSessionStore.setState({ sessions: [], activeSessionId: null });
+      useSessionStore.getState().addSession({
+        id: session.id,
+        title: session.title,
+        displayId: session.displayId,
+        folder: session.folder,
+        shell: session.shell,
+      });
+      renderCard(session);
+
+      fireEvent.doubleClick(screen.getByText("agentic-dashboard"));
+      const input = screen.getByLabelText("Session umbenennen") as HTMLInputElement;
+      expect(input.value).toBe("agentic-dashboard");
+    });
+  });
+
+  // ── Status dot behavior (quiet-rail row) ────────────────────────────
+
+  describe("status dot behavior", () => {
+    it("renders no status text chips — quiet-rail row has no TimeDisplay", () => {
+      // TimeDisplay is removed in the quiet-rail redesign. The dot + pulse carry status.
+      const now = Date.now();
+      for (const status of ["running", "starting", "waiting", "done", "error"] as const) {
+        const { unmount } = renderCard(makeSession({ status, lastOutputAt: now - 60_000 }));
+        expect(screen.queryByText(/Idle seit/)).toBeNull();
+        expect(screen.queryByText(/Wartet auf Input/)).toBeNull();
+        expect(screen.queryByText(/Fertig/)).toBeNull();
+        expect(screen.queryByText(/Fehler/)).toBeNull();
+        unmount();
+      }
+    });
+
+    it("pulsing dot for running status", () => {
+      const { container } = renderCard(makeSession({ status: "running" }));
+      const dot = container.querySelector("[data-testid='sess-dot']");
+      expect(dot?.className).toContain("animate-pulse");
+    });
+
+    it("pulsing dot for starting status", () => {
+      const { container } = renderCard(makeSession({ status: "starting" }));
+      const dot = container.querySelector("[data-testid='sess-dot']");
+      expect(dot?.className).toContain("animate-pulse");
+    });
+
+    it("no pulse for done status", () => {
+      const { container } = renderCard(makeSession({ status: "done" }));
+      const dot = container.querySelector("[data-testid='sess-dot']");
+      expect(dot?.className).not.toContain("animate-pulse");
+    });
+
+    it("no pulse for error status", () => {
+      const { container } = renderCard(makeSession({ status: "error" }));
+      const dot = container.querySelector("[data-testid='sess-dot']");
+      expect(dot?.className).not.toContain("animate-pulse");
+    });
+
+    it("dot turns error-colored for an errored session", () => {
+      const { container } = renderCard(makeSession({ folder: "C:/Projects/x", title: "t", status: "error" }));
+      const dot = container.querySelector("[data-testid='sess-dot']") as HTMLElement;
+      expect(dot.style.background).toContain("--color-error");
+    });
+
+    it("dot turns warning-colored for a waiting session", () => {
+      const { container } = renderCard(makeSession({ folder: "C:/Projects/x", title: "t", status: "waiting" }));
+      const dot = container.querySelector("[data-testid='sess-dot']") as HTMLElement;
+      expect(dot.style.background).toContain("--color-warning");
+    });
+
+    it("dot pulses for a running session and uses the project color", () => {
+      const { container } = renderCard(makeSession({ folder: "C:/Projects/x", title: "t", status: "running" }));
+      const dot = container.querySelector("[data-testid='sess-dot']") as HTMLElement;
+      expect(dot.className).toContain("animate-pulse");
+      expect(dot.style.background).toContain("oklch");
+    });
+
+    it("dot is dimmed for a done session", () => {
+      const { container } = renderCard(makeSession({ folder: "C:/Projects/x", title: "t", status: "done" }));
+      const dot = container.querySelector("[data-testid='sess-dot']") as HTMLElement;
+      expect(dot.className).toContain("opacity-40");
+    });
+  });
+
+  // ── Status dot removed (Concept-B P7.5 cleanup) ──────────────────────
+
+  describe("status dot is fully removed", () => {
+    it("renders no status indicator for any status — text-chip carries all state", () => {
+      const now = Date.now();
+      for (const status of ["running", "starting", "waiting", "done", "error"] as const) {
+        const { container, unmount } = renderCard(
+          makeSession({ status, lastOutputAt: now - 60_000 }),
+        );
+        expect(container.querySelector(".status-pulse-animation")).toBeNull();
+        expect(container.querySelector(".bg-info")).toBeNull();
+        expect(container.querySelector(".bg-warning")).toBeNull();
+        unmount();
+      }
+    });
+  });
+
+  it("shows the shortened project name as a muted suffix, not the full path", () => {
+    const session = makeSession({ folder: "C:/Projects/animetrackler", title: "anim", status: "running" });
+    renderCard(session);
+    expect(screen.getByText("animetrackler")).toBeInTheDocument();
+    expect(screen.queryByText("C:/Projects/animetrackler")).toBeNull();
+  });
+
+  // ── isActive / isInGrid styling ──────────────────────────────────────
+
+  describe("active and grid markers", () => {
+    it("applies active accent-tint styling when isActive=true", () => {
+      const { container } = renderCard(makeSession(), { isActive: true });
+      const card = container.querySelector(".cursor-pointer");
+      expect(card?.className).toContain("bg-accent-a10");
+      expect(card?.className).not.toContain("hover:bg-hover-overlay");
+    });
+
+    it("applies hover-overlay class at rest when isActive=false", () => {
+      const { container } = renderCard(makeSession(), { isActive: false });
+      const card = container.querySelector(".cursor-pointer");
+      expect(card?.className).toContain("hover:bg-hover-overlay");
+      expect(card?.className).not.toContain("bg-accent-a10");
+    });
+
+    it("renders grid marker icon when isInGrid=true", () => {
+      render(
+        <SessionCard
+          session={makeSession()}
+          isActive={false}
+          isInGrid
+          onClick={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      );
+      expect(screen.getByLabelText("Im Grid")).toBeTruthy();
+    });
+
+    it("omits grid marker icon when isInGrid is not set", () => {
+      renderCard(makeSession());
+      expect(screen.queryByLabelText("Im Grid")).toBeNull();
+    });
+  });
+
+  // ── Hover-action buttons ─────────────────────────────────────────────
+
+  describe("hover action buttons", () => {
+    it("invokes open_folder_in_explorer with the session folder", () => {
+      mockedInvoke.mockResolvedValueOnce(undefined);
+      renderCard(makeSession({ folder: "C:/Projects/demo" }));
+      fireEvent.click(screen.getByLabelText("Ordner im Explorer öffnen"));
+      expect(mockedInvoke).toHaveBeenCalledWith("open_folder_in_explorer", {
+        path: "C:/Projects/demo",
+      });
+    });
+
+    it("invokes open_terminal_in_folder with the session folder", () => {
+      mockedInvoke.mockResolvedValueOnce(undefined);
+      renderCard(makeSession({ folder: "C:/Projects/demo" }));
+      fireEvent.click(screen.getByLabelText("Terminal im Ordner öffnen"));
+      expect(mockedInvoke).toHaveBeenCalledWith("open_terminal_in_folder", {
+        path: "C:/Projects/demo",
+      });
+    });
+
+    it("does not trigger onClick when a hover-action button is clicked", () => {
+      const onClick = vi.fn();
+      mockedInvoke.mockResolvedValue(undefined);
+      renderCard(makeSession(), { onClick });
+      fireEvent.click(screen.getByLabelText("Ordner im Explorer öffnen"));
+      fireEvent.click(screen.getByLabelText("Terminal im Ordner öffnen"));
+      expect(onClick).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Rename edge cases ────────────────────────────────────────────────
+
+  describe("rename edge cases", () => {
+    it("does not rename when committed value is empty/whitespace", () => {
+      const session = makeSession({ id: "sess-empty", title: "Stay Name" });
+      useSessionStore.setState({ sessions: [], activeSessionId: null });
+      useSessionStore.getState().addSession({
+        id: session.id,
+        title: session.title,
+        folder: session.folder,
+        shell: session.shell,
+      });
+      renderCard(session);
+
+      fireEvent.doubleClick(screen.getByText("Stay Name"));
+      const input = screen.getByLabelText("Session umbenennen");
+      fireEvent.change(input, { target: { value: "   " } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      const stored = useSessionStore.getState().sessions.find((s) => s.id === "sess-empty");
+      expect(stored?.title).toBe("Stay Name");
+    });
+
+    it("does not rename on a no-op edit (unchanged value)", () => {
+      const session = makeSession({ id: "sess-noop", title: "Same Title" });
+      useSessionStore.setState({ sessions: [], activeSessionId: null });
+      useSessionStore.getState().addSession({
+        id: session.id,
+        title: session.title,
+        folder: session.folder,
+        shell: session.shell,
+      });
+      const renameSpy = vi.spyOn(useSessionStore.getState(), "renameSession");
+      renderCard(session);
+
+      fireEvent.doubleClick(screen.getByText("Same Title"));
+      const input = screen.getByLabelText("Session umbenennen");
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      expect(renameSpy).not.toHaveBeenCalled();
+      renameSpy.mockRestore();
+    });
+
+    it("commits rename on blur", () => {
+      const session = makeSession({ id: "sess-blur", title: "Before Blur" });
+      useSessionStore.setState({ sessions: [], activeSessionId: null });
+      useSessionStore.getState().addSession({
+        id: session.id,
+        title: session.title,
+        folder: session.folder,
+        shell: session.shell,
+      });
+      renderCard(session);
+
+      fireEvent.doubleClick(screen.getByText("Before Blur"));
+      const input = screen.getByLabelText("Session umbenennen");
+      fireEvent.change(input, { target: { value: "After Blur" } });
+      fireEvent.blur(input);
+
+      expect(screen.queryByLabelText("Session umbenennen")).toBeNull();
+      const stored = useSessionStore.getState().sessions.find((s) => s.id === "sess-blur");
+      expect(stored?.title).toBe("After Blur");
+    });
+
+    it("does not trigger onClick when clicking inside the edit input", () => {
+      const onClick = vi.fn();
+      const session = makeSession({ id: "sess-input-click", title: "Click Guard" });
+      useSessionStore.setState({ sessions: [], activeSessionId: null });
+      useSessionStore.getState().addSession({
+        id: session.id,
+        title: session.title,
+        folder: session.folder,
+        shell: session.shell,
+      });
+      renderCard(session, { onClick });
+
+      fireEvent.doubleClick(screen.getByText("Click Guard"));
+      const input = screen.getByLabelText("Session umbenennen");
+      fireEvent.click(input);
+      expect(onClick).not.toHaveBeenCalled();
+    });
+  });
+});

@@ -1,0 +1,65 @@
+# review Workflow
+# Deklarative Version des /review Skills
+# Code Review mit Security + Quality + Conventions Checks
+
+name: code-review
+description: "Code Review: Changes analysieren, Security + Quality + Conventions pruefen"
+version: 1
+
+inputs:
+  - name: pr_number
+    type: string
+    required: true
+    description: "Pull Request Nummer"
+
+steps:
+  - id: fetch-changes
+    type: action
+    command: "gh pr diff {pr_number}"
+    capture_output: true
+    output: diff
+
+  - id: security-review
+    type: agent
+    model: opus
+    prompt: "Security-Review: Pruefe Tauri 5-Fragen-Checkliste (Input-Validierung, Path Traversal, Shell Injection, Timeouts, Fehlerstruktur). Diff: {diff}"
+    read_only: true
+    output: security_findings
+    depends_on:
+      - fetch-changes
+
+  - id: quality-review
+    type: agent
+    model: sonnet
+    prompt: "Code Quality Review: DRY, Performance, Null-Safety. Diff: {diff}"
+    read_only: true
+    output: quality_findings
+    depends_on:
+      - fetch-changes
+
+  - id: conventions-review
+    type: agent
+    model: sonnet
+    prompt: "Conventions Review: Naming, Imports, Commit Messages, Coding Standards. Diff: {diff}"
+    read_only: true
+    output: conventions_findings
+    depends_on:
+      - fetch-changes
+
+  - id: synthesize
+    type: agent
+    model: opus
+    prompt: "Fasse Review-Ergebnisse zusammen. Security: {security_findings}. Quality: {quality_findings}. Conventions: {conventions_findings}. Erstelle finales Review."
+    read_only: true
+    output: review_summary
+    depends_on:
+      - security-review
+      - quality-review
+      - conventions-review
+
+metadata:
+  author: hossoOG
+  tags:
+    - review
+    - quality
+  estimated_duration_mins: 15

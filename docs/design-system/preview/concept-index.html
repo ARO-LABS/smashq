@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AgenticExplorer — Konzept-Vergleich A · B · C</title>
+  <style>
+    :root {
+      --bg: #0E0E10;
+      --surface: #16161A;
+      --raised: #1B1B20;
+      --border: rgba(255,255,255,0.08);
+      --text: #F2F2F0;
+      --text-muted: #9A9A98;
+      --text-dim: #6A6A68;
+      --accent: oklch(72% 0.14 190);
+      --font-display: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 14px; line-height: 1.5; height: 100vh; overflow: hidden; }
+    body { display: grid; grid-template-rows: auto 1fr; }
+
+    header.app {
+      padding: 20px 32px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 24px;
+    }
+    header.app .brand {
+      font-family: var(--font-display);
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+    header.app .brand .accent { color: var(--accent); }
+    header.app .meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+    header.app .actions {
+      display: flex;
+      gap: 8px;
+    }
+    header.app .actions button {
+      font: inherit;
+      background: var(--raised);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: color 200ms cubic-bezier(0.16, 1, 0.3, 1), border-color 200ms;
+    }
+    header.app .actions button:hover {
+      color: var(--text);
+      border-color: rgba(255,255,255,0.18);
+    }
+    header.app .actions button.active {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    main.grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      overflow: hidden;
+    }
+
+    article.column {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      background: var(--bg);
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .col-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .col-header h2 {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text);
+      margin: 0 0 6px;
+    }
+    .col-header h2 .tag {
+      display: inline-block;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      color: var(--accent);
+      margin-right: 8px;
+      vertical-align: 1px;
+    }
+    .col-header p.thesis {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+    .col-header p.thesis em {
+      font-style: normal;
+      color: var(--text);
+    }
+
+    .frame-wrap {
+      position: relative;
+      overflow: hidden;
+      background: var(--bg);
+    }
+    iframe.concept {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: transparent;
+      display: block;
+    }
+
+    .frame-wrap .open-link {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-dim);
+      text-decoration: none;
+      padding: 4px 8px;
+      background: rgba(0,0,0,0.5);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+      opacity: 0;
+      transition: opacity 200ms;
+    }
+    .frame-wrap:hover .open-link {
+      opacity: 1;
+    }
+    .frame-wrap .open-link:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .placeholder {
+      display: grid;
+      place-items: center;
+      padding: 40px 24px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      gap: 8px;
+    }
+    .placeholder code {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    @media (max-width: 1280px) {
+      main.grid { grid-template-columns: 1fr; grid-auto-rows: 480px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app">
+    <div class="brand">
+      AgenticExplorer <span class="accent">·</span> Konzept-Vergleich
+    </div>
+    <div class="meta">audit/principles-diff.md · 3 Konzepte · 3 Surfaces je Konzept</div>
+    <div class="actions">
+      <button id="btn-reload" type="button" title="Alle Iframes neu laden">Neu laden</button>
+      <button id="btn-fullwidth" type="button" title="Layout umschalten">Stack ↔ 3-Spalten</button>
+    </div>
+  </header>
+
+  <main class="grid" id="grid">
+    <article class="column">
+      <div class="col-header">
+        <h2><span class="tag">A</span> Refined Brutalism</h2>
+        <p class="thesis"><em>Inkrementell.</em> Sharp edges bleiben, +Whitespace, +layered Shadow, +Hero-Type. Kleinstes Risiko.</p>
+      </div>
+      <div class="frame-wrap">
+        <iframe class="concept" src="./concept-a-refined-brutalism/index.html" loading="lazy" title="Konzept A — Refined Brutalism"></iframe>
+        <a class="open-link" href="./concept-a-refined-brutalism/index.html" target="_blank">In neuem Tab öffnen ↗</a>
+      </div>
+    </article>
+
+    <article class="column">
+      <div class="col-header">
+        <h2><span class="tag">B</span> Organic Modern</h2>
+        <p class="thesis"><em>Linear/Raycast-Stil.</em> Radius 6-8px, layered Shadow, variable Inter, Motion 240/360ms.</p>
+      </div>
+      <div class="frame-wrap">
+        <iframe class="concept" src="./concept-b-organic-modern/index.html" loading="lazy" title="Konzept B — Organic Modern"></iframe>
+        <a class="open-link" href="./concept-b-organic-modern/index.html" target="_blank">In neuem Tab öffnen ↗</a>
+      </div>
+    </article>
+
+    <article class="column">
+      <div class="col-header">
+        <h2><span class="tag">C</span> Quiet Luxury</h2>
+        <p class="thesis"><em>Things3/Stripe-Stil.</em> Radius 2-4px, monochrome+1 Akzent, hairline Borders, Serif-Display, generous Spacing.</p>
+      </div>
+      <div class="frame-wrap">
+        <iframe class="concept" src="./concept-c-quiet-luxury/index.html" loading="lazy" title="Konzept C — Quiet Luxury"></iframe>
+        <a class="open-link" href="./concept-c-quiet-luxury/index.html" target="_blank">In neuem Tab öffnen ↗</a>
+      </div>
+    </article>
+  </main>
+
+  <script>
+    const reloadBtn = document.getElementById('btn-reload');
+    const stackBtn = document.getElementById('btn-fullwidth');
+    const grid = document.getElementById('grid');
+
+    reloadBtn.addEventListener('click', () => {
+      document.querySelectorAll('iframe.concept').forEach((f) => {
+        const src = f.src;
+        f.src = 'about:blank';
+        setTimeout(() => { f.src = src; }, 50);
+      });
+    });
+
+    let stacked = false;
+    stackBtn.addEventListener('click', () => {
+      stacked = !stacked;
+      if (stacked) {
+        grid.style.gridTemplateColumns = '1fr';
+        grid.style.gridAutoRows = '720px';
+        grid.style.overflowY = 'auto';
+      } else {
+        grid.style.gridTemplateColumns = 'repeat(3, 1fr)';
+        grid.style.gridAutoRows = '';
+        grid.style.overflowY = 'hidden';
+      }
+      stackBtn.classList.toggle('active', stacked);
+    });
+  </script>
+</body>
+</html>

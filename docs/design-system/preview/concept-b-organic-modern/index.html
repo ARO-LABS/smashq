@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Konzept B — Organic Modern</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0B0B0E;
+    --surface: #16161A;
+    --raised: #1D1D22;
+    --inset: #121215;
+    --border: rgb(255 255 255 / 0.08);
+    --border-strong: rgb(255 255 255 / 0.12);
+    --hairline: rgb(255 255 255 / 0.06);
+    --text-100: #F2F2F4;
+    --text-200: #D9D9DE;
+    --text-300: #A8A8B0;
+    --text-400: #76767E;
+    --text-500: #5A5A62;
+    --accent: oklch(72% 0.16 195);
+    --accent-soft: oklch(72% 0.16 195 / 0.10);
+    --accent-line: oklch(72% 0.16 195 / 0.45);
+    --success: #5DAF6A;
+    --warning: #E0A540;
+    --error: #E56565;
+    --info: #5C8DDE;
+    --shadow-rest: 0 0 0 1px rgb(255 255 255 / 0.06);
+    --shadow-lift: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 16px rgb(0 0 0 / 0.3), inset 0 0 0 1px rgb(255 255 255 / 0.08);
+    --shadow-modal: 0 4px 12px rgb(0 0 0 / 0.5), 0 24px 48px rgb(0 0 0 / 0.6);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text-200); }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+  .shell {
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 24px 20px 56px;
+  }
+
+  /* Top header */
+  .top {
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .top h1 {
+    margin: 0 0 6px;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text-100);
+  }
+  .top .thesis {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-400);
+    font-weight: 400;
+  }
+
+  /* Section labels (between surfaces) */
+  .section-label {
+    margin: 32px 0 12px;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--text-500);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-label::before {
+    content: "";
+    width: 4px; height: 4px;
+    border-radius: 100%;
+    background: var(--text-500);
+  }
+
+  /* Surface header (Favoriten / Einstellungen) — sentence case */
+  .surface-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 10px;
+  }
+  .surface-head h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-100);
+    letter-spacing: -0.005em;
+  }
+  .surface-head h2.large {
+    font-size: 20px;
+    letter-spacing: -0.01em;
+  }
+  .pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 22px;
+    padding: 0 8px 0 6px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid var(--accent-line);
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 240ms var(--ease);
+  }
+  .pill-btn:hover { background: oklch(72% 0.16 195 / 0.18); }
+  .pill-btn svg { width: 12px; height: 12px; }
+
+  /* --------- Surface A: Favorites list --------- */
+  .fav-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .fav {
+    display: grid;
+    grid-template-columns: 28px 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border-radius: 6px;
+    box-shadow: var(--shadow-rest);
+    transition: box-shadow 240ms var(--ease), background 240ms var(--ease);
+    cursor: default;
+  }
+  .fav:hover {
+    background: var(--raised);
+    box-shadow: var(--shadow-lift);
+  }
+  .fav:hover .fav-actions { opacity: 1; }
+  .fav-play {
+    width: 28px; height: 28px;
+    display: grid; place-items: center;
+    border-radius: 6px;
+    color: var(--text-300);
+    background: var(--inset);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+  }
+  .fav:hover .fav-play { color: var(--accent); }
+  .fav-play svg { width: 14px; height: 14px; }
+  .fav-text { min-width: 0; }
+  .fav-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-100);
+    letter-spacing: -0.005em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .fav-path {
+    margin-top: 2px;
+    font-size: 11px;
+    color: var(--text-500);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .fav-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--inset);
+    color: var(--text-300);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+    white-space: nowrap;
+  }
+  .fav-status .dot { width: 6px; height: 6px; border-radius: 100%; }
+  .fav-status.live { color: var(--success); }
+  .fav-status.live .dot { background: var(--success); box-shadow: 0 0 0 3px rgb(93 175 106 / 0.15); }
+  .fav-status.wait { color: var(--warning); }
+  .fav-status.wait .dot { background: var(--warning); }
+  .fav-status.idle { color: var(--text-400); }
+  .fav-status.idle .dot { background: var(--text-500); }
+  .fav-actions {
+    display: inline-flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 240ms var(--ease);
+  }
+  .icon-btn {
+    width: 26px; height: 26px;
+    display: grid; place-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 4px;
+    color: var(--text-400);
+    cursor: pointer;
+    transition: background 120ms var(--ease), color 120ms var(--ease);
+  }
+  .icon-btn:hover { background: rgb(255 255 255 / 0.05); color: var(--text-100); }
+  .icon-btn svg { width: 14px; height: 14px; }
+
+  /* --------- Surface B: 2x2 SessionCard grid --------- */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .card {
+    position: relative;
+    padding: 12px 12px 10px;
+    background: var(--surface);
+    border-radius: 6px;
+    box-shadow: var(--shadow-rest);
+    transition: box-shadow 240ms var(--ease);
+    min-height: 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .card:hover { box-shadow: var(--shadow-lift); }
+  .card.active {
+    background: linear-gradient(180deg, var(--accent-soft), var(--surface) 80%);
+    box-shadow: inset 0 0 0 1px var(--accent-line), 0 1px 2px rgb(0 0 0 / 0.3);
+  }
+  .card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 100%;
+    flex-shrink: 0;
+  }
+  .status-dot.success { background: var(--success); box-shadow: 0 0 0 3px rgb(93 175 106 / 0.15); }
+  .status-dot.warning { background: var(--warning); box-shadow: 0 0 0 3px rgb(224 165 64 / 0.15); }
+  .status-dot.info    { background: var(--info);    box-shadow: 0 0 0 3px rgb(92 141 222 / 0.15); }
+  .status-dot.error   { background: var(--error);   box-shadow: 0 0 0 3px rgb(229 101 101 / 0.15); }
+  .card-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-100);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1;
+  }
+  .card-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-500);
+    font-weight: 400;
+    margin-left: 2px;
+  }
+  .card-path {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-400);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card-foot {
+    margin-top: auto;
+    display: flex;
+    justify-content: flex-end;
+    align-items: baseline;
+  }
+  .card-elapsed {
+    font-size: 11px;
+    color: var(--text-400);
+  }
+  .card-chrome {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: inline-flex;
+    gap: 1px;
+    opacity: 0.5;
+    transition: opacity 240ms var(--ease);
+  }
+  .card:hover .card-chrome { opacity: 1; }
+  .card-chrome .icon-btn { width: 22px; height: 22px; }
+  .card-chrome .icon-btn svg { width: 12px; height: 12px; }
+
+  /* --------- Surface C: Settings --------- */
+  .settings-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .setting-card {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: var(--shadow-rest);
+  }
+  .setting-card h3 {
+    margin: 0 0 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-100);
+    letter-spacing: -0.005em;
+  }
+  .setting-card .helper {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-400);
+    line-height: 1.5;
+  }
+  .setting-row {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .field-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-300);
+  }
+  .select {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 10px 0 12px;
+    background: var(--raised);
+    color: var(--text-100);
+    border-radius: 6px;
+    box-shadow: inset 0 0 0 1px var(--border);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: box-shadow 120ms var(--ease), background 120ms var(--ease);
+  }
+  .select:hover {
+    background: #232328;
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+  }
+  .select .num { font-variant-numeric: tabular-nums; }
+  .select svg { width: 14px; height: 14px; color: var(--text-400); }
+
+  /* Radio + checkbox */
+  .opts { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .opt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 4px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-200);
+  }
+  .radio {
+    width: 14px; height: 14px;
+    border-radius: 100%;
+    background: var(--raised);
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+  }
+  .radio.on {
+    background: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+  .radio.on::after {
+    content: "";
+    width: 5px; height: 5px;
+    border-radius: 100%;
+    background: var(--bg);
+  }
+  .opt.selected { color: var(--text-100); font-weight: 500; }
+
+  .sub-block {
+    margin-top: 6px;
+    background: var(--inset);
+    border-radius: 8px;
+    padding: 14px 14px 10px;
+    box-shadow: inset 0 0 0 1px var(--hairline);
+    transition: opacity 240ms var(--ease);
+  }
+  .sub-block.dimmed { opacity: 0.5; }
+  .sub-block .sub-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-500);
+    margin-bottom: 8px;
+  }
+  .check {
+    width: 14px; height: 14px;
+    border-radius: 3px;
+    background: var(--raised);
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+  }
+  .check svg { width: 10px; height: 10px; color: transparent; }
+  .opt.checked .check {
+    background: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+  .opt.checked .check svg { color: var(--bg); }
+
+</style>
+</head>
+<body>
+  <main class="shell">
+    <header class="top">
+      <h1>Konzept B — Organic Modern</h1>
+      <p class="thesis">Linear/Raycast-DNA: weiche 6–8 px Radien, geschichtete Schatten, Inter Variable, warm-kühle Neutrals.</p>
+    </header>
+
+    <!-- ============== Surface (a): Favoriten ============== -->
+    <div class="section-label">Surface A — Favoriten</div>
+    <section>
+      <div class="surface-head">
+        <h2>Favoriten</h2>
+        <button class="pill-btn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Neu
+        </button>
+      </div>
+
+      <div class="fav-list">
+        <!-- 1 -->
+        <div class="fav">
+          <div class="fav-play">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+          <div class="fav-text">
+            <div class="fav-name">agentic-dashboard</div>
+            <div class="fav-path mono">C:\Projects\agentic-dashboard</div>
+          </div>
+          <span class="fav-status live"><span class="dot"></span>2 live sessions</span>
+          <div class="fav-actions">
+            <button class="icon-btn" type="button" aria-label="Bearbeiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button class="icon-btn" type="button" aria-label="Entfernen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+        </div>
+
+        <!-- 2 -->
+        <div class="fav">
+          <div class="fav-play">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+          <div class="fav-text">
+            <div class="fav-name">animetrackler</div>
+            <div class="fav-path mono">C:\Projects\animetrackler</div>
+          </div>
+          <span class="fav-status idle"><span class="dot"></span>idle</span>
+          <div class="fav-actions">
+            <button class="icon-btn" type="button" aria-label="Bearbeiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button class="icon-btn" type="button" aria-label="Entfernen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+        </div>
+
+        <!-- 3 -->
+        <div class="fav">
+          <div class="fav-play">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+          <div class="fav-text">
+            <div class="fav-name">PowerSYSADM</div>
+            <div class="fav-path mono">C:\Projects\PowerSYSADM</div>
+          </div>
+          <span class="fav-status wait"><span class="dot"></span>1 wartend</span>
+          <div class="fav-actions">
+            <button class="icon-btn" type="button" aria-label="Bearbeiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button class="icon-btn" type="button" aria-label="Entfernen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+        </div>
+
+        <!-- 4 -->
+        <div class="fav">
+          <div class="fav-play">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+          <div class="fav-text">
+            <div class="fav-name">agentic-creater-assistent</div>
+            <div class="fav-path mono">C:\Projects\agentic-creater-assistent</div>
+          </div>
+          <span class="fav-status idle"><span class="dot"></span>idle</span>
+          <div class="fav-actions">
+            <button class="icon-btn" type="button" aria-label="Bearbeiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button class="icon-btn" type="button" aria-label="Entfernen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== Surface (b): 2x2 sessions ============== -->
+    <div class="section-label">Surface B — Aktive Sessions</div>
+    <section>
+      <div class="grid">
+
+        <!-- 1 active -->
+        <div class="card active">
+          <div class="card-chrome">
+            <button class="icon-btn" type="button" aria-label="Ordner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
+            <button class="icon-btn" type="button" aria-label="Terminal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></button>
+            <button class="icon-btn" type="button" aria-label="Schliessen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+          <div class="card-head">
+            <span class="status-dot success"></span>
+            <div class="card-title">agentic-dashboard<span class="card-id">#1</span></div>
+          </div>
+          <div class="card-path">C:\Projects\agentic-dashboard</div>
+          <div class="card-foot"><span class="card-elapsed">Läuft seit 12:48</span></div>
+        </div>
+
+        <!-- 2 -->
+        <div class="card">
+          <div class="card-chrome">
+            <button class="icon-btn" type="button" aria-label="Ordner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
+            <button class="icon-btn" type="button" aria-label="Terminal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></button>
+            <button class="icon-btn" type="button" aria-label="Schliessen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+          <div class="card-head">
+            <span class="status-dot warning"></span>
+            <div class="card-title">animetrackler<span class="card-id">#2</span></div>
+          </div>
+          <div class="card-path">C:\Projects\animetrackler</div>
+          <div class="card-foot"><span class="card-elapsed">Wartet auf Input</span></div>
+        </div>
+
+        <!-- 3 -->
+        <div class="card">
+          <div class="card-chrome">
+            <button class="icon-btn" type="button" aria-label="Ordner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
+            <button class="icon-btn" type="button" aria-label="Terminal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></button>
+            <button class="icon-btn" type="button" aria-label="Schliessen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+          <div class="card-head">
+            <span class="status-dot info"></span>
+            <div class="card-title">PowerSYSADM<span class="card-id">#1</span></div>
+          </div>
+          <div class="card-path">C:\Projects\PowerSYSADM</div>
+          <div class="card-foot"><span class="card-elapsed">Fertig (3:21)</span></div>
+        </div>
+
+        <!-- 4 -->
+        <div class="card">
+          <div class="card-chrome">
+            <button class="icon-btn" type="button" aria-label="Ordner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
+            <button class="icon-btn" type="button" aria-label="Terminal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></button>
+            <button class="icon-btn" type="button" aria-label="Schliessen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+          <div class="card-head">
+            <span class="status-dot error"></span>
+            <div class="card-title">figurato-frontend<span class="card-id">#3</span></div>
+          </div>
+          <div class="card-path">C:\Projects\figurato-frontend</div>
+          <div class="card-foot"><span class="card-elapsed">Fehler (Exit 1)</span></div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============== Surface (c): Settings ============== -->
+    <div class="section-label">Surface C — Einstellungen</div>
+    <section>
+      <div class="surface-head">
+        <h2 class="large">Einstellungen</h2>
+      </div>
+
+      <div class="settings-stack">
+
+        <!-- Terminal-Verlauf card -->
+        <div class="setting-card">
+          <h3>Terminal-Verlauf</h3>
+          <p class="helper">Wieviele Zeilen pro Session im Scrollback gehalten werden. Mehr Zeilen verbrauchen mehr Arbeitsspeicher.</p>
+          <div class="setting-row">
+            <span class="field-label">Scrollback-Zeilen</span>
+            <button class="select" type="button">
+              <span class="num mono">25.000</span>
+              <span>Zeilen</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Debug-Logging card -->
+        <div class="setting-card">
+          <h3>Debug-Logging</h3>
+          <p class="helper">Detailliertes Logging fuer Diagnose. Standardmaessig aus, weil es Festplatte belastet.</p>
+
+          <div class="opts">
+            <label class="opt selected">
+              <span class="radio on"></span>
+              <span>Komplett aus</span>
+            </label>
+            <label class="opt">
+              <span class="radio"></span>
+              <span>Aktiviert</span>
+            </label>
+          </div>
+
+          <div class="sub-block dimmed">
+            <div class="sub-label">Log-Quellen</div>
+            <div class="opts" style="margin-top:0">
+              <label class="opt checked">
+                <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                <span>Frontend-Errors</span>
+              </label>
+              <label class="opt checked">
+                <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                <span>Backend-Log-Files</span>
+              </label>
+              <label class="opt">
+                <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                <span>Performance-Profiler</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>

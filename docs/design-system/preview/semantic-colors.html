@@ -1,0 +1,16 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+body{margin:0;padding:20px;background:var(--surface-base);color:var(--neutral-200);font-family:var(--font-body);}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+.swatch{width:96px;height:60px;display:flex;flex-direction:column;justify-content:flex-end;padding:6px 8px;border:1px solid var(--neutral-700);}
+.swatch .name{font-family:var(--font-mono);font-size:9px;color:#fff;letter-spacing:0.04em;opacity:0.92;mix-blend-mode:difference;}
+.swatch .val{font-family:var(--font-mono);font-size:8px;opacity:0.75;mix-blend-mode:difference;color:#fff;}
+</style></head><body class="dark">
+<div class="row">
+  <div class="swatch" style="background:var(--color-accent)"><div class="name">accent</div><div class="val">hue 190</div></div>
+  <div class="swatch" style="background:var(--color-success)"><div class="name">success</div><div class="val">hue 155</div></div>
+  <div class="swatch" style="background:var(--color-warning)"><div class="name">warning</div><div class="val">hue 70</div></div>
+  <div class="swatch" style="background:var(--color-error)"><div class="name">error</div><div class="val">hue 25</div></div>
+  <div class="swatch" style="background:var(--color-info)"><div class="name">info</div><div class="val">hue 250</div></div>
+</div>
+</body></html>

@@ -1,0 +1,16 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+body{margin:0;padding:20px;background:var(--surface-base);color:var(--neutral-200);font-family:var(--font-body);}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:end;}
+.cell{display:flex;flex-direction:column;align-items:center;gap:4px;}
+.box{background:var(--color-accent);opacity:0.85;}
+.lbl{font-family:var(--font-mono);font-size:9px;color:var(--neutral-500);letter-spacing:0.04em;}
+</style></head><body class="dark">
+<div class="grid">
+  <div class="cell"><div class="box" style="width:4px;height:4px"></div><div class="lbl">xs · 4</div></div>
+  <div class="cell"><div class="box" style="width:8px;height:8px"></div><div class="lbl">sm · 8</div></div>
+  <div class="cell"><div class="box" style="width:16px;height:16px"></div><div class="lbl">md · 16</div></div>
+  <div class="cell"><div class="box" style="width:24px;height:24px"></div><div class="lbl">lg · 24</div></div>
+  <div class="cell"><div class="box" style="width:48px;height:48px"></div><div class="lbl">2xl · 48</div></div>
+</div>
+</body></html>

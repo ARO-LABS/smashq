@@ -1,0 +1,475 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   Design Tokens — Light Mode (default)
+   ============================================ */
+:root {
+  /* ── Accent (tuned for white backgrounds) ── */
+  /* Accent als Hue/L/C-Vars — Per-Session-Override setzt nur --accent-h.
+     Default-Hue 195 + L 55% + C 0.18 reproduziert den bisherigen Light-Akzent. */
+  --accent-h: 195;
+  --accent-l: 55%;
+  --accent-c: 0.18;
+  --color-accent: oklch(var(--accent-l) var(--accent-c) var(--accent-h));
+  --color-accent-light: oklch(72% 0.10 190);
+  --color-accent-dark: oklch(40% 0.14 190);
+  --color-accent-subtle: oklch(92% 0.03 190);
+
+  /* ── Semantic ── */
+  --color-success: oklch(52% 0.18 155);
+  --color-error: oklch(52% 0.24 25);
+  --color-warning: oklch(58% 0.16 70);
+  --color-info: oklch(52% 0.14 250);
+
+  /* ── Tinted Neutrals (light mode: low = prominent text, high = backgrounds)
+        Warm hue 20 (rotorange) — gives the Light Mode a "warm paper" feel.
+        Chroma stays subliminal (0.005-0.012) so neutrals read as neutrals,
+        not as colored. WCAG contrast unchanged from the prior hue-250 ladder. */
+  --neutral-50:  oklch(12% 0.012 20);  /* boldest text */
+  --neutral-100: oklch(18% 0.012 20);  /* heading text */
+  --neutral-200: oklch(25% 0.012 20);  /* primary text (dark on light) */
+  --neutral-300: oklch(32% 0.012 20);
+  --neutral-400: oklch(40% 0.012 20);  /* secondary text  (WCAG AA ≥ 4.5:1 on white) */
+  --neutral-500: oklch(46% 0.012 20);  /* muted text      (WCAG AA ≥ 4.5:1 on white) */
+  --neutral-600: oklch(58% 0.010 20);  /* secondary/muted text, decorative separators */
+  --neutral-700: oklch(82% 0.010 20);  /* borders */
+  --neutral-800: oklch(92% 0.008 20);  /* subtle backgrounds */
+  --neutral-900: oklch(96% 0.006 20);  /* card backgrounds */
+  --neutral-950: oklch(99% 0.004 20);  /* base background */
+
+  /* ── Surfaces ── */
+  --surface-base:    oklch(97% 0.006 20);
+  --surface-raised:  oklch(99% 0.004 20);
+  --surface-overlay: oklch(98% 0.006 20);
+
+  /* ── Hover overlay — warm-tinted instead of pure black, matches the warm shell ── */
+  --hover-overlay: oklch(40% 0.05 20 / 0.04);
+
+  /* Alpha variants locked to the live --color-accent (hue 195 chroma 0.18)
+     so bg-accent-a05/a10/etc render the same hue as bare bg-accent.
+     Previously stale at hue 190 chroma 0.16 (pre-Concept-B accent) — matches
+     the dark-mode fix in commit 264b7da. */
+  --accent-a05: oklch(var(--accent-l) var(--accent-c) var(--accent-h) / 0.05);
+  --accent-a10: oklch(var(--accent-l) var(--accent-c) var(--accent-h) / 0.10);
+  --accent-a15: oklch(var(--accent-l) var(--accent-c) var(--accent-h) / 0.15);
+  --accent-a30: oklch(var(--accent-l) var(--accent-c) var(--accent-h) / 0.30);
+  --accent-a40: oklch(var(--accent-l) var(--accent-c) var(--accent-h) / 0.40);
+  --success-a05: oklch(52% 0.18 155 / 0.05);
+
+  /* ── Diff backgrounds (light mode) ── */
+  --diff-removed-bg:   oklch(93% 0.07 25);    /* pale rose under removed line */
+  --diff-added-bg:     oklch(93% 0.09 155);   /* pale mint under added line */
+  --diff-removed-emph: oklch(82% 0.14 25);    /* char-level deleted highlight */
+  --diff-added-emph:   oklch(82% 0.14 155);   /* char-level added highlight */
+
+  /* ── Typography ── */
+  --font-display: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+  --text-xs:   0.75rem;
+  --text-sm:   0.875rem;
+  --text-base: 1rem;
+  --text-lg:   1.25rem;
+  --text-xl:   clamp(1.5rem, 1rem + 2vw, 2rem);
+
+  --leading-tight:   1.25;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.65;
+
+  /* ── Motion (Impeccable: 100/300/500, expo easing) ── */
+  --duration-instant: 100ms;
+  --duration-fast:    200ms;
+  --duration-base:    300ms;
+  --duration-slow:    500ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in:  cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* ── Spacing (4pt base) ── */
+  --space-xs:  0.25rem;  /* 4px */
+  --space-sm:  0.5rem;   /* 8px */
+  --space-md:  0.75rem;  /* 12px */
+  --space-lg:  1rem;     /* 16px */
+  --space-xl:  1.5rem;   /* 24px */
+  --space-2xl: 2rem;     /* 32px */
+  --space-3xl: 3rem;     /* 48px */
+
+  /* ── Concept B — Radius scale ── */
+  --radius-xs:  2px;
+  --radius-sm:  4px;
+  --radius-md:  6px;
+  --radius-lg:  8px;
+  --radius-full: 9999px;
+
+  /* ── Concept B — Shadow recipe (3 tiers) ── */
+  --shadow-hairline: inset 0 0 0 1px oklch(100% 0 0 / 0.06);
+  --shadow-lift:
+    0 1px 2px  oklch(0% 0 0 / 0.4),
+    0 8px 16px oklch(0% 0 0 / 0.3),
+    inset 0 0 0 1px oklch(100% 0 0 / 0.08);
+  --shadow-modal:
+    0 4px 12px  oklch(0% 0 0 / 0.5),
+    0 24px 48px oklch(0% 0 0 / 0.6);
+}
+
+/* ============================================
+   Design Tokens — Dark Mode
+   ============================================ */
+.dark {
+  /* Dark-Mode: nur L/C anheben — Hue + --color-accent + Alpha erben aus :root
+     und recomputen automatisch (var-Substitution pro Element). */
+  --accent-l: 72%;
+  --accent-c: 0.16;
+  --color-accent-light: oklch(85% 0.08 190);
+  --color-accent-dark: oklch(50% 0.12 190);
+  --color-accent-subtle: oklch(25% 0.04 190);
+
+  --color-success: oklch(72% 0.16 155);
+  --color-error: oklch(62% 0.22 25);
+  --color-warning: oklch(75% 0.14 70);
+  --color-info: oklch(68% 0.12 250);
+
+  /* Concept B — neutrals matched 1:1 to docs/design-system/preview/concept-b-organic-modern.
+     Hue 280 (just-barely-cool grey, almost pure), chroma 0.003-0.011 (markedly
+     more neutral than the previous hue-250 blue-tint). Background pulled down
+     to L=8% so the cyan-teal accent reads with more contrast. */
+  --neutral-50:  oklch(98% 0.003 280);
+  --neutral-100: oklch(95% 0.003 280);  /* #F2F2F4 — boldest text */
+  --neutral-200: oklch(87% 0.004 280);  /* #D9D9DE — primary body text */
+  --neutral-300: oklch(70% 0.006 280);  /* #A8A8B0 — secondary text */
+  --neutral-400: oklch(53% 0.009 280);  /* #76767E — tertiary text (WCAG AA on dark) */
+  --neutral-500: oklch(44% 0.011 280);  /* #5A5A62 — muted text */
+  --neutral-600: oklch(35% 0.008 280);  /* decorative / hairline borders */
+  --neutral-700: oklch(25% 0.005 280);  /* primary borders / dividers */
+  --neutral-800: oklch(15% 0.005 280);  /* #1D1D22 — raised cards */
+  --neutral-900: oklch(12% 0.004 280);  /* #16161A — surface */
+  --neutral-950: oklch(8%  0.004 280);  /* #0B0B0E — base background (deep) */
+
+  --surface-base:    var(--neutral-950);
+  --surface-raised:  var(--neutral-900);
+  --surface-overlay: var(--neutral-800);
+  /* Concept B — additional inset level (#121215) used for chip backgrounds,
+     play-button pockets, status-pills. Bridges the gap between bg and surface. */
+  --surface-inset:   oklch(9% 0.003 280);
+
+  --hover-overlay: oklch(100% 0 0 / 0.05);
+
+  --success-a05: oklch(72% 0.16 155 / 0.05);
+
+  /* ── Diff backgrounds (dark mode — stronger chroma so tints read on near-black bg) ── */
+  --diff-removed-bg:   oklch(30% 0.10 25);    /* deep warm red under removed line */
+  --diff-added-bg:     oklch(30% 0.10 155);   /* deep mint under added line */
+  --diff-removed-emph: oklch(45% 0.18 25);    /* char-level deleted highlight */
+  --diff-added-emph:   oklch(45% 0.18 155);   /* char-level added highlight */
+}
+
+/* ── Concept B — Light-mode shadow overrides (softer, neutral inset) ── */
+:root:not(.dark) {
+  --shadow-hairline: inset 0 0 0 1px oklch(0% 0 0 / 0.06);
+  --shadow-lift:
+    0 1px 2px  oklch(0% 0 0 / 0.06),
+    0 8px 16px oklch(0% 0 0 / 0.08);
+  --shadow-modal:
+    0 4px 12px  oklch(0% 0 0 / 0.10),
+    0 24px 48px oklch(0% 0 0 / 0.16);
+}
+
+/* ============================================
+   Base Styles
+   ============================================ */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--surface-base);
+  color: var(--neutral-200);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Theme transition for smooth mode switch */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease, box-shadow 200ms ease !important;
+}
+
+/* ── Headings use display font ── */
+h1, h2, h3, h4, h5, h6,
+.font-display {
+  font-family: var(--font-display);
+  line-height: var(--leading-tight);
+}
+
+/* ── Monospace only for code/terminal ── */
+code, pre, kbd,
+.font-mono,
+.retro-terminal {
+  font-family: var(--font-mono);
+}
+
+/* ============================================
+   Scrollbar
+   ============================================ */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface-raised);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--neutral-600);
+  border-radius: 2px;
+}
+
+/* ============================================
+   Focus Rings (Impeccable: never outline:none without replacement)
+   ============================================ */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ============================================
+   Reduced Motion (Impeccable: PFLICHT)
+   Two triggers — either kills animations:
+   - OS preference via @media (prefers-reduced-motion: reduce)
+   - In-app toggle via .reduce-motion class (added by useThemeEffect when
+     settingsStore.theme.reducedMotion === true)
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* ============================================
+   Component Styles
+   ============================================ */
+
+/* ── Terminal Block ── */
+.retro-terminal {
+  background: var(--neutral-950);
+  border: 1px solid var(--neutral-700);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-relaxed);
+}
+
+/* Light mode: terminal keeps dark look */
+:root:not(.dark) .retro-terminal {
+  background: var(--surface-raised);
+  border-color: var(--neutral-700);
+}
+
+/* ── Subtle Glow (only for active states — not everywhere) ── */
+.glow-accent {
+  box-shadow: 0 0 6px oklch(72% 0.14 190 / 0.4), 0 0 12px oklch(72% 0.14 190 / 0.15);
+}
+.glow-success {
+  box-shadow: 0 0 6px oklch(72% 0.18 155 / 0.4), 0 0 12px oklch(72% 0.18 155 / 0.15);
+}
+.glow-error {
+  box-shadow: 0 0 6px oklch(62% 0.24 25 / 0.4), 0 0 12px oklch(62% 0.24 25 / 0.15);
+}
+.glow-warning {
+  box-shadow: 0 0 6px oklch(72% 0.16 70 / 0.4), 0 0 12px oklch(72% 0.16 70 / 0.15);
+}
+
+/* Light mode: softer glows as subtle shadows */
+:root:not(.dark) .glow-accent {
+  box-shadow: 0 1px 4px oklch(55% 0.16 190 / 0.15), 0 0 8px oklch(55% 0.16 190 / 0.08);
+}
+:root:not(.dark) .glow-success {
+  box-shadow: 0 1px 4px oklch(52% 0.18 155 / 0.15), 0 0 8px oklch(52% 0.18 155 / 0.08);
+}
+:root:not(.dark) .glow-error {
+  box-shadow: 0 1px 4px oklch(52% 0.24 25 / 0.15), 0 0 8px oklch(52% 0.24 25 / 0.08);
+}
+:root:not(.dark) .glow-warning {
+  box-shadow: 0 1px 4px oklch(58% 0.16 70 / 0.15), 0 0 8px oklch(58% 0.16 70 / 0.08);
+}
+
+/* ============================================
+   Animations (exponential easing, no bounce)
+   ============================================ */
+
+@keyframes status-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 4px currentColor;
+  }
+  50% {
+    opacity: 0.5;
+    box-shadow: 0 0 8px currentColor, 0 0 16px currentColor;
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.status-pulse-animation {
+  animation: status-pulse 2s var(--ease-in-out) infinite;
+}
+
+@keyframes status-breathe {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 4px currentColor;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    box-shadow: 0 0 8px currentColor;
+    transform: scale(1.15);
+  }
+}
+
+.status-breathe-animation {
+  animation: status-breathe 3s var(--ease-in-out) infinite;
+}
+
+.spin-animation {
+  animation: spin 1.5s linear infinite;
+}
+
+/* Toast transitions (non-Framer-Motion fallback) */
+.toast-enter {
+  opacity: 0;
+  transform: translateX(80px);
+}
+.toast-enter-active {
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity var(--duration-base) var(--ease-out),
+              transform var(--duration-base) var(--ease-out);
+}
+.toast-exit {
+  opacity: 1;
+  transform: translateX(0);
+}
+.toast-exit-active {
+  opacity: 0;
+  transform: translateX(80px);
+  transition: opacity var(--duration-fast) var(--ease-in),
+              transform var(--duration-fast) var(--ease-in);
+}
+
+/* ============================================
+   Semantic Type Classes (.ae-*)
+   Kanonische Quelle: docs/design-system/colors_and_type.css
+   Zweck: Wiederkehrende Typografie-Rezepte in einem semantischen Namen
+   buendeln. Klassen sind optional — bestehende Tailwind-Strings bleiben
+   gueltig und werden nur bei exakter visueller Aequivalenz migriert.
+   ============================================ */
+.ae-h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: var(--leading-tight);
+  letter-spacing: 0.02em;
+  color: var(--neutral-100);
+}
+.ae-h2 {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: var(--leading-tight);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.ae-h3 {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--neutral-300);
+}
+.ae-body {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--neutral-200);
+}
+.ae-body-sm {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--neutral-400);
+}
+.ae-label {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  color: var(--neutral-400);
+}
+.ae-mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--neutral-300);
+}
+.ae-code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  padding: 0.15em 0.4em;
+  background: var(--neutral-800);
+  color: var(--color-success);
+}
+
+/* ── Markdown Preview ── */
+.md-preview {
+  user-select: text;
+  color: var(--neutral-200);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.7;
+}
+.md-preview h1 { font-size: 1.8em; font-weight: 700; color: var(--color-accent); margin: 1.2em 0 0.6em; border-bottom: 1px solid var(--neutral-700); padding-bottom: 0.3em; }
+.md-preview h2 { font-size: 1.4em; font-weight: 600; color: var(--neutral-100); margin: 1em 0 0.5em; }
+.md-preview h3 { font-size: 1.15em; font-weight: 600; color: var(--neutral-100); margin: 0.8em 0 0.4em; }
+.md-preview h4, .md-preview h5, .md-preview h6 { font-size: 1em; font-weight: 600; color: var(--neutral-200); margin: 0.6em 0 0.3em; }
+.md-preview p { margin: 0.6em 0; }
+.md-preview a { color: var(--color-info); text-decoration: underline; }
+.md-preview a:hover { color: var(--color-accent-light); }
+.md-preview strong { font-weight: 700; color: var(--neutral-100); }
+.md-preview em { font-style: italic; }
+.md-preview ul, .md-preview ol { margin: 0.5em 0; padding-left: 1.5em; }
+.md-preview li { margin: 0.25em 0; }
+.md-preview ul { list-style-type: disc; }
+.md-preview ol { list-style-type: decimal; }
+.md-preview blockquote { border-left: 3px solid var(--color-accent); padding: 0.5em 1em; margin: 0.8em 0; color: var(--neutral-400); background: var(--accent-a05); }
+.md-preview code { font-family: var(--font-mono); font-size: 0.875em; padding: 0.15em 0.4em; border-radius: 3px; background: var(--neutral-800); color: var(--color-success); }
+.md-preview pre { margin: 0.8em 0; padding: 1em; border-radius: 4px; background: var(--neutral-900); border: 1px solid var(--neutral-700); overflow-x: auto; }
+.md-preview pre code { padding: 0; background: none; color: var(--neutral-200); }
+.md-preview hr { border: none; border-top: 1px solid var(--neutral-700); margin: 1.5em 0; }
+.md-preview table { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
+.md-preview th, .md-preview td { border: 1px solid var(--neutral-700); padding: 0.5em 0.75em; text-align: left; }
+.md-preview th { background: var(--surface-raised); font-weight: 600; color: var(--neutral-100); }
+.md-preview img { max-width: 100%; border-radius: 4px; }

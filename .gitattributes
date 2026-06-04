@@ -1,0 +1,2 @@
+# Ensure shell scripts keep LF line endings (required for Git hooks on Windows)
+.husky/* text eol=lf

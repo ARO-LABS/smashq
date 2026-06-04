@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>AgenticExplorer — UI Kit</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--surface-base); color: var(--neutral-200); font-family: var(--font-body); overflow: hidden; }
+  #root { height: 100vh; }
+  * { box-sizing: border-box; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--surface-raised); }
+  ::-webkit-scrollbar-thumb { background: var(--neutral-600); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--neutral-500); }
+  @keyframes ae-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+  @keyframes ae-slide-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+  button { font-family: inherit; }
+  input:focus-visible { outline: none; }
+  .toast { animation: ae-slide-in 200ms var(--ease-out); }
+</style>
+</head>
+<body class="dark">
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="Icon.jsx"></script>
+<script type="text/babel" src="Button.jsx"></script>
+<script type="text/babel" src="Panel.jsx"></script>
+<script type="text/babel" src="SideNav.jsx"></script>
+<script type="text/babel" src="SessionsView.jsx"></script>
+<script type="text/babel" src="KanbanView.jsx"></script>
+
+<script type="text/babel">
+const INITIAL_SESSIONS = [
+  { id: 's1', name: 'agentic-dashboard', path: '~/projects/agentic-dashboard', status: 'running', elapsed: '0:42', branch: 'feat/panel-glow', model: 'sonnet-4.5', tokens: '42.1k / 200k', pid: '48213',
+    log: [
+      { text: '$ claude --cwd ~/projects/agentic-dashboard', color: 'var(--neutral-500)' },
+      { text: '', },
+      { text: '● Task: Fix PTY handshake on Windows', color: 'var(--color-accent)' },
+      { text: '', },
+      { text: '  Read src/commands/pty.rs (238 lines)', color: 'var(--neutral-400)' },
+      { text: '  Read src/lib/pty-bridge.ts (142 lines)', color: 'var(--neutral-400)' },
+      { text: '  Edit src/commands/pty.rs', color: 'var(--neutral-200)' },
+      { text: '    → wrap CreatePseudoConsole call in mutex', color: 'var(--neutral-500)' },
+      { text: '', },
+      { text: '  ✓ cargo check (2.1s)', color: 'var(--color-success)' },
+      { text: '  ✓ vitest run src/lib/pty-bridge.test.ts (18 passed)', color: 'var(--color-success)' },
+      { text: '', },
+      { text: 'Waiting for input...', color: 'var(--color-warning)' },
+    ]
+  },
+  { id: 's2', name: 'figurato-frontend', path: '~/projects/figurato-frontend', status: 'waiting', elapsed: '2:14', branch: 'main', model: 'sonnet-4.5', tokens: '8.3k / 200k', pid: '48217' },
+  { id: 's3', name: 'doldir', path: '~/projects/doldir', status: 'idle', elapsed: '12:48', branch: 'portfolio-main' },
+  { id: 's4', name: 'subvseth', path: '~/projects/subvseth', status: 'done', elapsed: '0:48', branch: 'main' },
+  { id: 's5', name: 'walletapp', path: '~/projects/walletapp', status: 'error', elapsed: '0:12', branch: 'main' },
+];
+
+function App() {
+  const [mode, setMode] = React.useState('dark');
+  const [tab, setTab] = React.useState('sessions');
+  const [sessions, setSessions] = React.useState(INITIAL_SESSIONS);
+  const [activeId, setActiveId] = React.useState('s1');
+  const [toasts, setToasts] = React.useState([]);
+
+  React.useEffect(() => {
+    document.body.classList.toggle('dark', mode === 'dark');
+    document.body.classList.toggle('light', mode === 'light');
+  }, [mode]);
+
+  const pushToast = (t) => {
+    const id = Math.random().toString(36).slice(2);
+    setToasts(xs => [...xs, { id, ...t }]);
+    setTimeout(() => setToasts(xs => xs.filter(x => x.id !== id)), 4000);
+  };
+
+  const closeSession = (id) => {
+    const s = sessions.find(x => x.id === id);
+    setSessions(xs => xs.filter(x => x.id !== id));
+    if (activeId === id) setActiveId(sessions[0]?.id);
+    pushToast({ level: 'info', title: 'SESSION CLOSED', body: `${s?.name} beendet.` });
+  };
+
+  const newSession = () => {
+    const id = 's' + Math.random().toString(36).slice(2, 6);
+    const n = { id, name: `session-${id.slice(1)}`, path: '~/projects/new', status: 'running', elapsed: '0:00', branch: 'main' };
+    setSessions(xs => [n, ...xs]);
+    setActiveId(id);
+    pushToast({ level: 'ok', title: 'SESSION STARTED', body: `claude --cwd ~/projects/new` });
+  };
+
+  const { SideNav, SessionsView, KanbanView } = window;
+  const { CheckCircle, Alert, Info, X } = window.Icons;
+
+  const toastIcon = { ok: CheckCircle, error: Alert, info: Info, warn: Alert };
+  const toastColor = { ok: 'var(--color-success)', error: 'var(--color-error)', info: 'var(--color-accent)', warn: 'var(--color-warning)' };
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', minHeight: 0 }}>
+      <SideNav activeTab={tab} onTabChange={setTab} mode={mode} onToggleTheme={() => setMode(m => m === 'dark' ? 'light' : 'dark')} />
+
+      <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', background: 'var(--surface-base)' }}>
+        <header style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          height: 40, padding: '0 16px',
+          background: 'var(--surface-raised)', borderBottom: '1px solid var(--neutral-700)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--color-accent)' }}>AgenticExplorer</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--neutral-500)' }}>/</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--neutral-300)' }}>{tab}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--neutral-500)' }}>
+            <span><window.StatusDot status="running" size={6} /> {sessions.filter(s => s.status === 'running').length} aktiv</span>
+            <span>{sessions.length} sitzungen</span>
+          </div>
+        </header>
+
+        <div style={{ flex: 1, padding: 2, minHeight: 0, overflow: 'hidden' }}>
+          {tab === 'sessions' && <SessionsView sessions={sessions} activeId={activeId} setActiveId={setActiveId} onCloseSession={closeSession} onNewSession={newSession} />}
+          {tab === 'kanban' && <KanbanView />}
+          {tab === 'library' && <Placeholder label="Bibliothek" />}
+          {tab === 'editor' && <Placeholder label="Editor" />}
+          {tab === 'logs' && <Placeholder label="Protokolle" />}
+        </div>
+      </main>
+
+      <div style={{ position: 'fixed', top: 52, right: 16, display: 'flex', flexDirection: 'column', gap: 8, zIndex: 50, width: 320 }}>
+        {toasts.map(t => {
+          const Icon = toastIcon[t.level] || Info;
+          return (
+            <div key={t.id} className="toast" style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+              padding: '10px 12px', background: 'var(--surface-overlay)',
+              border: `1px solid ${toastColor[t.level]}`, borderLeftWidth: 2,
+              boxShadow: `0 0 0 1px ${toastColor[t.level]}30, 0 0 12px ${toastColor[t.level]}30`,
+            }}>
+              <span style={{ color: toastColor[t.level], marginTop: 1 }}><Icon size={14} /></span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: toastColor[t.level] }}>{t.title}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--neutral-300)', marginTop: 2 }}>{t.body}</div>
+              </div>
+              <button onClick={() => setToasts(xs => xs.filter(x => x.id !== t.id))}
+                style={{ background: 'transparent', border: 'none', color: 'var(--neutral-500)', cursor: 'pointer', padding: 0 }}>
+                <X size={12} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Placeholder({ label }) {
+  const { Panel } = window;
+  return (
+    <Panel title={label}>
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--neutral-500)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+        {label} · noch nicht implementiert in diesem UI Kit
+      </div>
+    </Panel>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,213 @@
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { X, FolderOpen, Terminal } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
+import { DiffActionButton } from "../diff/DiffActionButton";
+import { useSessionStore } from "../../store/sessionStore";
+import { useSettingsStore } from "../../store/settingsStore";
+import type { ClaudeSession } from "../../store/sessionStore";
+import { logError } from "../../utils/errorLogger";
+import { folderLabel } from "../../utils/pathUtils";
+import { resolveSessionAccent, accentCssVars, accentColorFor, type AccentName } from "../../utils/sessionAccent";
+import { SessionAccentMenu } from "./SessionAccentMenu";
+
+interface SessionCardProps {
+  session: ClaudeSession;
+  isActive: boolean;
+  isInGrid?: boolean;
+  onClick: (sessionId: string) => void;
+  onClose: (sessionId: string) => void;
+}
+
+
+const SessionCardInner = ({ session, isActive, isInGrid, onClick, onClose }: SessionCardProps) => {
+  const renameSession = useSessionStore((s) => s.renameSession);
+
+  const sessionAccents = useSettingsStore((s) => s.sessionAccents);
+  const setSessionAccent = useSettingsStore((s) => s.setSessionAccent);
+  const clearSessionAccent = useSettingsStore((s) => s.clearSessionAccent);
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+
+  const accent: AccentName = resolveSessionAccent(session, sessionAccents);
+  const claudeId = session.claudeSessionId?.trim() ?? "";
+  const hasOverride = claudeId !== "" && claudeId in sessionAccents;
+  const dotColor = accentColorFor(session.folder, sessionAccents[claudeId] ?? null);
+  const projectName = folderLabel(session.folder);
+
+  // Dot encodes session health on top of project identity:
+  // error/waiting override the color; running pulses; done dims; else plain project color.
+  const dotBackground =
+    session.status === "error"
+      ? "var(--color-error)"
+      : session.status === "waiting"
+        ? "var(--color-warning)"
+        : dotColor;
+  const dotStateClass =
+    session.status === "running" || session.status === "starting"
+      ? "animate-pulse"
+      : session.status === "done"
+        ? "opacity-40"
+        : "";
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [isEditing]);
+
+  // displayId exists only for internal title-collision uniqueness and is never
+  // shown to the user, so inline-edit pre-fills the plain title.
+  const displayString = session.title;
+
+  const startRename = useCallback(() => {
+    setIsEditing(true);
+    setEditValue(displayString);
+  }, [displayString]);
+
+  const commitRename = useCallback(() => {
+    const trimmed = editValue.trim();
+    // Compare against the plain title so a no-op edit (open + save unchanged)
+    // does not trigger a rename.
+    if (trimmed && trimmed !== displayString) {
+      renameSession(session.id, trimmed);
+      if (session.claudeSessionId) {
+        useSettingsStore.getState().setSessionTitleOverride(session.claudeSessionId, trimmed);
+      }
+    }
+    setIsEditing(false);
+    setEditValue("");
+  }, [editValue, session.id, session.claudeSessionId, displayString, renameSession]);
+
+  const cancelRename = useCallback(() => {
+    setIsEditing(false);
+    setEditValue("");
+  }, []);
+
+  return (
+    <div
+      onClick={() => onClick(session.id)}
+      onContextMenu={(e) => {
+        e.preventDefault(); // natives WebView-Menü auf allen Karten unterdrücken
+        if (!claudeId) return; // ohne persistenten Key kein eigenes Menü
+        setMenuPos({ x: e.clientX, y: e.clientY });
+      }}
+      style={accentCssVars(accent)}
+      className={`
+        relative group flex items-center gap-2 h-7 pl-3 pr-2 cursor-pointer rounded-md transition-colors
+        ${isActive ? "bg-accent-a10" : "hover:bg-hover-overlay"}
+      `}
+    >
+      <span
+        data-testid="sess-dot"
+        className={`shrink-0 w-2 h-2 rounded-full ${dotStateClass}`}
+        style={{ background: dotBackground }}
+        aria-hidden="true"
+      />
+      {isEditing ? (
+        <input
+          ref={editInputRef}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={commitRename}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitRename();
+            if (e.key === "Escape") cancelRename();
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="font-medium text-sm text-neutral-200 bg-neutral-800 border border-neutral-600 rounded-sm px-1 py-0 flex-1 min-w-0 outline-none focus:border-accent"
+          aria-label="Session umbenennen"
+        />
+      ) : (
+        <span
+          className="font-medium text-sm text-neutral-200 truncate flex-1"
+          onDoubleClick={(e) => { e.stopPropagation(); startRename(); }}
+          title="Doppelklick zum Umbenennen"
+        >
+          {session.title}
+        </span>
+      )}
+      <span className="shrink-0 text-[11px] text-neutral-500 font-mono truncate max-w-[84px] group-hover:opacity-0 transition-opacity">
+        {projectName}
+      </span>
+
+      {/* Hover action chrome */}
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-surface-base/90 rounded-sm">
+        <DiffActionButton sessionId={session.id} errorSource="SessionCard.openDiff" />
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            invoke("open_folder_in_explorer", { path: session.folder }).catch((err: unknown) =>
+              logError("SessionCard.openFolder", err)
+            );
+          }}
+          className="p-1 text-neutral-400 hover:text-accent hover:bg-hover-overlay transition-colors"
+          aria-label="Ordner im Explorer öffnen"
+          title="Ordner im Explorer öffnen"
+        >
+          <FolderOpen className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            invoke("open_terminal_in_folder", { path: session.folder }).catch((err: unknown) =>
+              logError("SessionCard.openTerminal", err)
+            );
+          }}
+          className="p-1 text-neutral-400 hover:text-accent hover:bg-hover-overlay transition-colors"
+          aria-label="Terminal im Ordner öffnen"
+          title="Terminal im Ordner öffnen"
+        >
+          <Terminal className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose(session.id);
+          }}
+          className="p-1 text-neutral-500 hover:text-error hover:bg-hover-overlay transition-colors"
+          aria-label="Session schließen"
+          title="Session schließen"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/*
+        Grid-Indicator: 6px accent dot at bottom-right. Lives outside the hover
+        chrome (which occupies top-1.5 right-1.5), so it stays visible at rest
+        AND on hover. Replaces the inline LayoutGrid icon that previously sat
+        in the title row — that one was eclipsed by the chrome on hover.
+      */}
+      {isInGrid && (
+        <div
+          className="absolute bottom-1 right-1 w-1.5 h-1.5 rounded-full bg-accent"
+          aria-label="Im Grid"
+          title="Im Grid"
+        />
+      )}
+      {menuPos && claudeId && (
+        <SessionAccentMenu
+          x={menuPos.x}
+          y={menuPos.y}
+          current={accent}
+          hasOverride={hasOverride}
+          onSelect={(name) => {
+            setSessionAccent(claudeId, name);
+            setMenuPos(null);
+          }}
+          onReset={() => {
+            clearSessionAccent(claudeId);
+            setMenuPos(null);
+          }}
+          onClose={() => setMenuPos(null)}
+        />
+      )}
+    </div>
+  );
+};
+
+export const SessionCard = React.memo(SessionCardInner);

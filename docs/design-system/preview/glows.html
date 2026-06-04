@@ -1,0 +1,15 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+body{margin:0;padding:24px;background:var(--surface-base);color:var(--neutral-200);font-family:var(--font-body);}
+.row{display:flex;gap:14px;}
+.cell{display:flex;flex-direction:column;align-items:center;gap:6px;}
+.sq{width:72px;height:48px;background:var(--surface-raised);border:1px solid;}
+.lbl{font-family:var(--font-mono);font-size:9px;color:var(--neutral-500);letter-spacing:0.04em;}
+</style></head><body class="dark">
+<div class="row">
+  <div class="cell"><div class="sq" style="border-color:var(--color-accent);box-shadow:0 0 0 1px var(--accent-a30),0 0 12px var(--accent-a30);"></div><div class="lbl">glow-accent</div></div>
+  <div class="cell"><div class="sq" style="border-color:var(--color-success);box-shadow:0 0 0 1px oklch(68% .17 155 / .3),0 0 12px oklch(68% .17 155 / .3);"></div><div class="lbl">glow-success</div></div>
+  <div class="cell"><div class="sq" style="border-color:var(--color-warning);box-shadow:0 0 0 1px oklch(75% .14 70 / .3),0 0 12px oklch(75% .14 70 / .3);"></div><div class="lbl">glow-warning</div></div>
+  <div class="cell"><div class="sq" style="border-color:var(--color-error);box-shadow:0 0 0 1px oklch(62% .22 25 / .3),0 0 12px oklch(62% .22 25 / .3);"></div><div class="lbl">glow-error</div></div>
+</div>
+</body></html>

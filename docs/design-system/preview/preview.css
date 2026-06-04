@@ -1,0 +1,68 @@
+/* Shared styles for Design System preview cards */
+@import url('../colors_and_type.css');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--surface-base);
+  color: var(--neutral-200);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  padding: 20px;
+  min-height: 100vh;
+}
+
+.card {
+  width: 100%;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-family: var(--font-body);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--neutral-500);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--neutral-500);
+}
+
+.swatch {
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--neutral-700);
+  position: relative;
+}
+
+.dark-context {
+  background: oklch(11% 0.012 250);
+  color: oklch(80% 0.008 250);
+  --surface-base: oklch(11% 0.012 250);
+  --surface-raised: oklch(15% 0.012 250);
+  --neutral-700: oklch(26% 0.012 250);
+  --neutral-500: oklch(52% 0.01 250);
+  --neutral-400: oklch(62% 0.01 250);
+  --neutral-200: oklch(80% 0.008 250);
+  --color-accent: oklch(72% 0.14 190);
+  --color-success: oklch(72% 0.16 155);
+  --color-error: oklch(62% 0.22 25);
+  --color-warning: oklch(75% 0.14 70);
+}

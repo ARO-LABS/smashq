@@ -1,0 +1,47 @@
+node_modules/
+dist/
+dist-ssr/
+src-tauri/target/
+src-tauri/gen/
+*.local
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.*
+coverage/
+.eslintcache
+
+# Worktrees fuer subagent-driven development
+.worktrees/
+
+# Cargo target-dir drift (jemand hatte mal `--target-dir target-c` getippt → 8.6 GB)
+target-*/
+
+# Internal / private
+.claude/
+scripts/
+AI_ARCHITECT_SYNC.md
+Projekt.txt
+.playwright-mcp/
+graphify-out/
+.planning/
+_temp/
+skills-lock.json
+
+# Throwaway-Output (bg-Agent-Reports, Sprint-Reviews, Ad-hoc-HTML)
+reports/
+reviews/
+sprint-review*
+tab-bar-config-plan*
+praesentation/
+*.pptx
+/nul
+
+# Playwright E2E artifacts
+e2e/test-results/
+e2e/playwright-report/
+e2e/screenshots/
+
+# Brainstorming visual-companion artifacts (ephemeral)
+.superpowers/

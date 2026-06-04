@@ -1,0 +1,17 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+body{margin:0;padding:20px;background:var(--surface-base);color:var(--neutral-200);font-family:var(--font-body);}
+.p{background:var(--surface-raised);border:1px solid var(--neutral-700);}
+.p.active{border-color:var(--color-accent);box-shadow:0 0 0 1px var(--accent-a30),0 0 12px var(--accent-a30);}
+.hdr{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--neutral-700);}
+.ttl{font-family:var(--font-display);font-size:11px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--neutral-300);}
+.ttl.act{color:var(--color-accent);}
+.body{padding:14px;font-family:var(--font-mono);font-size:11px;color:var(--neutral-400);}
+.row{display:flex;gap:12px;}
+.row > *{flex:1;}
+</style></head><body class="dark">
+<div class="row">
+  <div class="p"><div class="hdr"><span class="ttl">Details</span></div><div class="body">default panel</div></div>
+  <div class="p active"><div class="hdr"><span class="ttl act">Terminal · active</span></div><div class="body">with accent glow</div></div>
+</div>
+</body></html>

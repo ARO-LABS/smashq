@@ -1,0 +1,202 @@
+/* ============================================================
+   AgenticExplorer Design System — Colors + Type
+   Source of truth extracted from src/index.css + tailwind.config.js
+   ============================================================ */
+
+/* ── Fonts ── */
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+/* ============================================
+   LIGHT MODE (default) — Design Tokens
+   ============================================ */
+:root {
+  /* ── Accent (tuned for white backgrounds) — Cyan-teal at hue 190 ── */
+  --color-accent:         oklch(55% 0.16 190);
+  --color-accent-light:   oklch(72% 0.10 190);
+  --color-accent-dark:    oklch(40% 0.14 190);
+  --color-accent-subtle:  oklch(92% 0.03 190);
+
+  /* ── Semantic ── */
+  --color-success: oklch(52% 0.18 155);
+  --color-error:   oklch(52% 0.24 25);
+  --color-warning: oklch(58% 0.16 70);
+  --color-info:    oklch(52% 0.14 250);
+
+  /* ── Tinted Neutrals (low = text, high = background) ── */
+  --neutral-50:  oklch(12% 0.01  250);
+  --neutral-100: oklch(18% 0.01  250);
+  --neutral-200: oklch(25% 0.01  250);
+  --neutral-300: oklch(32% 0.01  250);
+  --neutral-400: oklch(40% 0.01  250);
+  --neutral-500: oklch(46% 0.01  250);
+  --neutral-600: oklch(58% 0.008 250);
+  --neutral-700: oklch(82% 0.008 250);
+  --neutral-800: oklch(92% 0.005 250);
+  --neutral-900: oklch(96% 0.003 250);
+  --neutral-950: oklch(99% 0.002 250);
+
+  /* ── Surfaces ── */
+  --surface-base:    oklch(97% 0.003 250);
+  --surface-raised:  oklch(100% 0 0);
+  --surface-overlay: oklch(98% 0.003 250);
+
+  --hover-overlay: oklch(0% 0 0 / 0.04);
+
+  /* ── Alpha variants ── */
+  --accent-a05: oklch(55% 0.16 190 / 0.05);
+  --accent-a10: oklch(55% 0.16 190 / 0.10);
+  --accent-a15: oklch(55% 0.16 190 / 0.15);
+  --accent-a30: oklch(55% 0.16 190 / 0.30);
+  --accent-a40: oklch(55% 0.16 190 / 0.40);
+  --success-a05: oklch(52% 0.18 155 / 0.05);
+
+  /* ── Typography — font stacks ── */
+  --font-display: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif;
+  --font-body:    'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+  /* ── Type scale ── */
+  --text-xs:   0.75rem;   /* 12px */
+  --text-sm:   0.875rem;  /* 14px */
+  --text-base: 1rem;      /* 16px */
+  --text-lg:   1.25rem;   /* 20px */
+  --text-xl:   clamp(1.5rem, 1rem + 2vw, 2rem);
+
+  --leading-tight:   1.25;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.65;
+
+  /* ── Motion (Impeccable: 100/300/500 rule, expo easing) ── */
+  --duration-instant: 100ms;
+  --duration-fast:    200ms;
+  --duration-base:    300ms;
+  --duration-slow:    500ms;
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in:     cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* ── Spacing (4pt base) ── */
+  --space-xs:  0.25rem;   /* 4  */
+  --space-sm:  0.5rem;    /* 8  */
+  --space-md:  0.75rem;   /* 12 */
+  --space-lg:  1rem;      /* 16 */
+  --space-xl:  1.5rem;    /* 24 */
+  --space-2xl: 2rem;      /* 32 */
+  --space-3xl: 3rem;      /* 48 */
+
+  /* Radii — this system uses NONE. Everything is sharp (rounded-none). */
+  --radius-none: 0;
+  --radius-sm:   2px;     /* occasionally used for kanban cards, labels */
+  --radius-full: 9999px;  /* status dots only */
+}
+
+/* ============================================
+   DARK MODE — overrides
+   ============================================ */
+.dark {
+  --color-accent:        oklch(72% 0.14 190);
+  --color-accent-light:  oklch(85% 0.08 190);
+  --color-accent-dark:   oklch(50% 0.12 190);
+  --color-accent-subtle: oklch(25% 0.04 190);
+
+  --color-success: oklch(72% 0.16 155);
+  --color-error:   oklch(62% 0.22 25);
+  --color-warning: oklch(75% 0.14 70);
+  --color-info:    oklch(68% 0.12 250);
+
+  --neutral-50:  oklch(95% 0.008 250);
+  --neutral-100: oklch(90% 0.008 250);
+  --neutral-200: oklch(80% 0.008 250);
+  --neutral-300: oklch(70% 0.01  250);
+  --neutral-400: oklch(62% 0.01  250);
+  --neutral-500: oklch(52% 0.01  250);
+  --neutral-600: oklch(42% 0.01  250);
+  --neutral-700: oklch(26% 0.012 250);
+  --neutral-800: oklch(20% 0.012 250);
+  --neutral-900: oklch(15% 0.012 250);
+  --neutral-950: oklch(11% 0.012 250);
+
+  --surface-base:    var(--neutral-950);
+  --surface-raised:  var(--neutral-900);
+  --surface-overlay: var(--neutral-800);
+
+  --hover-overlay: oklch(100% 0 0 / 0.05);
+
+  --accent-a05: oklch(72% 0.14 190 / 0.05);
+  --accent-a10: oklch(72% 0.14 190 / 0.10);
+  --accent-a15: oklch(72% 0.14 190 / 0.15);
+  --accent-a30: oklch(72% 0.14 190 / 0.30);
+  --accent-a40: oklch(72% 0.14 190 / 0.40);
+  --success-a05: oklch(72% 0.16 155 / 0.05);
+}
+
+/* ============================================
+   Semantic type styles
+   ============================================ */
+.ae-h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: var(--leading-tight);
+  letter-spacing: 0.02em;
+  color: var(--neutral-100);
+}
+.ae-h2 {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: var(--leading-tight);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.ae-h3 {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--neutral-300);
+}
+.ae-body {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--neutral-200);
+}
+.ae-body-sm {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--neutral-400);
+}
+.ae-label {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  color: var(--neutral-400);
+}
+.ae-mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--neutral-300);
+}
+.ae-code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  padding: 0.15em 0.4em;
+  background: var(--neutral-800);
+  color: var(--color-success);
+}
+
+/* ============================================
+   Glow utilities (subtle, for active states only)
+   ============================================ */
+.glow-accent  { box-shadow: 0 0 6px oklch(72% 0.14 190 / 0.4), 0 0 12px oklch(72% 0.14 190 / 0.15); }
+.glow-success { box-shadow: 0 0 6px oklch(72% 0.18 155 / 0.4), 0 0 12px oklch(72% 0.18 155 / 0.15); }
+.glow-error   { box-shadow: 0 0 6px oklch(62% 0.24 25  / 0.4), 0 0 12px oklch(62% 0.24 25  / 0.15); }
+.glow-warning { box-shadow: 0 0 6px oklch(72% 0.16 70  / 0.4), 0 0 12px oklch(72% 0.16 70  / 0.15); }
+
+:root:not(.dark) .glow-accent  { box-shadow: 0 1px 4px oklch(55% 0.16 190 / 0.15), 0 0 8px oklch(55% 0.16 190 / 0.08); }
+:root:not(.dark) .glow-success { box-shadow: 0 1px 4px oklch(52% 0.18 155 / 0.15), 0 0 8px oklch(52% 0.18 155 / 0.08); }
+:root:not(.dark) .glow-error   { box-shadow: 0 1px 4px oklch(52% 0.24 25  / 0.15), 0 0 8px oklch(52% 0.24 25  / 0.08); }
+:root:not(.dark) .glow-warning { box-shadow: 0 1px 4px oklch(58% 0.16 70  / 0.15), 0 0 8px oklch(58% 0.16 70  / 0.08); }

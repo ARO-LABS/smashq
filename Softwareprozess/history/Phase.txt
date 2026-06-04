@@ -1,0 +1,433 @@
+================================================================================
+[ARCHIVED am 2026-04-05] — AGENTIC DASHBOARD — Softwareprozess
+================================================================================
+
+Grund der Archivierung:
+  Die Rolle dieser Datei (Roadmap + Release-Status + Anforderungsanalyse) wird
+  seit Sprint v1.4.0 von drei fokussierten Dokumenten uebernommen:
+
+    - Softwareprozess/arc42-specification.md
+        → Single Source of Truth fuer Architektur, Roadmap, User Stories.
+          Wird nach jedem Sprint-Review erweitert.
+
+    - CHANGELOG.md
+        → Release-Historie (Keep-a-Changelog-Format).
+
+    - tasks/todo.md
+        → Operativer Sprint-Backlog.
+
+  Diese Phase.txt bleibt als historisches Artefakt erhalten — sie dokumentiert,
+  wie die Planung von v1.0.0 bis v1.4.0 organisiert war (klassisches Wasserfall-
+  Phasenmodell). Der Pivot zu arc42 erfolgte, weil die 7-Phasen-Struktur sich
+  in der Praxis nicht bewaehrt hat (Phase 5 "Test" wurde nie erreicht —
+  siehe tasks/lessons.md, Eintrag 2026-04-02).
+
+Urspruenglicher Inhalt folgt unveraendert:
+
+================================================================================
+AGENTIC DASHBOARD — Softwareprozess
+================================================================================
+
+Phasen:
+1. Anforderungsanalyse: Anforderungen erfassen und dokumentieren
+   1.1 Personas definieren
+   1.2 User Stories erstellen
+   1.3 Machbarkeitsanalyse
+2. Planung: Projektstruktur und Zeitplan erstellen
+3. Entwurf: Systemarchitektur und Design festlegen
+4. Implementierung: Programmierung der Software
+5. Test: Ueberpruefung und Fehlerbehebung
+6. Einfuehrung: Software bereitstellen und einfuehren
+7. Wartung: Pflege und Weiterentwicklung der Software
+
+================================================================================
+PHASE 1 — ANFORDERUNGSANALYSE
+================================================================================
+
+1.1 Personas
+-------------
+Persona H (Hauptnutzer / Entwickler):
+- Benoetigt Dashboard fuer Pipeline-Visualisierung und -Analyse
+- Will Native Win App (mainly), waere gut auch Mac
+- Will Zeitsparen bei Verbesserung der Agenten-Pipeline
+- Dashboard soll schnell sein und visuell gut aussehen
+- Terminal-Integration: Ausfuehrung in der App sehen/steuern
+- OAuth Token von verschiedenen Anbietern speichern
+- Powershell/Bash Instanzen starten, Input/Output sehen/steuern
+- Arbeit mit Agenten/Skills/Hooks deterministischer machen
+- GitHub-Status pro Projekt: PRs, Issues, Branch, letzter Commit (2026-03-17)
+- Agenten-Konfiguration pro Projekt einsehen: CLAUDE.md, Skills, Hooks, MCP (2026-03-17)
+
+Persona C (Co-Nutzer / AI-Hub-User):
+- Funktionen per Chat ueberpruefen, Schnittstellen zu Anbietern (Kalender, Midjourney)
+- Dashboard als zentraler Hub fuer AI- und arbeitsverbundene Aufgaben
+- API-Anfragen und Kosten ueberwachen pro API Key
+- GitHub-Projekte: Fortschritt anzeigen
+- Andere AI-Projekte vom Dashboard aus starten
+
+1.2 User Stories
+-----------------
+
+--- Release v1.0.0 (ERLEDIGT — 2026-03-17) ---
+
+US-S1: [DONE] Als Entwickler (H) will ich mehrere Claude CLI Sessions in einem Fenster verwalten.
+US-S2: [DONE] Als Entwickler (H) will ich Sessions erstellen, umbenennen, wechseln und schliessen.
+US-S3: [DONE] Als Entwickler (H) will ich Projektordner pro Session auswaehlen und zuweisen.
+US-S4: [DONE] Als Entwickler (H) will ich in der Sidebar erkennen ob eine Session aktiv arbeitet, denkt, wartet oder fertig ist.
+US-S5: [DONE] Als Entwickler (H) will ich globale Notizen im Dashboard festhalten.
+US-S6: [DONE] Als Entwickler (H) will ich die aktive Session mit Projektname im Header sehen.
+
+--- Release v1.1.0 (ERLEDIGT — 2026-03-17) — Agenten-Transparenz ---
+Prioritaet: HOCH | Aufwand: MITTEL | Abhaengigkeiten: Tauri File-Read Command
+
+US-A1: Als Entwickler (H) will ich die CLAUDE.md eines Projekts im Dashboard lesen koennen,
+       damit ich die Agenten-Anweisungen pruefen kann ohne die Datei manuell zu oeffnen.
+       Akzeptanzkriterien:
+       - CLAUDE.md wird aus dem Session-Ordner geladen
+       - Markdown wird gerendert dargestellt
+       - Aktualisiert sich bei Session-Wechsel
+
+US-A2: Als Entwickler (H) will ich die registrierten Skills (.claude/skills/) eines Projekts
+       auflisten und einsehen, damit ich nachvollziehen kann welche Faehigkeiten die Agenten haben.
+       Akzeptanzkriterien:
+       - Alle .md Dateien in .claude/skills/ werden aufgelistet
+       - Klick auf einen Skill zeigt den Inhalt
+       - Leerer Zustand wenn kein .claude/skills/ Ordner existiert
+
+US-A3: Als Entwickler (H) will ich die Hooks-Konfiguration (.claude/settings.json) eines Projekts
+       sehen, damit ich verstehe welche automatischen Aktionen bei Events ausgeloest werden.
+       Akzeptanzkriterien:
+       - settings.json wird geladen und Hooks-Sektion wird strukturiert angezeigt
+       - Unterscheidung zwischen Projekt- und User-Settings
+       - Fehlerfall: "Keine Hooks konfiguriert" wenn Datei fehlt
+
+US-A4: Als Entwickler (H) will ich nach einer Session pruefen koennen ob die Agenten sich an
+       das vorgesehene Design gehalten haben — eine Art Audit-View.
+       Akzeptanzkriterien:
+       - Zusammenfassung: welche Skills wurden aufgerufen vs. welche existieren
+       - Abweichungen vom CLAUDE.md hervorheben (Stretch Goal, v1.2.0+)
+
+--- Release v1.2.0 (ERLEDIGT — 2026-03-17) — GitHub-Integration ---
+Prioritaet: MITTEL | Aufwand: HOCH | Abhaengigkeiten: GitHub Token oder gh CLI
+
+US-G1: Als Entwickler (H) will ich pro Session/Projekt die offenen PRs sehen,
+       damit ich den Review-Status kenne ohne den Browser zu oeffnen.
+       Akzeptanzkriterien:
+       - Offene PRs mit Titel, Autor, Status (draft/review/approved)
+       - Klick oeffnet PR im Browser
+
+US-G2: Als Entwickler (H) will ich pro Session/Projekt die offenen Issues sehen,
+       damit ich weiss welche Bugs/Tasks anstehen.
+       Akzeptanzkriterien:
+       - Offene Issues mit Titel, Labels, Assignee
+       - Filterbar nach Label
+
+US-G3: Als Entwickler (H) will ich den aktuellen Branch und letzten Commit pro Projekt sehen,
+       damit ich weiss auf welchem Stand jede Session arbeitet.
+       Akzeptanzkriterien:
+       - Branch-Name + letzter Commit (Hash, Message, Zeitpunkt)
+       - Aktualisiert sich automatisch (Polling oder Event-basiert)
+
+--- Backlog (unpriorisiert) ---
+
+US-C1: Als AI-Hub-User (C) will ich API-Kosten pro Key ueberwachen.
+US-C2: Als AI-Hub-User (C) will ich andere AI-Projekte vom Dashboard starten.
+US-C3: Als AI-Hub-User (C) will ich Schnittstellen zu externen Anbietern nutzen (Kalender, Midjourney).
+US-O1: Als Entwickler (H) will ich OAuth Tokens fuer verschiedene Anbieter speichern.
+US-O2: Als Entwickler (H) will ich die Pipeline im Real-Modus (echte Claude CLI) starten.
+
+1.3 Machbarkeitsanalyse
+-------------------------
+
+v1.0.0 Session Manager: [ERLEDIGT] — Tauri v2 + React + PTY = funktioniert produktiv.
+
+v1.1.0 Agenten-Transparenz:
+- CLAUDE.md lesen: Machbar. Neuer Tauri-Command `read_file(path)` noetig.
+  Tauri v2 erlaubt Filesystem-Zugriff. Kein Security-Risiko da nur Lesen im Projektordner.
+- Skills auflisten: Machbar. `read_dir` + `read_file` fuer .claude/skills/*.md.
+- Hooks anzeigen: Machbar. JSON-Parse von .claude/settings.json im Frontend.
+- Audit-View: Teilweise machbar. Einfache Version (Config anzeigen) ja.
+  Volle Audit (was wurde wirklich aufgerufen) braucht Log-Analyse — Stretch Goal.
+- Fazit: MACHBAR mit bestehendem Tech-Stack, kein neues Tooling noetig.
+
+v1.2.0 GitHub-Integration:
+- Branch/Commit: Machbar. `git` CLI Commands via Tauri Shell-Plugin.
+- PRs/Issues: Machbar. Entweder `gh` CLI oder GitHub REST API direkt.
+  Token-Verwaltung existiert bereits im settingsStore (apiKeys[]).
+- Fazit: MACHBAR, braucht GitHub Token Onboarding im Settings-UI.
+
+================================================================================
+PHASE 2 — PLANUNG (v1.1.0 Agenten-Transparenz)
+================================================================================
+
+Scope: US-A1, US-A2, US-A3 (US-A4 Audit als Stretch Goal)
+
+UI-Konzept:
+- ENTSCHIEDEN (2026-03-17): Tab-Leiste ueber dem Terminal in der Session-Ansicht.
+  Begruendung: Kontextgebunden — Config gehoert zur Session die gerade laeuft.
+  Tabs: [Terminal] [CLAUDE.md] [Skills] [Hooks]
+  Beim Session-Wechsel aktualisiert sich der Inhalt automatisch.
+
+Technische Bausteine:
+1. Tauri-Command: `read_project_file(folder, relative_path)` → String
+2. Tauri-Command: `list_project_dir(folder, relative_path)` → Vec<String>
+3. Frontend-Komponenten: AgentConfigView, ClaudeMdViewer, SkillsList, HooksViewer
+4. Markdown-Rendering: Lightweight Library (z.B. react-markdown) oder Pre-Tag
+
+Reihenfolge:
+1. Tauri-Commands (Backend)
+2. CLAUDE.md Viewer (US-A1) — einfachster Einstieg
+3. Skills-Liste (US-A2)
+4. Hooks-Viewer (US-A3)
+5. Integration + Verifikation
+
+================================================================================
+PHASE 3 — ENTWURF (v1.1.0 Agenten-Transparenz)
+================================================================================
+
+3.1 UI-Architektur
+-------------------
+
+Aktuelle Struktur (SessionManagerView, Single-Modus):
+
+  ┌──────────────────────────────────────────────────────────┐
+  │ Header (Session-Kontext + Notizen)                       │
+  ├────────────┬─────────────────────────────────────────────┤
+  │ SessionList│ TerminalToolbar (Layout-Toggle)             │
+  │ (280px)    ├─────────────────────────────────────────────┤
+  │            │ SessionTerminal (xterm.js, 100% Platz)      │
+  │            │                                             │
+  │            │                                             │
+  ├────────────┴─────────────────────────────────────────────┤
+  │ SessionStatusBar                                         │
+  └──────────────────────────────────────────────────────────┘
+
+Neue Struktur mit Tab-Leiste:
+
+  ┌──────────────────────────────────────────────────────────┐
+  │ Header (Session-Kontext + Notizen)                       │
+  ├────────────┬─────────────────────────────────────────────┤
+  │ SessionList│ TerminalToolbar (Layout-Toggle)             │
+  │ (280px)    ├─────────────────────────────────────────────┤
+  │            │ ContentTabs: [Terminal] [CLAUDE.md] [Skills]│[Hooks]
+  │            ├─────────────────────────────────────────────┤
+  │            │ Tab-Content (je nach aktivem Tab):          │
+  │            │  - Terminal: SessionTerminal (xterm.js)     │
+  │            │  - CLAUDE.md: Markdown-Viewer (read-only)   │
+  │            │  - Skills: Liste + Detail-Ansicht           │
+  │            │  - Hooks: JSON-Viewer (strukturiert)        │
+  ├────────────┴─────────────────────────────────────────────┤
+  │ SessionStatusBar                                         │
+  └──────────────────────────────────────────────────────────┘
+
+Tab-Leiste: h-9 (36px), zwischen TerminalToolbar und Content.
+Nur im Single-Modus sichtbar (Grid-Modus zeigt nur Terminals).
+Default-Tab: "terminal" (kein Verhaltens-Bruch fuer bestehende User).
+
+3.2 Neue Tauri-Commands (Rust Backend)
+----------------------------------------
+
+Command 1: read_project_file(folder: String, relative_path: String) -> String
+  - Liest Datei aus Projektordner (z.B. folder + "/CLAUDE.md")
+  - Security: Pfad wird kanonisiert, muss innerhalb von folder bleiben
+  - Fehlerfall: Leerer String wenn Datei nicht existiert
+
+Command 2: list_project_dir(folder: String, relative_path: String) -> Vec<String>
+  - Listet Dateien in Unterordner (z.B. folder + "/.claude/skills/")
+  - Gibt nur Dateinamen zurueck, keine vollen Pfade
+  - Fehlerfall: Leere Liste wenn Ordner nicht existiert
+
+3.3 Neue Frontend-Komponenten
+-------------------------------
+
+ContentTabs.tsx (NEU):
+  - Tab-Leiste mit 4 Tabs: Terminal, CLAUDE.md, Skills, Hooks
+  - State: lokaler useState oder im sessionStore
+  - Props: activeTab, onTabChange
+  - Styling: accent-Farbe fuer aktiven Tab (wie SideNav-Pattern)
+
+ClaudeMdViewer.tsx (NEU):
+  - Laedt CLAUDE.md via read_project_file(folder, "CLAUDE.md")
+  - Rendert als Markdown (react-markdown oder einfaches <pre> fuer v1)
+  - Refresh-Button zum Neuladen
+  - Leerer Zustand: "Keine CLAUDE.md gefunden"
+
+SkillsViewer.tsx (NEU):
+  - Laedt Skill-Liste via list_project_dir(folder, ".claude/skills")
+  - Linke Liste: Skill-Dateien (.md)
+  - Rechte Seite: Inhalt der ausgewaehlten Skill-Datei
+  - Leerer Zustand: "Keine Skills konfiguriert"
+
+HooksViewer.tsx (NEU):
+  - Laedt .claude/settings.json via read_project_file
+  - Parsed JSON, zeigt hooks-Sektion strukturiert an
+  - Unterscheidung: Projekt-Settings vs. User-Settings
+  - Leerer Zustand: "Keine Hooks konfiguriert"
+
+3.4 Aenderungen an bestehenden Dateien
+-----------------------------------------
+
+SessionManagerView.tsx:
+  - Import ContentTabs + Viewer-Komponenten
+  - Neuer State: contentTab ("terminal" | "claude-md" | "skills" | "hooks")
+  - Tab-Leiste zwischen TerminalToolbar und Content-Area einfuegen
+  - Content-Area rendert je nach contentTab die passende Komponente
+  - Reset auf "terminal" bei Session-Wechsel
+
+src-tauri/src/lib.rs:
+  - Neue Commands registrieren: read_project_file, list_project_dir
+
+src-tauri/src/session/commands.rs (oder neues Modul):
+  - Implementierung der zwei Commands mit Path-Validation
+
+3.5 Abhaengigkeiten
+---------------------
+
+Keine neuen npm-Pakete noetig fuer v1 (Markdown als <pre> mit Whitespace).
+Optional spaeter: react-markdown fuer schoenes Rendering.
+
+3.6 Implementierungsreihenfolge
+---------------------------------
+
+Schritt 1: Tauri-Commands (read_project_file, list_project_dir)
+Schritt 2: ContentTabs.tsx + Integration in SessionManagerView
+Schritt 3: ClaudeMdViewer.tsx (US-A1)
+Schritt 4: SkillsViewer.tsx (US-A2)
+Schritt 5: HooksViewer.tsx (US-A3)
+Schritt 6: Verifikation (tsc, build, visueller Test)
+
+================================================================================
+PHASE 2+3 — PLANUNG & ENTWURF (v1.2.0 GitHub-Integration)
+================================================================================
+
+Scope: US-G1 (PRs), US-G2 (Issues), US-G3 (Branch/Commit)
+
+Machbarkeit (verifiziert):
+- tauri-plugin-shell installiert + aktiviert
+- std::process::Command Pattern im Backend vorhanden (folder_actions, pipeline)
+- api.github.com bereits in CSP connect-src erlaubt
+- apiKeys[] im settingsStore bereit fuer GitHub Token
+- gh CLI wird bereits im logParser erkannt
+
+Ansatz: git CLI fuer lokale Infos (Branch, Commit), gh CLI fuer GitHub-Daten (PRs, Issues).
+Kein direkter GitHub API Call vom Frontend — alles via Tauri-Commands (sicherer, Token bleibt im Backend).
+
+UI-Konzept:
+- Neuer Content-Tab "GitHub" in der Tab-Leiste (neben Terminal, CLAUDE.md, Skills, Hooks)
+- Zeigt: Branch + letzter Commit (oben), PRs (Mitte), Issues (unten)
+- Fallback: "gh CLI nicht gefunden" oder "kein Git-Repo" Hinweis
+
+Tauri-Commands:
+1. get_git_info(folder) -> { branch, lastCommit: { hash, message, date }, remoteUrl }
+2. get_github_prs(folder) -> Vec<{ number, title, author, status, url }>
+3. get_github_issues(folder) -> Vec<{ number, title, labels, assignee, url }>
+
+Implementierungsreihenfolge:
+1. Tauri-Commands: git_info, github_prs, github_issues
+2. GitHubViewer.tsx Frontend-Komponente
+3. ContentTabs um "GitHub" Tab erweitern
+4. Verifikation
+
+================================================================================
+RELEASE-STATUS (Stand: 2026-03-25)
+================================================================================
+
+v1.0.0 [DONE] — Session Manager MVP (2026-03-17)
+  US-S1..S6: Multi-Session, Terminal, Favoriten, Grid, Notizen, Header-Kontext
+
+v1.1.0 [DONE] — Agenten-Transparenz (2026-03-17)
+  US-A1..A3: CLAUDE.md Viewer, Skills Viewer, Hooks Viewer
+  US-A4 (Stretch): Audit-View — NICHT umgesetzt
+
+v1.2.0 [DONE] — GitHub-Integration (2026-03-17)
+  US-G1..G3: PRs, Issues, Git Info im Dashboard
+
+Ungeplant umgesetzt:
+  - Theming-System (Dark/Light) + Accent Colors (2026-03-24)
+  - Changelog-Dialog (2026-03-24)
+  - Projekt-Notizen ohne Session browsebar (2026-03-25)
+  - Toast-System, Error Boundaries, Favoriten-System
+
+================================================================================
+KONSOLIDIERUNGS-SPRINT (ab 2026-03-25)
+================================================================================
+
+Ziel: Prozess-Reife erhoehen, Tech Debt abbauen, saubere Grundlage fuer
+      Feature-Forward schaffen.
+
+Erkenntnisse aus Retrospektive:
+- Prozess-Reife: 4/10 (Doku 8/10, Einhaltung 3/10)
+- 12 tote Dateien (nie integrierter Code)
+- 0 automatisierte Tests trotz geplanter Testing-Pyramide
+- Phasen 5-7 (Test, Einfuehrung, Wartung) nie durchlaufen
+
+Tasks: Siehe tasks/todo.md
+Ideen: Siehe tasks/ideas.md
+Lessons: Siehe tasks/lessons.md
+
+================================================================================
+FEATURE-FORWARD SPRINT — Pipeline-Ueberwachung (ab 2026-03-28)
+================================================================================
+
+Ziel: Dashboard von reiner Session-Verwaltung zu aktiver Pipeline-Ueberwachung
+      erweitern. Erkannte Agenten und Worktrees visualisieren, Workflows aus
+      Projekt-Konfiguration ableiten.
+
+Grundlage: Bestehende Infrastruktur (agent_detector.rs, agentStore.ts,
+           pipelineStore.ts, DashboardMap.tsx) wird mit echten Daten verbunden.
+
+User Stories: Siehe tasks/user-stories-pipeline.md
+
+--- MVP (Phase 1) ---
+
+US-P1: [OFFEN] Pipeline-View mit echten Daten
+  Erkannte Agenten und Worktrees als Nodes in DashboardMap.tsx.
+  Abhaengigkeiten: agentStore, agent_detector (existieren)
+  Issue: #12
+
+US-P2: [OFFEN] Workflow-Erkennung aus Projekt-Konfiguration
+  Skills + Hooks analysieren → Workflow-Profil anzeigen.
+  Abhaengigkeiten: Tauri-Commands read_project_file, list_project_dir (existieren)
+  Issue: #13
+
+US-P4: [OFFEN] Paralleles Agent-Tracking
+  Alle aktiven Agenten ueber alle Sessions hinweg ueberwachen.
+  Abhaengigkeiten: agentStore (existiert)
+  Issue: Neu
+
+--- Phase 2 ---
+
+US-P3: [OFFEN] Session-Start nach erkanntem Workflow
+  Skill direkt aus Dashboard starten → neue Session mit vorausgefuelltem Befehl.
+  Abhaengigkeiten: US-P2
+  Issue: #13
+
+US-P5: [OFFEN] Agent-Hierarchie-Darstellung
+  Parent/Child-Beziehungen zwischen Agenten als Baumstruktur.
+  Abhaengigkeiten: US-P1, agent_detector.rs Erweiterung
+  Issue: Neu
+
+--- Architektur-Entscheidungen ---
+
+1. "Workflow" = benannte Sammlung erkannter Skills + Hooks eines Projekts
+2. MVP ist manuell (User klickt "Starten"), automatisches Triggern ist Future
+3. DashboardMap.tsx wird mit agentStore-Daten gespeist statt pipelineStore Mock
+4. Kein neues Visualisierungs-Framework — bestehende Isometrie wiederverwenden
+
+Details: tasks/user-stories-pipeline.md (Abschnitt "Architektur-Entscheidungen")
+
+================================================================================
+BACKLOG (unpriorisiert)
+================================================================================
+
+US-C1: API-Kosten pro Key ueberwachen (niedrige Prio)
+US-C3: Schnittstellen zu externen Anbietern (Kalender, Midjourney)
+US-O1: OAuth Tokens speichern (Keychain-Integration)
+US-A4: Audit-View (Agent-Compliance pruefen, abhaengig von US-P2)
+---:   Settings-UI (Store komplett, Placeholder als UI)
+---:   Smoke-Tests einrichten (mindestens Stores + kritische Flows)
+---:   CI/CD Pipeline (GitHub Actions)
+
+================================================================================
+PHASE 4-7 — werden nach Feature-Forward-Sprint geplant
+================================================================================
