@@ -2,6 +2,7 @@ import { LayoutList, LayoutGrid, PanelRightOpen, PanelRightClose, GitBranch } fr
 import type { LayoutMode } from "../../store/sessionStore";
 import { useGitBranch } from "../../hooks/useGitBranch";
 import { DiffActionButton } from "../diff/DiffActionButton";
+import { TasksPanel } from "../shared/TasksPanel";
 
 interface TerminalToolbarProps {
   layoutMode: LayoutMode;
@@ -59,6 +60,7 @@ export function TerminalToolbar({
           errorSource="TerminalToolbar.openDiff"
         />
       )}
+      <TasksPanel variant="window" folder={folder} sessionId={sessionId} />
 
       {/* Config panel toggle — only in single mode */}
       {layoutMode === "single" && onToggleConfigPanel && (

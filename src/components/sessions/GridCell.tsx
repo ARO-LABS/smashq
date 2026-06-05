@@ -2,6 +2,7 @@ import { Maximize2, X, GitBranch } from "lucide-react";
 import { useSessionStore } from "../../store/sessionStore";
 import { useGitBranch } from "../../hooks/useGitBranch";
 import { DiffActionButton } from "../diff/DiffActionButton";
+import { TasksPanel } from "../shared/TasksPanel";
 
 interface GridCellChromeProps {
   sessionId: string;
@@ -48,6 +49,11 @@ export function GridCellChrome({
         iconSize="inline"
         padding="p-1"
         errorSource="GridCell.openDiff"
+      />
+      <TasksPanel
+        variant="grid-tile"
+        folder={session?.folder}
+        sessionId={sessionId}
       />
       <button
         onClick={(e) => {
