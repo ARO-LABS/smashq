@@ -40,7 +40,7 @@ export function StatusDot({ status, size = 8 }: StatusDotProps): JSX.Element {
       <span
         aria-label="in Arbeit"
         role="img"
-        className="shrink-0 rounded-full bg-accent animate-pulse"
+        className="shrink-0 rounded-full bg-accent status-pulse-animation"
         style={{ width: size, height: size, display: "inline-block" }}
       />
     );

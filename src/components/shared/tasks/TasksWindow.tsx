@@ -101,7 +101,7 @@ function AddTaskRow({ onAdd }: AddTaskRowProps): JSX.Element {
           }
         }}
         placeholder="Aufgabe hinzufügen — Enter"
-        className="flex-1 bg-transparent text-[11.5px] text-neutral-300 placeholder:text-neutral-600 focus-visible:outline-none"
+        className="flex-1 bg-transparent text-[11.5px] text-neutral-300 placeholder:text-neutral-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-inset rounded-sm"
         aria-label="Aufgabe hinzufügen"
       />
     </div>

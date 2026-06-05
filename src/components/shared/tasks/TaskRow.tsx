@@ -126,7 +126,7 @@ export function TaskRow({
     >
       {/* Header row */}
       <div className="flex gap-2 items-start">
-        <StatusDot status={task.status} size={8} aria-hidden />
+        <StatusDot status={task.status} size={8} />
 
         <span
           className={[

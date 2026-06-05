@@ -8,9 +8,9 @@ describe("StatusDot", () => {
   it("renders active dot with accent background and pulse animation", () => {
     const { container } = render(<StatusDot status="active" />);
     const dot = screen.getByRole("img", { name: "in Arbeit" });
-    // Active state must carry bg-accent and animate-pulse (reuse of running-session class)
+    // Active state must carry bg-accent and the design-token pulse (exponential easing, matches StatusBadge)
     expect(dot.className).toContain("bg-accent");
-    expect(dot.className).toContain("animate-pulse");
+    expect(dot.className).toContain("status-pulse-animation");
     // Confirm no border class is applied (distinguishes it from open ring)
     expect(dot.className).not.toContain("border");
     // Size defaults to 8px
@@ -24,7 +24,7 @@ describe("StatusDot", () => {
     const { container } = render(<StatusDot status="done" size={14} />);
     const dot = screen.getByRole("img", { name: "erledigt" });
     expect(dot.className).toContain("bg-success");
-    expect(dot.className).not.toContain("animate-pulse");
+    expect(dot.className).not.toContain("status-pulse-animation");
     // Custom size is applied
     expect((dot as HTMLElement).style.width).toBe("14px");
     expect(container.firstChild).toBeTruthy();

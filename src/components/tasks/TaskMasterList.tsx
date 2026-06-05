@@ -111,7 +111,7 @@ function InlineAddRow({
           }
         }}
         placeholder="Aufgabe hinzufügen — Enter"
-        className="flex-1 bg-transparent text-xs text-neutral-200 placeholder:text-neutral-600 focus-visible:outline-none"
+        className="flex-1 bg-transparent text-xs text-neutral-200 placeholder:text-neutral-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-inset rounded-sm"
         aria-label="Neue Aufgabe"
       />
     </div>
