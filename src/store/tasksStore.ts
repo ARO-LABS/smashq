@@ -105,9 +105,21 @@ export interface AddTaskInput {
   source?: TaskSource;
 }
 
+export type UpdateTaskFields = Partial<
+  Pick<
+    TaskItem,
+    "title" | "projectKey" | "status" | "deadline" | "deadlineHasTime" | "note" | "subtasks"
+  >
+>;
+
 interface TasksState {
   tasks: TaskItem[];
   addTask: (input: AddTaskInput) => string;
+  updateTask: (id: string, fields: UpdateTaskFields) => void;
+  completeTask: (id: string) => void;
+  reopenTask: (id: string) => void;
+  archiveTask: (id: string) => void;
+  reorderTask: (id: string, sortIndex: number) => void;
 }
 
 function createTaskId(): string {
@@ -141,6 +153,39 @@ export const useTasksStore = create<TasksState>()(
         if (typeof input.note === "string") task.note = input.note;
         set({ tasks: [...tasks, task] });
         return id;
+      },
+
+      updateTask: (id, fields) =>
+        set((state) => ({
+          tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...fields } : t)),
+        })),
+
+      completeTask: (id) =>
+        set((state) => ({
+          tasks: state.tasks.map((t) =>
+            t.id === id ? { ...t, status: "done" as const, completedAt: Date.now() } : t,
+          ),
+        })),
+
+      reopenTask: (id) =>
+        set((state) => ({
+          tasks: state.tasks.map((t) =>
+            t.id === id ? { ...t, status: "open" as const, completedAt: null } : t,
+          ),
+        })),
+
+      archiveTask: (id) =>
+        set((state) => ({
+          tasks: state.tasks.map((t) =>
+            t.id === id ? { ...t, archivedAt: Date.now() } : t,
+          ),
+        })),
+
+      reorderTask: (id, sortIndex) => {
+        if (!Number.isFinite(sortIndex)) return;
+        set((state) => ({
+          tasks: state.tasks.map((t) => (t.id === id ? { ...t, sortIndex } : t)),
+        }));
       },
     }),
     {

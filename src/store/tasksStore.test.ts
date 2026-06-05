@@ -114,3 +114,60 @@ describe("useTasksStore.addTask", () => {
     expect(useTasksStore.getState().tasks[0].projectKey).toBeNull();
   });
 });
+
+describe("useTasksStore mutations", () => {
+  beforeEach(resetTasks);
+
+  it("updateTask merges allowed fields", () => {
+    const id = useTasksStore.getState().addTask({ title: "x" });
+    useTasksStore.getState().updateTask(id, { title: "y", deadline: 99, note: "hi" });
+    const t = useTasksStore.getState().tasks[0];
+    expect(t.title).toBe("y");
+    expect(t.deadline).toBe(99);
+    expect(t.note).toBe("hi");
+  });
+
+  it("updateTask is a no-op for an unknown id", () => {
+    const id = useTasksStore.getState().addTask({ title: "x" });
+    useTasksStore.getState().updateTask("nope", { title: "changed" });
+    expect(useTasksStore.getState().tasks[0].title).toBe("x");
+    expect(useTasksStore.getState().tasks[0].id).toBe(id);
+  });
+
+  it("completeTask sets status done + completedAt", () => {
+    const id = useTasksStore.getState().addTask({ title: "x" });
+    useTasksStore.getState().completeTask(id);
+    const t = useTasksStore.getState().tasks[0];
+    expect(t.status).toBe("done");
+    expect(typeof t.completedAt).toBe("number");
+  });
+
+  it("reopenTask clears completedAt and sets status open", () => {
+    const id = useTasksStore.getState().addTask({ title: "x" });
+    useTasksStore.getState().completeTask(id);
+    useTasksStore.getState().reopenTask(id);
+    const t = useTasksStore.getState().tasks[0];
+    expect(t.status).toBe("open");
+    expect(t.completedAt).toBeNull();
+  });
+
+  it("archiveTask sets archivedAt (soft delete, entry stays)", () => {
+    const id = useTasksStore.getState().addTask({ title: "x" });
+    useTasksStore.getState().archiveTask(id);
+    const t = useTasksStore.getState().tasks[0];
+    expect(typeof t.archivedAt).toBe("number");
+    expect(useTasksStore.getState().tasks).toHaveLength(1);
+  });
+
+  it("reorderTask sets the sortIndex directly", () => {
+    const id = useTasksStore.getState().addTask({ title: "x" });
+    useTasksStore.getState().reorderTask(id, 5500);
+    expect(useTasksStore.getState().tasks[0].sortIndex).toBe(5500);
+  });
+
+  it("reorderTask ignores a non-finite index", () => {
+    const id = useTasksStore.getState().addTask({ title: "x" });
+    useTasksStore.getState().reorderTask(id, Number.NaN);
+    expect(useTasksStore.getState().tasks[0].sortIndex).toBe(1000);
+  });
+});
