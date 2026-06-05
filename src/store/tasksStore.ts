@@ -251,19 +251,20 @@ export const useTasksStore = create<TasksState>()(
         const p = persisted as { tasks?: unknown } | null;
         return { tasks: sanitizeTasks(p?.tasks) };
       },
-      // Same-version corruption recovery: migrate only runs on a version
-      // bump; a tampered tasks.json at the current version must still be
-      // healed before the first render reads it (mirrors settingsStore #209).
-      onRehydrateStorage: () => (state, error) => {
-        if (error) {
-          logError("tasksStore.hydration", error);
-          return;
-        }
-        if (!state) return;
-        const clean = sanitizeTasks(state.tasks);
-        if (JSON.stringify(clean) !== JSON.stringify(state.tasks)) {
-          useTasksStore.setState({ tasks: clean });
-        }
+      // Heal corruption in the SYNCHRONOUS merge path: it returns the state
+      // that feeds the first render, and — critically — it does NOT reference
+      // useTasksStore. Eager hydration runs DURING create(persist(...)), before
+      // useTasksStore is bound, so calling useTasksStore.setState() from
+      // onRehydrateStorage hits a TDZ ReferenceError (caught only at runtime
+      // with non-empty persisted data). merge covers the same-version tamper
+      // class that migrate (version-bump-only) misses. See lessons #209 /
+      // "heal in merge, not onRehydrateStorage".
+      merge: (persisted: unknown, current: TasksState): TasksState => {
+        const p = persisted as { tasks?: unknown } | null;
+        return { ...current, tasks: sanitizeTasks(p?.tasks) };
+      },
+      onRehydrateStorage: () => (_state, error) => {
+        if (error) logError("tasksStore.hydration", error);
       },
     },
   ),
