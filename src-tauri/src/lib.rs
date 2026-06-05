@@ -262,6 +262,8 @@ pub fn run() {
             settings::commands::save_favorites_file,
             settings::commands::load_notes,
             settings::commands::save_note_file,
+            settings::commands::load_tasks,
+            settings::commands::save_tasks,
         ])
         .on_window_event(move |window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
