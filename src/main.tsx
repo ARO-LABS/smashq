@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from "react";
 import ReactDOM from "react-dom/client";
 import { initTauriStorage } from "./store/tauriStorage";
+import { initTasksStorage } from "./store/tasksStorage";
 import "./index.css";
 
 const LogWindowApp = lazy(() => import("./LogWindowApp"));
@@ -9,7 +10,7 @@ const DiffWindowApp = lazy(() => import("./DiffWindowApp"));
 
 const DETACHED_VIEWS = new Set(["kanban", "library", "editor", "settings"]);
 
-initTauriStorage().then(async () => {
+Promise.all([initTauriStorage(), initTasksStorage()]).then(async () => {
   if (import.meta.env.DEV || localStorage.getItem("agenticexplorer-perf") === "1") {
     const { initPerf } = await import("./utils/perfLogger");
     initPerf();

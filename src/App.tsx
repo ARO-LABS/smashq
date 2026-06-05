@@ -6,6 +6,7 @@ import { useThemeEffect } from "./hooks/useThemeEffect";
 import { useSessionRestore } from "./hooks/useSessionRestore";
 import { initSessionRestoreSync } from "./store/sessionRestoreSync";
 import { flushPendingSaves } from "./store/tauriStorage";
+import { flushPendingTaskSaves } from "./store/tasksStorage";
 import { useUIStore } from "./store/uiStore";
 
 function App() {
@@ -55,10 +56,11 @@ function App() {
     import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
       return getCurrentWindow().onCloseRequested(async () => {
         await flushPendingSaves();
+        await flushPendingTaskSaves();
       }).then((fn) => { unlistenClose = fn; });
     }).catch(() => {
       // Fallback for non-Tauri environments (dev browser)
-      window.addEventListener("beforeunload", () => { flushPendingSaves(); });
+      window.addEventListener("beforeunload", () => { flushPendingSaves(); flushPendingTaskSaves(); });
     });
 
     // Sync open sessions to settingsStore for restore on next startup
