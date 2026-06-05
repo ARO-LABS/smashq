@@ -8,7 +8,7 @@ const LogWindowApp = lazy(() => import("./LogWindowApp"));
 const DetachedViewApp = lazy(() => import("./DetachedViewApp"));
 const DiffWindowApp = lazy(() => import("./DiffWindowApp"));
 
-const DETACHED_VIEWS = new Set(["kanban", "library", "editor", "settings"]);
+const DETACHED_VIEWS = new Set(["kanban", "library", "editor", "settings", "tasks"]);
 
 Promise.all([initTauriStorage(), initTasksStorage()]).then(async () => {
   if (import.meta.env.DEV || localStorage.getItem("agenticexplorer-perf") === "1") {

@@ -89,9 +89,9 @@ describe("ICON_SIZE tokens", () => {
 });
 
 describe("ICONS registry — completeness & validity", () => {
-  it("exposes the five groups plus top-level pin + notes + group icons", () => {
+  it("exposes the icon groups plus top-level pin + notes + tasks + group icons", () => {
     expect(Object.keys(ICONS).sort()).toEqual(
-      ["action", "groupCollapse", "groupCreate", "nav", "notes", "pin", "theme", "toast", "update"],
+      ["action", "groupCollapse", "groupCreate", "nav", "notes", "pin", "tasks", "theme", "toast", "update"],
     );
   });
 

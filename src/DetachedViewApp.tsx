@@ -14,6 +14,9 @@ const MarkdownEditorView = lazy(() =>
 const PreferencesView = lazy(() =>
   import("./components/settings/PreferencesView").then((m) => ({ default: m.PreferencesView }))
 );
+const TasksView = lazy(() =>
+  import("./components/tasks/TasksView").then((m) => ({ default: m.TasksView }))
+);
 
 function NeonSpinner() {
   return (
@@ -47,6 +50,8 @@ export default function DetachedViewApp({ view }: { view: string }) {
         return <MarkdownEditorView />;
       case "settings":
         return <PreferencesView />;
+      case "tasks":
+        return <TasksView />;
       default:
         return <div className="flex items-center justify-center h-full text-neutral-500">Unbekannte Ansicht: {view}</div>;
     }
