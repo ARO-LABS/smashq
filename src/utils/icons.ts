@@ -35,6 +35,8 @@ import {
   ArrowDownCircle, AlertCircle,
   // misc
   Pin, NotebookPen,
+  // tasks
+  ListChecks, Check, CalendarClock, Calendar, CalendarPlus, ArrowRight, Clock, Circle,
 } from "lucide-react";
 
 /**
@@ -96,6 +98,27 @@ export const ICONS = {
   /** Inline "+ Neue Gruppe" button (FavoritesList footer). */
   groupCreate: Plus,
   groupCollapse: ChevronDown,
+  /** Tasks feature — dock launcher, status dots, deadline chips, actions. */
+  tasks: {
+    /** Dock launcher + terminal-toolbar icon + window header. */
+    panel: ListChecks,
+    /** Erledigt action + done dot + subtask done. */
+    check: Check,
+    /** Open status dot (rendered as hollow ring). */
+    open: Circle,
+    /** Deadline chip + Deadline field value. */
+    deadline: CalendarClock,
+    /** Date display / editor header. */
+    calendar: Calendar,
+    /** "In Kalender" .ics export. */
+    calendarAdd: CalendarPlus,
+    /** Wieder öffnen. */
+    reopen: RotateCcw,
+    /** "nächste" marker + "In großer Ansicht öffnen". */
+    next: ArrowRight,
+    /** Relative-deadline glyph inside chip. */
+    clock: Clock,
+  },
 } as const;
 
 /**

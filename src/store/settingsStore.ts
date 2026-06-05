@@ -122,6 +122,28 @@ export function sanitizeNotesWindowSize(value: unknown): WindowSize {
   };
 }
 
+/** Default size for the Tasks floating window. */
+export const DEFAULT_TASKS_WINDOW_SIZE: WindowSize = { w: 348, h: 348 };
+
+/**
+ * Clamp + sanitize a candidate tasks-window size. Bounds:
+ *   width  in [280, 2400]
+ *   height in [200, 1600]
+ * Falls back to DEFAULT_TASKS_WINDOW_SIZE on any corruption (NaN, negative,
+ * wrong type, missing field). Mirrors sanitizeNotesWindowSize 1:1.
+ */
+export function sanitizeTasksWindowSize(value: unknown): WindowSize {
+  const def = DEFAULT_TASKS_WINDOW_SIZE;
+  if (!value || typeof value !== "object") return def;
+  const v = value as Record<string, unknown>;
+  const rawW = typeof v.w === "number" && Number.isFinite(v.w) ? v.w : def.w;
+  const rawH = typeof v.h === "number" && Number.isFinite(v.h) ? v.h : def.h;
+  return {
+    w: Math.max(280, Math.min(2400, Math.floor(rawW))),
+    h: Math.max(200, Math.min(1600, Math.floor(rawH))),
+  };
+}
+
 export interface ApiKeyMetadataEntry {
   id: string;
   provider: string;
@@ -216,6 +238,8 @@ export interface SettingsState {
   sessionAccents: Record<string, string>;
   /** Persisted size of the floating notes window. */
   notesWindowSize: WindowSize;
+  /** Persisted size of the floating tasks window. */
+  tasksWindowSize: WindowSize;
 
   // Actions
   setTheme: (partial: Partial<ThemeSettings>) => void;
@@ -245,6 +269,7 @@ export interface SettingsState {
   removeRestorableSessionByClaudeId: (claudeSessionId: string) => void;
 
   setNotesWindowSize: (size: WindowSize) => void;
+  setTasksWindowSize: (size: WindowSize) => void;
 
   addApiKeyMetadata: (entry: ApiKeyMetadataEntry) => void;
   removeApiKeyMetadata: (id: string) => void;
@@ -456,6 +481,7 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
     sessionTitleOverrides: {} as Record<string, string>,
     sessionAccents: {} as Record<string, string>,
     notesWindowSize: DEFAULT_NOTES_WINDOW_SIZE,
+    tasksWindowSize: DEFAULT_TASKS_WINDOW_SIZE,
   };
   if (!persisted || typeof persisted !== "object") return defaults as unknown as SettingsState;
   const p = persisted as Record<string, unknown>;
@@ -553,6 +579,7 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
       )
       : defaults.sessionAccents,
     notesWindowSize: sanitizeNotesWindowSize(p.notesWindowSize),
+    tasksWindowSize: sanitizeTasksWindowSize(p.tasksWindowSize),
   } as unknown as SettingsState; // Actions are added by Zustand during merge
 }
 
@@ -629,9 +656,13 @@ export const useSettingsStore = create<SettingsState>()(
       sessionTitleOverrides: {},
       sessionAccents: {},
       notesWindowSize: DEFAULT_NOTES_WINDOW_SIZE,
+      tasksWindowSize: DEFAULT_TASKS_WINDOW_SIZE,
 
       setNotesWindowSize: (size) =>
         set({ notesWindowSize: sanitizeNotesWindowSize(size) }),
+
+      setTasksWindowSize: (size) =>
+        set({ tasksWindowSize: sanitizeTasksWindowSize(size) }),
 
       setSessionRestore: (data) => set({ sessionRestore: data }),
 
@@ -1089,8 +1120,9 @@ export const useSettingsStore = create<SettingsState>()(
         sessionTitleOverrides: state.sessionTitleOverrides,
         sessionAccents: state.sessionAccents,
         notesWindowSize: state.notesWindowSize,
+        tasksWindowSize: state.tasksWindowSize,
       }),
-      version: 7,
+      version: 8,
       migrate: (persisted: unknown, fromVersion: number) => _settingsMigrate(persisted, fromVersion),
       // SYNCHRONOUS heal of the rehydrated state. This runs DURING rehydration
       // and its return value feeds the very first render — unlike
@@ -1150,6 +1182,15 @@ export const useSettingsStore = create<SettingsState>()(
             validatedSize.h !== state.notesWindowSize?.h
           ) {
             patches.notesWindowSize = validatedSize;
+          }
+
+          // Same-version-recovery for tasksWindowSize: mirrors notesWindowSize pattern.
+          const validatedTasksSize = sanitizeTasksWindowSize(state.tasksWindowSize);
+          if (
+            validatedTasksSize.w !== state.tasksWindowSize?.w ||
+            validatedTasksSize.h !== state.tasksWindowSize?.h
+          ) {
+            patches.tasksWindowSize = validatedTasksSize;
           }
 
           // Validate favoriteGroups + favorites for dangling groupIds and NaN
