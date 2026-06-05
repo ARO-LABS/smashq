@@ -130,15 +130,19 @@ function createTaskId(): string {
 // Curried selectors (project-scoped) return a (state) => T function so they
 // compose with useTasksStore(selectX(key)) without re-creating arrays inline.
 
-/** All non-archived tasks. */
+/** All non-archived tasks, sorted by sortIndex. */
 export const selectActiveTasks = (state: TasksState): TaskItem[] =>
-  state.tasks.filter((t) => t.archivedAt === null);
+  state.tasks
+    .filter((t) => t.archivedAt === null)
+    .sort((a, b) => a.sortIndex - b.sortIndex);
 
-/** Non-archived tasks for one projectKey (null = global tasks). */
+/** Non-archived tasks for one projectKey (null = global tasks), sorted by sortIndex. */
 export const selectTasksForProject =
   (projectKey: string | null) =>
   (state: TasksState): TaskItem[] =>
-    state.tasks.filter((t) => t.archivedAt === null && t.projectKey === projectKey);
+    state.tasks
+      .filter((t) => t.archivedAt === null && t.projectKey === projectKey)
+      .sort((a, b) => a.sortIndex - b.sortIndex);
 
 /** Open (not done) non-archived tasks for one projectKey, sorted by sortIndex. */
 export const selectOpenTasksForProject =
@@ -190,7 +194,24 @@ export const useTasksStore = create<TasksState>()(
 
       updateTask: (id, fields) =>
         set((state) => ({
-          tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...fields } : t)),
+          tasks: state.tasks.map((t) => {
+            if (t.id !== id) return t;
+            const next: TaskItem = { ...t, ...fields };
+            // Live mutations bypass the hydration sanitizer; coerce the two
+            // fields a UI form can realistically corrupt so we never persist
+            // values sanitizeTask would reject on the next load.
+            if ("deadline" in fields) {
+              next.deadline = toNullableTimestamp(fields.deadline);
+            }
+            if ("subtasks" in fields) {
+              next.subtasks = Array.isArray(fields.subtasks)
+                ? fields.subtasks
+                    .map(sanitizeSubtask)
+                    .filter((s): s is Subtask => s !== null)
+                : t.subtasks;
+            }
+            return next;
+          }),
         })),
 
       completeTask: (id) =>

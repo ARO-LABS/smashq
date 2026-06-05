@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { sanitizeTask, sanitizeTasks, useTasksStore, selectActiveTasks, selectTasksForProject, selectOpenTasksForProject, selectNextTask } from "./tasksStore";
+import { sanitizeTask, sanitizeTasks, useTasksStore, selectActiveTasks, selectTasksForProject, selectOpenTasksForProject, selectNextTask, type Subtask } from "./tasksStore";
 
 describe("sanitizeTask", () => {
   const valid = {
@@ -134,6 +134,22 @@ describe("useTasksStore mutations", () => {
     expect(useTasksStore.getState().tasks[0].id).toBe(id);
   });
 
+  it("updateTask coerces an invalid deadline to null", () => {
+    const id = useTasksStore.getState().addTask({ title: "x", deadline: 100 });
+    useTasksStore.getState().updateTask(id, { deadline: Number.NaN });
+    expect(useTasksStore.getState().tasks[0].deadline).toBeNull();
+  });
+
+  it("updateTask drops malformed subtasks", () => {
+    const id = useTasksStore.getState().addTask({ title: "x" });
+    useTasksStore.getState().updateTask(id, {
+      subtasks: [{ id: "ok", title: "t", done: true }, { id: 5 }] as unknown as Subtask[],
+    });
+    expect(useTasksStore.getState().tasks[0].subtasks).toEqual([
+      { id: "ok", title: "t", done: true },
+    ]);
+  });
+
   it("completeTask sets status done + completedAt", () => {
     const id = useTasksStore.getState().addTask({ title: "x" });
     useTasksStore.getState().completeTask(id);
@@ -212,5 +228,23 @@ describe("tasks selectors", () => {
     const id = useTasksStore.getState().addTask({ title: "x", projectKey: "c:/p" });
     useTasksStore.getState().completeTask(id);
     expect(selectNextTask("c:/p")(useTasksStore.getState())).toBeUndefined();
+  });
+});
+
+describe("tasksStore corruption recovery", () => {
+  beforeEach(resetTasks);
+
+  it("[#209] rehydrate heals a tampered same-version payload", async () => {
+    localStorage.setItem(
+      "smashq-tasks",
+      JSON.stringify({
+        state: { tasks: [{ id: "good", title: "ok" }, { title: "no id" }, null] },
+        version: 1,
+      }),
+    );
+    await useTasksStore.persist.rehydrate();
+    const tasks = useTasksStore.getState().tasks;
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].id).toBe("good");
   });
 });
