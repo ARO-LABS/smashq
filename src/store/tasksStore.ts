@@ -1,3 +1,8 @@
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+import { logError } from "../utils/errorLogger";
+import { tasksStorage } from "./tasksStorage";
+
 // ── Types ─────────────────────────────────────────────────────────────
 
 export type TaskStatus = "open" | "active" | "done";
@@ -88,3 +93,79 @@ export function sanitizeTasks(value: unknown): TaskItem[] {
   if (!Array.isArray(value)) return [];
   return value.map(sanitizeTask).filter((t): t is TaskItem => t !== null);
 }
+
+// ── Store ─────────────────────────────────────────────────────────────
+
+export interface AddTaskInput {
+  title: string;
+  projectKey?: string | null;
+  deadline?: number | null;
+  deadlineHasTime?: boolean;
+  note?: string;
+  source?: TaskSource;
+}
+
+interface TasksState {
+  tasks: TaskItem[];
+  addTask: (input: AddTaskInput) => string;
+}
+
+function createTaskId(): string {
+  return `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export const useTasksStore = create<TasksState>()(
+  persist(
+    (set, get) => ({
+      tasks: [],
+
+      addTask: (input: AddTaskInput): string => {
+        const id = createTaskId();
+        const now = Date.now();
+        const tasks = get().tasks;
+        const maxSort = tasks.reduce((m, t) => Math.max(m, t.sortIndex), 0);
+        const task: TaskItem = {
+          id,
+          projectKey: input.projectKey ?? null,
+          title: input.title.trim(),
+          status: "open",
+          deadline: input.deadline ?? null,
+          deadlineHasTime: input.deadlineHasTime ?? false,
+          subtasks: [],
+          source: input.source ?? "manual",
+          sortIndex: maxSort + 1000,
+          createdAt: now,
+          completedAt: null,
+          archivedAt: null,
+        };
+        if (typeof input.note === "string") task.note = input.note;
+        set({ tasks: [...tasks, task] });
+        return id;
+      },
+    }),
+    {
+      name: "smashq-tasks",
+      storage: createJSONStorage(() => tasksStorage),
+      partialize: (state) => ({ tasks: state.tasks }),
+      version: 1,
+      migrate: (persisted: unknown): { tasks: TaskItem[] } => {
+        const p = persisted as { tasks?: unknown } | null;
+        return { tasks: sanitizeTasks(p?.tasks) };
+      },
+      // Same-version corruption recovery: migrate only runs on a version
+      // bump; a tampered tasks.json at the current version must still be
+      // healed before the first render reads it (mirrors settingsStore #209).
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          logError("tasksStore.hydration", error);
+          return;
+        }
+        if (!state) return;
+        const clean = sanitizeTasks(state.tasks);
+        if (JSON.stringify(clean) !== JSON.stringify(state.tasks)) {
+          useTasksStore.setState({ tasks: clean });
+        }
+      },
+    },
+  ),
+);

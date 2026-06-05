@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { sanitizeTask, sanitizeTasks } from "./tasksStore";
+import { describe, it, expect, beforeEach } from "vitest";
+import { sanitizeTask, sanitizeTasks, useTasksStore } from "./tasksStore";
 
 describe("sanitizeTask", () => {
   const valid = {
@@ -69,5 +69,48 @@ describe("sanitizeTasks", () => {
     ]);
     expect(out).toHaveLength(1);
     expect(out[0].id).toBe("a");
+  });
+});
+
+function resetTasks() {
+  useTasksStore.setState({ tasks: [] });
+}
+
+describe("useTasksStore.addTask", () => {
+  beforeEach(resetTasks);
+
+  it("adds a task with sane defaults and returns its id", () => {
+    const id = useTasksStore.getState().addTask({ title: "First", projectKey: "c:/p" });
+    const tasks = useTasksStore.getState().tasks;
+    expect(tasks).toHaveLength(1);
+    const t = tasks[0];
+    expect(t.id).toBe(id);
+    expect(t.id).toMatch(/^task-/);
+    expect(t.title).toBe("First");
+    expect(t.projectKey).toBe("c:/p");
+    expect(t.status).toBe("open");
+    expect(t.source).toBe("manual");
+    expect(t.deadline).toBeNull();
+    expect(t.subtasks).toEqual([]);
+    expect(t.archivedAt).toBeNull();
+    expect(t.sortIndex).toBe(1000);
+  });
+
+  it("trims the title", () => {
+    useTasksStore.getState().addTask({ title: "  spaced  " });
+    expect(useTasksStore.getState().tasks[0].title).toBe("spaced");
+  });
+
+  it("assigns increasing sortIndex in 1000-step gaps", () => {
+    useTasksStore.getState().addTask({ title: "a" });
+    useTasksStore.getState().addTask({ title: "b" });
+    const [a, b] = useTasksStore.getState().tasks;
+    expect(a.sortIndex).toBe(1000);
+    expect(b.sortIndex).toBe(2000);
+  });
+
+  it("defaults projectKey to null when omitted (global task)", () => {
+    useTasksStore.getState().addTask({ title: "global" });
+    expect(useTasksStore.getState().tasks[0].projectKey).toBeNull();
   });
 });
