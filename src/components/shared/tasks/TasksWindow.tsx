@@ -34,6 +34,7 @@ import {
 import type { TaskItem } from "../../../store/tasksStore";
 import { TaskRow } from "./TaskRow";
 import { TaskDetail } from "./TaskDetail";
+import { exportTaskIcs } from "../../../utils/exportTaskIcs";
 
 // ── Props ──────────────────────────────────────────────────────────────
 
@@ -169,6 +170,7 @@ function TaskListBody({
                 onComplete={() => ctx.completeTask(task.id)}
                 onReopen={() => ctx.reopenTask(task.id)}
                 onArchive={() => ctx.archiveTask(task.id)}
+                onExportIcs={() => void exportTaskIcs(task)}
               />
             )}
           </div>

@@ -34,6 +34,7 @@ import { filterTasks } from "../shared/tasks/taskGrouping";
 import { TaskDetail } from "../shared/tasks/TaskDetail";
 import { TasksHeader, TasksSubBar } from "./TasksToolbar";
 import { TaskMasterList } from "./TaskMasterList";
+import { exportTaskIcs } from "../../utils/exportTaskIcs";
 
 // ── Component ──────────────────────────────────────────────────────────────
 
@@ -168,6 +169,7 @@ export function TasksView(): JSX.Element {
               onComplete={handleComplete}
               onReopen={handleReopen}
               onArchive={handleArchive}
+              onExportIcs={() => void exportTaskIcs(selectedTask)}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center text-sm text-neutral-500">

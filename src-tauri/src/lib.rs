@@ -255,6 +255,8 @@ pub fn run() {
             github::project::commands::move_project_item,
             // Log reader
             log_reader::commands::read_backend_log,
+            // ICS calendar export
+            session::ics_export::commands::export_task_ics,
             // User settings (Documents/Smashq/)
             settings::commands::load_user_settings,
             settings::commands::save_user_settings,
