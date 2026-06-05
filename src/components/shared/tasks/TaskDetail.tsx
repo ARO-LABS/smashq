@@ -45,6 +45,10 @@ export interface TaskDetailProps {
   onArchive: () => void;
   /** Called when the user clicks "In Kalender". Disabled when deadline is null. */
   onExportIcs?: () => void;
+  /** Pane mode only: focus + select the title input (for a just-created task). */
+  autoFocusTitle?: boolean;
+  /** Called once after the title was auto-focused, so the parent clears its flag. */
+  onTitleAutoFocused?: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -178,14 +182,30 @@ function PaneDetail({
   onReopen,
   onArchive,
   onExportIcs,
+  autoFocusTitle,
+  onTitleAutoFocused,
 }: Omit<TaskDetailProps, "mode">): JSX.Element {
   // ── Title editing ───────────────────────────────────────────────────
   const [titleValue, setTitleValue] = useState(task.title);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Sync when a different task is passed in (id change)
   useEffect(() => {
     setTitleValue(task.title);
   }, [task.id, task.title]);
+
+  // One-step "Neue Aufgabe": focus + select the default title so the user types
+  // straight over it. Guarded so it fires once per freshly-created task; the
+  // parent clears its flag via onTitleAutoFocused, flipping autoFocusTitle off.
+  useEffect(() => {
+    if (!autoFocusTitle) return;
+    const el = titleInputRef.current;
+    if (el) {
+      el.focus();
+      el.select();
+    }
+    onTitleAutoFocused?.();
+  }, [autoFocusTitle, task.id, onTitleAutoFocused]);
 
   const commitTitle = (): void => {
     const trimmed = titleValue.trim();
@@ -245,6 +265,7 @@ function PaneDetail({
       <div className="flex items-start gap-2.5 px-4 py-3">
         <StatusDot status={task.status} size={11} />
         <input
+          ref={titleInputRef}
           type="text"
           value={titleValue}
           onChange={(e) => setTitleValue(e.target.value)}
@@ -502,6 +523,8 @@ export function TaskDetail({
   onReopen,
   onArchive,
   onExportIcs,
+  autoFocusTitle,
+  onTitleAutoFocused,
 }: TaskDetailProps): JSX.Element {
   if (mode === "accordion") {
     return (
@@ -526,6 +549,8 @@ export function TaskDetail({
       onReopen={onReopen}
       onArchive={onArchive}
       onExportIcs={onExportIcs}
+      autoFocusTitle={autoFocusTitle}
+      onTitleAutoFocused={onTitleAutoFocused}
     />
   );
 }

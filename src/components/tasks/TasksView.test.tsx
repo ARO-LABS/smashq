@@ -55,6 +55,35 @@ describe("TasksView — happy path", () => {
   });
 });
 
+// ── Neue Aufgabe: one-step create + open + focus title ──────────────────────
+
+describe("TasksView — Neue Aufgabe (direct create + open)", () => {
+  it("creates a task and opens its detail card directly on click", () => {
+    render(<TasksView />);
+
+    // Empty pane prompt before clicking.
+    expect(screen.getByText("Aufgabe wählen")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Neue Aufgabe" }));
+
+    // A task is created in the store…
+    expect(useTasksStore.getState().tasks).toHaveLength(1);
+    expect(useTasksStore.getState().tasks[0].title).toBe("Neue Aufgabe");
+
+    // …and the detail card shows it (no intermediate inline-add step).
+    const titleInput = screen.getByLabelText("Aufgabentitel") as HTMLInputElement;
+    expect(titleInput.value).toBe("Neue Aufgabe");
+  });
+
+  it("focuses + selects the new task's title for immediate editing", () => {
+    render(<TasksView />);
+    fireEvent.click(screen.getByRole("button", { name: "Neue Aufgabe" }));
+
+    const titleInput = screen.getByLabelText("Aufgabentitel") as HTMLInputElement;
+    expect(document.activeElement).toBe(titleInput);
+  });
+});
+
 // ── Edge case ──────────────────────────────────────────────────────────────
 
 describe("TasksView — with seeded tasks", () => {

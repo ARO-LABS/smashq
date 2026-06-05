@@ -49,10 +49,6 @@ export interface TaskMasterListProps {
   availableProjects: ProjectOption[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  /** Inline-add row visibility + handlers. */
-  addRowOpen: boolean;
-  onAdd: (title: string) => void;
-  onCloseAddRow: () => void;
 }
 
 // ── Group label ───────────────────────────────────────────────────────────
@@ -70,50 +66,6 @@ function GroupLabel({
       {typeof openCount === "number" && openCount > 0 && (
         <span className="font-mono">{openCount}</span>
       )}
-    </div>
-  );
-}
-
-// ── Inline-add row ─────────────────────────────────────────────────────────
-
-function InlineAddRow({
-  onAdd,
-  onClose,
-}: {
-  onAdd: (title: string) => void;
-  onClose: () => void;
-}): JSX.Element {
-  const [value, setValue] = useState("");
-  const PlusIcon = ICONS.action.newSession;
-
-  const commit = (): void => {
-    const trimmed = value.trim();
-    if (!trimmed) return;
-    onAdd(trimmed);
-    setValue(""); // keep focus, ready for the next entry
-  };
-
-  return (
-    <div className="flex items-center gap-1.5 bg-surface-base shadow-hairline rounded-md px-2 py-1.5 mx-1.5 mt-1.5">
-      <PlusIcon className="w-3 h-3 text-accent shrink-0" aria-hidden="true" />
-      <input
-        type="text"
-        autoFocus
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            commit();
-          } else if (e.key === "Escape") {
-            e.preventDefault();
-            onClose();
-          }
-        }}
-        placeholder="Aufgabe hinzufügen — Enter"
-        className="flex-1 bg-transparent text-xs text-neutral-200 placeholder:text-neutral-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-inset rounded-sm"
-        aria-label="Neue Aufgabe"
-      />
     </div>
   );
 }
@@ -264,9 +216,6 @@ export function TaskMasterList({
   availableProjects,
   selectedId,
   onSelect,
-  addRowOpen,
-  onAdd,
-  onCloseAddRow,
 }: TaskMasterListProps): JSX.Element {
   const hasQuery = query.trim() !== "";
   const totalVisible =
@@ -277,7 +226,7 @@ export function TaskMasterList({
   // "none" wins even under a non-"all" filter — an empty store should never
   // read as if the filter hid existing work.
   let emptyMessage: string | null = null;
-  if (totalVisible === 0 && !addRowOpen) {
+  if (totalVisible === 0) {
     if (!hasAnyTasks) {
       emptyMessage = "Noch keine Aufgaben — neue Aufgabe anlegen";
     } else if (hasQuery) {
@@ -292,8 +241,6 @@ export function TaskMasterList({
 
   return (
     <>
-      {addRowOpen && <InlineAddRow onAdd={onAdd} onClose={onCloseAddRow} />}
-
       {emptyMessage !== null ? (
         <EmptyState message={emptyMessage} />
       ) : (
