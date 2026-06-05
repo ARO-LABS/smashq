@@ -1,8 +1,3 @@
-import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
-import { logError } from "../utils/errorLogger";
-import { tasksStorage } from "./tasksStorage";
-
 // ── Types ─────────────────────────────────────────────────────────────
 
 export type TaskStatus = "open" | "active" | "done";
@@ -93,26 +88,3 @@ export function sanitizeTasks(value: unknown): TaskItem[] {
   if (!Array.isArray(value)) return [];
   return value.map(sanitizeTask).filter((t): t is TaskItem => t !== null);
 }
-
-// ── Store placeholder (expanded by later tasks) ───────────────────────
-
-interface TasksState {
-  tasks: TaskItem[];
-}
-
-export const useTasksStore = create<TasksState>()(
-  persist(
-    () => ({ tasks: [] as TaskItem[] }),
-    {
-      name: "tasks-store",
-      storage: createJSONStorage(() => tasksStorage),
-      onRehydrateStorage: () => (state, error) => {
-        if (error) {
-          logError("tasksStore", error);
-        } else if (state) {
-          state.tasks = sanitizeTasks(state.tasks);
-        }
-      },
-    },
-  ),
-);
