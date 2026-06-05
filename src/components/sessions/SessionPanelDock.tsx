@@ -187,6 +187,7 @@ export function SessionPanelDock({ onNewSession, onAddFavorite }: SessionPanelDo
 
   const launchers: DockLauncher[] = [
     { view: "kanban", label: "Kanban", icon: ICONS.nav.kanban },
+    { view: "tasks", label: "Aufgaben", icon: ICONS.tasks.panel },
     { view: "library", label: "Bibliothek", icon: ICONS.nav.library },
     { view: "editor", label: "Editor", icon: ICONS.nav.editor },
   ];
