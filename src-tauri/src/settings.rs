@@ -233,6 +233,23 @@ pub mod commands {
 
         atomic_write(&path, &content)
     }
+
+    /// Load tasks JSON from Documents/Smashq/tasks.json
+    /// Returns empty string if file doesn't exist yet (first run).
+    /// Falls back to backup files if primary is missing or corrupt.
+    #[tauri::command]
+    pub async fn load_tasks() -> Result<String, ADPError> {
+        let path = settings_dir()?.join("tasks.json");
+        load_with_fallback(&path, "tasks")
+    }
+
+    /// Save tasks JSON to Documents/Smashq/tasks.json
+    #[tauri::command]
+    pub async fn save_tasks(data: String) -> Result<(), ADPError> {
+        let path = settings_dir()?.join("tasks.json");
+        create_backup(&path, 3);
+        atomic_write(&path, &data)
+    }
 }
 
 #[cfg(test)]
