@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { sanitizeTask, sanitizeTasks, useTasksStore } from "./tasksStore";
+import { sanitizeTask, sanitizeTasks, useTasksStore, selectActiveTasks, selectTasksForProject, selectOpenTasksForProject, selectNextTask } from "./tasksStore";
 
 describe("sanitizeTask", () => {
   const valid = {
@@ -169,5 +169,48 @@ describe("useTasksStore mutations", () => {
     const id = useTasksStore.getState().addTask({ title: "x" });
     useTasksStore.getState().reorderTask(id, Number.NaN);
     expect(useTasksStore.getState().tasks[0].sortIndex).toBe(1000);
+  });
+});
+
+describe("tasks selectors", () => {
+  beforeEach(resetTasks);
+
+  it("selectActiveTasks excludes archived tasks", () => {
+    const a = useTasksStore.getState().addTask({ title: "a" });
+    useTasksStore.getState().addTask({ title: "b" });
+    useTasksStore.getState().archiveTask(a);
+    const active = selectActiveTasks(useTasksStore.getState());
+    expect(active).toHaveLength(1);
+    expect(active[0].title).toBe("b");
+  });
+
+  it("selectTasksForProject returns only that project's active tasks", () => {
+    useTasksStore.getState().addTask({ title: "p1", projectKey: "c:/p1" });
+    useTasksStore.getState().addTask({ title: "p2", projectKey: "c:/p2" });
+    const out = selectTasksForProject("c:/p1")(useTasksStore.getState());
+    expect(out).toHaveLength(1);
+    expect(out[0].title).toBe("p1");
+  });
+
+  it("selectOpenTasksForProject excludes done tasks", () => {
+    const done = useTasksStore.getState().addTask({ title: "done", projectKey: "c:/p" });
+    useTasksStore.getState().addTask({ title: "open", projectKey: "c:/p" });
+    useTasksStore.getState().completeTask(done);
+    const out = selectOpenTasksForProject("c:/p")(useTasksStore.getState());
+    expect(out).toHaveLength(1);
+    expect(out[0].title).toBe("open");
+  });
+
+  it("selectNextTask returns the lowest-sortIndex open task of a project", () => {
+    useTasksStore.getState().addTask({ title: "first", projectKey: "c:/p" });
+    useTasksStore.getState().addTask({ title: "second", projectKey: "c:/p" });
+    const next = selectNextTask("c:/p")(useTasksStore.getState());
+    expect(next?.title).toBe("first");
+  });
+
+  it("selectNextTask returns undefined when no open task exists", () => {
+    const id = useTasksStore.getState().addTask({ title: "x", projectKey: "c:/p" });
+    useTasksStore.getState().completeTask(id);
+    expect(selectNextTask("c:/p")(useTasksStore.getState())).toBeUndefined();
   });
 });

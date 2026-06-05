@@ -112,7 +112,7 @@ export type UpdateTaskFields = Partial<
   >
 >;
 
-interface TasksState {
+export interface TasksState {
   tasks: TaskItem[];
   addTask: (input: AddTaskInput) => string;
   updateTask: (id: string, fields: UpdateTaskFields) => void;
@@ -125,6 +125,39 @@ interface TasksState {
 function createTaskId(): string {
   return `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
+
+// ── Selectors ─────────────────────────────────────────────────────────
+// Curried selectors (project-scoped) return a (state) => T function so they
+// compose with useTasksStore(selectX(key)) without re-creating arrays inline.
+
+/** All non-archived tasks. */
+export const selectActiveTasks = (state: TasksState): TaskItem[] =>
+  state.tasks.filter((t) => t.archivedAt === null);
+
+/** Non-archived tasks for one projectKey (null = global tasks). */
+export const selectTasksForProject =
+  (projectKey: string | null) =>
+  (state: TasksState): TaskItem[] =>
+    state.tasks.filter((t) => t.archivedAt === null && t.projectKey === projectKey);
+
+/** Open (not done) non-archived tasks for one projectKey, sorted by sortIndex. */
+export const selectOpenTasksForProject =
+  (projectKey: string | null) =>
+  (state: TasksState): TaskItem[] =>
+    state.tasks
+      .filter(
+        (t) =>
+          t.archivedAt === null && t.status !== "done" && t.projectKey === projectKey,
+      )
+      .sort((a, b) => a.sortIndex - b.sortIndex);
+
+/** The derived "nächste" task: lowest-sortIndex open task of a project. */
+export const selectNextTask =
+  (projectKey: string | null) =>
+  (state: TasksState): TaskItem | undefined =>
+    selectOpenTasksForProject(projectKey)(state)[0];
+
+// ── Store ─────────────────────────────────────────────────────────────
 
 export const useTasksStore = create<TasksState>()(
   persist(
