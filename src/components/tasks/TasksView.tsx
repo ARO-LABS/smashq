@@ -47,8 +47,9 @@ export function TasksView(): JSX.Element {
   const [query, setQuery] = useState("");
   const [grouping, setGrouping] = useState<TaskGrouping>("project");
   const [filter, setFilter] = useState<TaskFilter>("open");
-  const [addRowOpen, setAddRowOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Id of a just-created task whose title should be auto-focused in the pane.
+  const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
 
   // ── Derived task partitions ──────────────────────────────────────────────
   // filterTasks applies the search query; status split drives the open groups
@@ -96,14 +97,19 @@ export function TasksView(): JSX.Element {
   );
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-  const handleAdd = (title: string): void => {
-    // New manual task lands in the effective project scope (Global when none).
+  const handleNewTask = (): void => {
+    // One-step create: make the task with a default title, select it, and flag
+    // its title for auto-focus in the detail pane so the user types straight
+    // over "Neue Aufgabe". New tasks are open — leave the "done" filter so the
+    // freshly-created row stays visible (and selected) instead of dropping out.
+    if (filter === "done") setFilter("open");
     const id = ctx.addTask({
-      title,
+      title: "Neue Aufgabe",
       projectKey: ctx.effectiveProjectKey,
       source: "manual",
     });
     setSelectedId(id);
+    setPendingFocusId(id);
   };
 
   const handleUpdate = (fields: UpdateTaskFields): void => {
@@ -130,7 +136,7 @@ export function TasksView(): JSX.Element {
       <TasksHeader
         query={query}
         onQueryChange={setQuery}
-        onNewTask={() => setAddRowOpen(true)}
+        onNewTask={handleNewTask}
       />
 
       <div className="flex-1 flex overflow-hidden min-h-0">
@@ -152,9 +158,6 @@ export function TasksView(): JSX.Element {
             availableProjects={ctx.availableProjects}
             selectedId={selectedId}
             onSelect={setSelectedId}
-            addRowOpen={addRowOpen}
-            onAdd={handleAdd}
-            onCloseAddRow={() => setAddRowOpen(false)}
           />
         </div>
 
@@ -170,6 +173,8 @@ export function TasksView(): JSX.Element {
               onReopen={handleReopen}
               onArchive={handleArchive}
               onExportIcs={() => void exportTaskIcs(selectedTask)}
+              autoFocusTitle={pendingFocusId === selectedTask.id}
+              onTitleAutoFocused={() => setPendingFocusId(null)}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center text-sm text-neutral-500">
