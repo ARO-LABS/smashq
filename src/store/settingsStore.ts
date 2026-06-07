@@ -1224,7 +1224,16 @@ export const useSettingsStore = create<SettingsState>()(
         }
 
         if (Object.keys(patches).length > 0) {
-          useSettingsStore.setState(patches);
+          // Defer to a microtask. onRehydrateStorage can run SYNCHRONOUSLY
+          // inside create(persist(...)) when storage.getItem returns a sync
+          // value (real Tauri: cache hit; localStorage fallback: always sync).
+          // At that point the `useSettingsStore` const is still in its Temporal
+          // Dead Zone — referencing it here throws "Cannot access
+          // 'useSettingsStore' before initialization" (minified: 'p'), surfaced
+          // as the settingsStore.hydration error. Running setState one microtask
+          // later (after create() returns and the const is bound) applies the
+          // heal patches safely, still before first paint.
+          void Promise.resolve().then(() => useSettingsStore.setState(patches));
         }
       },
     }
