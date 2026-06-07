@@ -98,6 +98,9 @@ export function LogViewer() {
     getScrollElement: () => scrollRef.current,
     estimateSize: () => LOG_ROW_HEIGHT,
     overscan: 20,
+    // Dynamic measurement: expanded stack traces and wrapped messages are
+    // taller than the 32px estimate. Without this, fixed offsets overlap.
+    measureElement: (el) => el.getBoundingClientRect().height,
   });
 
   // Auto-scroll when liveTail is on
@@ -242,6 +245,8 @@ export function LogViewer() {
             {virtualizer.getVirtualItems().map((virtualRow) => (
               <div
                 key={grouped[virtualRow.index].id}
+                data-index={virtualRow.index}
+                ref={virtualizer.measureElement}
                 style={{
                   position: "absolute",
                   top: 0,

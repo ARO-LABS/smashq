@@ -50,6 +50,29 @@ describe("LogEntryRow", () => {
     expect(screen.getByText("sessionStore")).toBeTruthy();
   });
 
+  it("lets the message wrap instead of truncating (no clipping overlap)", () => {
+    render(
+      <LogEntryRow
+        entry={entry({
+          message:
+            "a very long message that would otherwise be clipped by truncate and overlap the next virtualized row",
+        })}
+      />,
+    );
+    const msg = screen.getByText(/a very long message/);
+    expect(msg.className).not.toContain("truncate");
+    expect(msg.className).toContain("break-words");
+  });
+
+  it("does not fix the row height (allows tall expanded rows to grow)", () => {
+    const { container } = render(
+      <LogEntryRow entry={entry({ message: "crash", stack: "at foo()" })} />,
+    );
+    const innerRow = container.querySelector<HTMLElement>("[style]");
+    expect(innerRow?.style.height).toBe("");
+    expect(innerRow?.style.minHeight).not.toBe("");
+  });
+
   it("does not render a stack trace until expanded", () => {
     const { container } = render(
       <LogEntryRow entry={entry({ stack: "at foo()\nat bar()" })} />,

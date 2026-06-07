@@ -47,8 +47,8 @@ export const LogEntryRow = memo(function LogEntryRow({
   return (
     <div className="group border-b border-neutral-800 hover:bg-hover-overlay font-mono text-xs">
       <div
-        className={`flex items-center gap-2 px-3 ${hasStack ? "cursor-pointer" : ""}`}
-        style={{ height: LOG_ROW_HEIGHT }}
+        className={`flex items-start gap-2 px-3 py-1.5 ${hasStack ? "cursor-pointer" : ""}`}
+        style={{ minHeight: LOG_ROW_HEIGHT }}
         onClick={hasStack ? () => setExpanded(!expanded) : undefined}
       >
         {/* Expand icon for stack traces */}
@@ -95,7 +95,7 @@ export const LogEntryRow = memo(function LogEntryRow({
         )}
 
         {/* Message */}
-        <span className="text-neutral-200 truncate">{entry.message}</span>
+        <span className="text-neutral-200 break-words min-w-0 flex-1">{entry.message}</span>
       </div>
 
       {/* Expanded stack trace */}
