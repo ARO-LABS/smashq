@@ -50,12 +50,8 @@ export function wireRuntimeGates(): () => void {
   wireLoggingGate(() => useSettingsStore.getState().preferences.frontendLogging);
 
   // Persistence gate follows the master disk toggle (backendFileLogging) — both
-  // log sources persist to the one NDJSON file. Flush any buffered frontend
-  // entries on window unload so a close does not lose the last batch.
+  // log sources persist to the one NDJSON file.
   wirePersistenceGate(() => useSettingsStore.getState().preferences.backendFileLogging);
-  if (typeof window !== "undefined") {
-    window.addEventListener("beforeunload", () => void flushFrontendLogs());
-  }
 
   // Settings toggle is the single source of truth. No DEV/localStorage OR —
   // disabling must actually skip work. Manual override: window.__perf.enable().
@@ -78,9 +74,31 @@ export function wireRuntimeGates(): () => void {
     })
     .catch((err) => logError("wireRuntimeGates.crossWindowListen", err));
 
+  // Flush buffered frontend logs when THIS window closes. Use Tauri's
+  // close-requested event (async-aware) — NOT `beforeunload`, which Tauri
+  // webviews fire unreliably and cannot await, so the last batch could be lost.
+  // Mirrors the close-flush pattern in App.tsx (flushPendingSaves). The chained
+  // `.then` keeps the unlisten handle assignable so cleanup can remove it
+  // instead of orphaning the listener.
+  let unlistenClose: (() => void) | undefined;
+  void import("@tauri-apps/api/window")
+    .then(({ getCurrentWindow }) =>
+      getCurrentWindow()
+        .onCloseRequested(async () => {
+          await flushFrontendLogs();
+        })
+        .then((fn) => {
+          unlistenClose = fn;
+        }),
+    )
+    .catch((err) => logError("wireRuntimeGates.closeFlush", err));
+
   return () => {
     unsubscribePerf();
     unlistenCrossWindow?.();
+    unlistenClose?.();
+    // Final flush on React unmount (covers HMR + detached-view teardown).
+    void flushFrontendLogs();
   };
 }
 

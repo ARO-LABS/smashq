@@ -25,8 +25,8 @@ function App() {
     installGlobalErrorHandlers();
 
     // Wire runtime logging + perf gates against the persisted preferences.
-    // Perf is OR'd with DEV / localStorage opt-ins inside the helper so
-    // existing dev workflows keep working when the user pref is off.
+    // The Settings toggle is the sole authority for perf capture (no DEV/
+    // localStorage OR); manual dev override remains via window.__perf.enable().
     const unsubscribePerf = wireRuntimeGates();
 
     // Push the persisted backend-file-logging value to Rust. Only the main

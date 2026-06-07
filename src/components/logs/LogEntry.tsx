@@ -31,7 +31,8 @@ function formatTime(timestamp: string): string {
   }
 }
 
-/** Fixed row height for virtualization (px) */
+/** Row-height estimate for virtualization (px). Actual height is measured
+ *  dynamically (measureElement) so expanded stacks / wrapped messages grow. */
 export const LOG_ROW_HEIGHT = 32;
 
 interface LogEntryRowProps {

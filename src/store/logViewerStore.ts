@@ -63,6 +63,9 @@ export const useLogViewerStore = create<LogViewerState>((set) => ({
       // the same on-disk log file on every mount and on manual refresh —
       // without this, each refresh would append up to 500 duplicate backend
       // lines and evict genuine entries via the MAX_ENTRIES cap.
+      // Key intentionally omits severity/module/stack: an identical
+      // timestamp+source+message is treated as the same line (the grouping UI
+      // surfaces repeat counts, so collapsing same-ms duplicates is desired).
       const keyOf = (e: {
         timestamp: string;
         source: LogSource;

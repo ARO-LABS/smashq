@@ -70,6 +70,11 @@ fn init_logging() {
                 message: record.args().to_string(),
                 stack: None,
             };
+            // write_entries fully releases the structured_log STATE mutex before
+            // returning; the emit below runs OUTSIDE that lock. Keep it that way:
+            // emitting while holding the lock — or adding any log::* call into the
+            // write path — risks a non-reentrant Mutex deadlock, since this closure
+            // runs for every log record on the logging thread.
             crate::structured_log::write_entries(std::slice::from_ref(&entry));
             if let Some(app) = crate::APP_HANDLE.get() {
                 use tauri::Emitter;

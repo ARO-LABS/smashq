@@ -61,9 +61,9 @@ export interface PipelineSettings {
  * All default to `false` — power-users opt in when actively debugging.
  */
 export interface AppPreferencesSettings {
-  /** Frontend errorLogger ring-buffer aktiv? Toast-Output bleibt unabhängig. */
+  /** Frontend-Logging aktiv? Speist den geteilten 1000-Eintrag-Log-Store. Toast-Output bleibt unabhängig. */
   frontendLogging: boolean;
-  /** Rust file logging aktiv? Steuert smashq.log via Tauri-Command. */
+  /** Disk-Persistenz aktiv? Schreibt app-log.ndjson (Frontend + Backend) via Tauri-Command. */
   backendFileLogging: boolean;
   /** perfLogger (IPC-Latenz, Render-Zeit) aktiv? Bereits DEV-only, dieses Toggle gated zusätzlich. */
   performanceProfiler: boolean;
