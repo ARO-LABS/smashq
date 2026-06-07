@@ -50,8 +50,11 @@ test("generate design section into developer-doc.html", async ({ page }) => {
       );
       const interactive = (await handle.getAttribute("data-dg-interactive")) === "true";
 
-      const srcdoc = `<!doctype html><html class="${theme === "dark" ? "dark" : ""}"><head><meta charset="utf-8">${FONT_LINK}<style>${css}</style><style>body{margin:12px;background:var(--surface-base)}</style></head><body>${bodyHtml}</body></html>`;
-      const iframe = `<iframe title="${id} (${theme})" loading="lazy" style="width:100%;height:160px;border:1px solid var(--border);border-radius:2px;background:#fff" srcdoc="${escapeSrcdoc(srcdoc)}"></iframe>`;
+      const srcdoc = `<!doctype html><html class="${theme === "dark" ? "dark" : ""}"><head><meta charset="utf-8">${FONT_LINK}<style>${css}</style><style>html,body{margin:0}body{padding:12px;background:var(--surface-base)}</style></head><body>${bodyHtml}</body></html>`;
+      // Auto-size to content: srcdoc iframes are same-origin, so onload can read
+      // the rendered height. Fixes clipping of tall stages (tokens) and the empty
+      // whitespace under short stages (buttons/cards) that a fixed height caused.
+      const iframe = `<iframe title="${id} (${theme})" loading="lazy" scrolling="no" onload="this.style.height=(this.contentWindow.document.body.scrollHeight+4)+'px'" style="width:100%;height:120px;border:1px solid var(--border);border-radius:2px;background:#fff;display:block" srcdoc="${escapeSrcdoc(srcdoc)}"></iframe>`;
 
       let img = "";
       try {
