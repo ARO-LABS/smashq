@@ -2,9 +2,10 @@
  * TasksWindow — floating portal window for per-scope task management.
  *
  * Chrome mirrors NotesWindow 1:1 (createPortal, fixed-position root, segmented
- * tabs, close button, drag handle, resize handle). The body replaces the notes
- * textarea with a compact task list + inline accordion expansion. The footer
- * hosts a quick-add input row.
+ * tabs, close button, resize handle). The header bar is the drag surface
+ * (dragHandlers spread onto it). The body replaces the notes textarea with a
+ * compact task list + inline accordion expansion. The footer hosts a quick-add
+ * input row.
  *
  * Architecture note — why read tasks inside this component and not through ctx?
  * The spec asks for a scoped task list that reacts live to store changes.
@@ -239,9 +240,16 @@ export function TasksWindow({
       }}
       className="z-50 bg-surface-raised rounded-md shadow-modal flex flex-col"
     >
-      {/* Header: segmented tabs + close button */}
-      <div className="flex items-center justify-between px-2 py-2 border-b border-neutral-800">
-        <div className="inline-flex p-0.5 rounded-md bg-surface-base gap-0.5 min-w-0">
+      {/* Header: segmented tabs + close button — drag surface */}
+      <div
+        {...dragHandlers}
+        className="flex items-center justify-between px-2 py-2 border-b border-neutral-800 cursor-move select-none"
+        style={{ touchAction: "none" }}
+      >
+        <div
+          className="inline-flex p-0.5 rounded-md bg-surface-base gap-0.5 min-w-0"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
           <button
             onClick={() => setActiveTab("project")}
             aria-label="Projekt-Aufgaben"
@@ -281,6 +289,7 @@ export function TasksWindow({
         {/* Close button — outside segmented control */}
         <button
           onClick={onClose}
+          onPointerDown={(e) => e.stopPropagation()}
           className="p-1 rounded-md text-neutral-500 hover:text-neutral-200 hover:bg-hover-overlay transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
           aria-label="Aufgaben schliessen"
           title="Schliessen"
@@ -308,17 +317,6 @@ export function TasksWindow({
       <div className="border-t border-neutral-800 px-2 py-1.5 relative">
         <AddTaskRow onAdd={handleAddTask} />
       </div>
-
-      {/* Drag handle (bottom-left) — 4-direction move arrows */}
-      <span
-        {...dragHandlers}
-        role="button"
-        aria-label="Aufgaben-Fenster verschieben"
-        className="absolute left-0.5 bottom-0.5 p-0.5 cursor-move text-neutral-600 hover:text-neutral-300 transition-colors"
-        style={{ touchAction: "none" }}
-      >
-        <ICONS.action.move className="w-3 h-3" aria-hidden="true" />
-      </span>
 
       {/* Resize handle (bottom-right) — diagonal strokes */}
       <span
