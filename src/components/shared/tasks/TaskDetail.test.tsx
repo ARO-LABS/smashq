@@ -1,12 +1,14 @@
 /**
  * TaskDetail tests
  *
- * 1. Happy path — open task (pane mode) shows "Erledigt" + "Archivieren" buttons.
- * 2. Edge case  — done task (pane mode) shows "Wieder öffnen" + "Archivieren".
+ * 1. Happy path — open task (pane mode) shows "Erledigt" + "Löschen" buttons.
+ * 2. Edge case  — done task (pane mode) shows "Wieder öffnen" + "Löschen".
+ * 3. Inline confirm — two-stage delete confirmation (arm + confirm).
+ * 4. Inline confirm — "Abbrechen" cancels without deleting.
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { TaskDetail } from "./TaskDetail";
 import type { TaskItem } from "../../../store/tasksStore";
 import type { ProjectOption } from "./TaskMetaChips";
@@ -38,7 +40,7 @@ const PROJECTS: ProjectOption[] = [{ key: null, label: "Global" }];
 // ── Happy path ─────────────────────────────────────────────────────────
 
 describe("TaskDetail — happy path (pane, open task)", () => {
-  it("renders Erledigt and Archivieren buttons for an open task", () => {
+  it("renders Erledigt and Löschen buttons for an open task", () => {
     const task = makeTask({ status: "open" });
 
     render(
@@ -49,23 +51,23 @@ describe("TaskDetail — happy path (pane, open task)", () => {
         onUpdate={vi.fn()}
         onComplete={vi.fn()}
         onReopen={vi.fn()}
-        onArchive={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
     // Primary action: Erledigt
     expect(screen.getByRole("button", { name: /Erledigt/ })).toBeTruthy();
 
-    // Secondary action: Archivieren
+    // Secondary action: Löschen (the initial confirm-arm button)
     expect(
-      screen.getAllByRole("button", { name: /Archivieren/ }).length,
+      screen.getAllByRole("button", { name: /Löschen/ }).length,
     ).toBeGreaterThanOrEqual(1);
 
     // "Wieder öffnen" must NOT appear for an open task
     expect(screen.queryByRole("button", { name: /Wieder öffnen/ })).toBeNull();
   });
 
-  it("renders Erledigt and Archivieren for an active task", () => {
+  it("renders Erledigt and Löschen for an active task", () => {
     const task = makeTask({ status: "active" });
 
     render(
@@ -76,7 +78,7 @@ describe("TaskDetail — happy path (pane, open task)", () => {
         onUpdate={vi.fn()}
         onComplete={vi.fn()}
         onReopen={vi.fn()}
-        onArchive={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -88,7 +90,7 @@ describe("TaskDetail — happy path (pane, open task)", () => {
 // ── Edge case ──────────────────────────────────────────────────────────
 
 describe("TaskDetail — edge case (pane, done task)", () => {
-  it("renders Wieder öffnen and Archivieren for a done task", () => {
+  it("renders Wieder öffnen and Löschen for a done task", () => {
     const task = makeTask({
       status: "done",
       completedAt: Date.now(),
@@ -102,16 +104,16 @@ describe("TaskDetail — edge case (pane, done task)", () => {
         onUpdate={vi.fn()}
         onComplete={vi.fn()}
         onReopen={vi.fn()}
-        onArchive={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
     // Reopen action
     expect(screen.getByRole("button", { name: /Wieder öffnen/ })).toBeTruthy();
 
-    // Archivieren still present
+    // Löschen still present
     expect(
-      screen.getAllByRole("button", { name: /Archivieren/ }).length,
+      screen.getAllByRole("button", { name: /Löschen/ }).length,
     ).toBeGreaterThanOrEqual(1);
 
     // "Erledigt" must NOT appear in the action bar for a done task
@@ -120,5 +122,55 @@ describe("TaskDetail — edge case (pane, done task)", () => {
     // that is NOT inside a menu. Since the menu is closed by default, any
     // button labelled "Erledigt" visible now would be the action-bar button.
     expect(screen.queryByRole("button", { name: /^Erledigt$/ })).toBeNull();
+  });
+});
+
+// ── Inline confirm — two-stage delete ─────────────────────────────────
+
+describe("TaskDetail — inline delete confirmation (pane mode)", () => {
+  it("requires confirmation before deleting", () => {
+    const onDelete = vi.fn();
+    const task = makeTask({ status: "open" });
+
+    render(
+      <TaskDetail
+        task={task}
+        mode="pane"
+        availableProjects={PROJECTS}
+        onUpdate={vi.fn()}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+        onDelete={onDelete}
+      />,
+    );
+
+    // First click: arms the confirm — onDelete must NOT be called yet
+    fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+    expect(onDelete).not.toHaveBeenCalled();
+
+    // Second click: confirms deletion
+    fireEvent.click(screen.getByRole("button", { name: /Wirklich löschen/i }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancel keeps the task (does not delete)", () => {
+    const onDelete = vi.fn();
+    const task = makeTask({ status: "open" });
+
+    render(
+      <TaskDetail
+        task={task}
+        mode="pane"
+        availableProjects={PROJECTS}
+        onUpdate={vi.fn()}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+        onDelete={onDelete}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Abbrechen" }));
+    expect(onDelete).not.toHaveBeenCalled();
   });
 });

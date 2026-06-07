@@ -125,7 +125,7 @@ export function TasksView(): JSX.Element {
     if (selectedId !== null) ctx.reopenTask(selectedId);
   };
 
-  const handleArchive = (): void => {
+  const handleDelete = (): void => {
     if (selectedId !== null) ctx.deleteTask(selectedId);
     // Selection drop-out is handled by the reselect effect on the next render.
   };
@@ -171,7 +171,7 @@ export function TasksView(): JSX.Element {
               onUpdate={handleUpdate}
               onComplete={handleComplete}
               onReopen={handleReopen}
-              onArchive={handleArchive}
+              onDelete={handleDelete}
               onExportIcs={() => void exportTaskIcs(selectedTask)}
               autoFocusTitle={pendingFocusId === selectedTask.id}
               onTitleAutoFocused={() => setPendingFocusId(null)}

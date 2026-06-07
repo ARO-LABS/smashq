@@ -167,7 +167,7 @@ function TaskListBody({
                 onUpdate={(fields) => ctx.updateTask(task.id, fields)}
                 onComplete={() => ctx.completeTask(task.id)}
                 onReopen={() => ctx.reopenTask(task.id)}
-                onArchive={() => ctx.deleteTask(task.id)}
+                onDelete={() => ctx.deleteTask(task.id)}
                 onExportIcs={() => void exportTaskIcs(task)}
               />
             )}

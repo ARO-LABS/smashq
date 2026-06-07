@@ -114,8 +114,7 @@ describe("TasksView — with seeded tasks", () => {
       (screen.getByLabelText("Aufgabentitel") as HTMLInputElement).value,
     ).toBe("Zweite Aufgabe");
 
-    // The detail pane's action bar offers "Archivieren" for the selected task
-    // (unique to the pane — the filter chips reuse the word "Erledigt").
-    expect(screen.getByText("Archivieren")).toBeTruthy();
+    // The detail pane's action bar offers "Löschen" for the selected task.
+    expect(screen.getByText("Löschen")).toBeTruthy();
   });
 });

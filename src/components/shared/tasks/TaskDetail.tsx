@@ -5,7 +5,7 @@
  * - "pane"      — full sidebar panel (editable title, fields layout meta,
  *                 note textarea, subtasks list, state-dependent action bar)
  * - "accordion" — compact inline expansion (chiprow meta, compact note,
- *                 subtask count + rows, tiny ghost Archivieren)
+ *                 subtask count + rows, tiny ghost Löschen with inline confirm)
  *
  * Why two modes in one component?
  * Both modes share the same data contract (TaskDetailProps) and render the
@@ -42,7 +42,7 @@ export interface TaskDetailProps {
   onUpdate: (fields: UpdateTaskFields) => void;
   onComplete: () => void;
   onReopen: () => void;
-  onArchive: () => void;
+  onDelete: () => void;
   /** Called when the user clicks "In Kalender". */
   onExportIcs?: () => void;
   /** Pane mode only: focus + select the title input (for a just-created task). */
@@ -180,7 +180,7 @@ function PaneDetail({
   onUpdate,
   onComplete,
   onReopen,
-  onArchive,
+  onDelete,
   onExportIcs,
   autoFocusTitle,
   onTitleAutoFocused,
@@ -228,6 +228,15 @@ function PaneDetail({
     setNoteValue(value);
     debouncedNoteUpdate(value);
   };
+
+  // ── Delete confirm state ─────────────────────────────────────────────
+  const [confirming, setConfirming] = useState(false);
+
+  // Reset confirm state when the displayed task changes so a primed
+  // confirmation does not carry over to a different task.
+  useEffect(() => {
+    setConfirming(false);
+  }, [task.id]);
 
   // ── Subtask helpers ──────────────────────────────────────────────────
   const handleSubtaskToggle = (subtaskId: string): void => {
@@ -372,7 +381,7 @@ function PaneDetail({
       </div>
 
       {/* ── Action bar ─────────────────────────────────────────────── */}
-      <div className="shrink-0 px-4 py-3 border-t border-neutral-800 bg-surface-raised flex gap-2">
+      <div className="shrink-0 px-4 py-3 border-t border-neutral-800 bg-surface-raised flex gap-2 items-center">
         {isOpenOrActive && (
           <>
             <button
@@ -383,14 +392,33 @@ function PaneDetail({
               <CheckIcon className="w-3 h-3" aria-hidden="true" />
               Erledigt
             </button>
-            <button
-              type="button"
-              onClick={onArchive}
-              className="text-xs px-3 py-1.5 rounded-md inline-flex items-center gap-1.5 text-neutral-400 hover:bg-hover-overlay transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-            >
-              <TrashIcon className="w-3 h-3" aria-hidden="true" />
-              Archivieren
-            </button>
+            {confirming ? (
+              <span className="inline-flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => { setConfirming(false); onDelete(); }}
+                  className="text-[10.5px] text-error hover:underline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+                >
+                  Wirklich löschen?
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirming(false)}
+                  className="text-[10.5px] text-neutral-500 hover:text-neutral-300 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+                >
+                  Abbrechen
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirming(true)}
+                className="inline-flex items-center gap-1.5 text-[10.5px] text-neutral-500 hover:text-error focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+              >
+                <TrashIcon className="w-3 h-3" aria-hidden="true" />
+                Löschen
+              </button>
+            )}
           </>
         )}
         {isDone && (
@@ -403,14 +431,33 @@ function PaneDetail({
               <ReopenIcon className="w-3 h-3" aria-hidden="true" />
               Wieder öffnen
             </button>
-            <button
-              type="button"
-              onClick={onArchive}
-              className="text-xs px-3 py-1.5 rounded-md inline-flex items-center gap-1.5 text-neutral-400 hover:bg-hover-overlay transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-            >
-              <TrashIcon className="w-3 h-3" aria-hidden="true" />
-              Archivieren
-            </button>
+            {confirming ? (
+              <span className="inline-flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => { setConfirming(false); onDelete(); }}
+                  className="text-[10.5px] text-error hover:underline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+                >
+                  Wirklich löschen?
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirming(false)}
+                  className="text-[10.5px] text-neutral-500 hover:text-neutral-300 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+                >
+                  Abbrechen
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirming(true)}
+                className="inline-flex items-center gap-1.5 text-[10.5px] text-neutral-500 hover:text-error focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+              >
+                <TrashIcon className="w-3 h-3" aria-hidden="true" />
+                Löschen
+              </button>
+            )}
           </>
         )}
       </div>
@@ -426,7 +473,7 @@ function AccordionDetail({
   onUpdate,
   onComplete,
   onReopen,
-  onArchive,
+  onDelete,
   onExportIcs,
 }: Omit<TaskDetailProps, "mode">): JSX.Element {
   const TrashIcon = ICONS.action.trash;
@@ -436,6 +483,13 @@ function AccordionDetail({
   useEffect(() => {
     setNoteValue(task.note ?? "");
   }, [task.id, task.note]);
+
+  // Reset confirm state when the displayed task changes.
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    setConfirming(false);
+  }, [task.id]);
 
   const debouncedNoteUpdate = useDebounced((note: string) => {
     onUpdate({ note });
@@ -499,15 +553,34 @@ function AccordionDetail({
         </div>
       )}
 
-      {/* Tiny ghost Archivieren */}
-      <button
-        type="button"
-        onClick={onArchive}
-        className="self-start text-[10.5px] text-neutral-500 hover:text-error inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-hover-overlay transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-      >
-        <TrashIcon className="w-3 h-3" aria-hidden="true" />
-        Archivieren
-      </button>
+      {/* Tiny ghost Löschen with inline confirm */}
+      {confirming ? (
+        <span className="inline-flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => { setConfirming(false); onDelete(); }}
+            className="text-[10.5px] text-error hover:underline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+          >
+            Wirklich löschen?
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirming(false)}
+            className="text-[10.5px] text-neutral-500 hover:text-neutral-300 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+          >
+            Abbrechen
+          </button>
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="self-start inline-flex items-center gap-1.5 text-[10.5px] text-neutral-500 hover:text-error focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+        >
+          <TrashIcon className="w-3 h-3" aria-hidden="true" />
+          Löschen
+        </button>
+      )}
     </div>
   );
 }
@@ -521,7 +594,7 @@ export function TaskDetail({
   onUpdate,
   onComplete,
   onReopen,
-  onArchive,
+  onDelete,
   onExportIcs,
   autoFocusTitle,
   onTitleAutoFocused,
@@ -534,7 +607,7 @@ export function TaskDetail({
         onUpdate={onUpdate}
         onComplete={onComplete}
         onReopen={onReopen}
-        onArchive={onArchive}
+        onDelete={onDelete}
         onExportIcs={onExportIcs}
       />
     );
@@ -547,7 +620,7 @@ export function TaskDetail({
       onUpdate={onUpdate}
       onComplete={onComplete}
       onReopen={onReopen}
-      onArchive={onArchive}
+      onDelete={onDelete}
       onExportIcs={onExportIcs}
       autoFocusTitle={autoFocusTitle}
       onTitleAutoFocused={onTitleAutoFocused}
