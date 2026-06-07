@@ -35,6 +35,7 @@ npm run lint             # ESLint
 - `src/store/uiStore.ts` — UI-State (Tabs, Toasts)
 - `src-tauri/src/session/` — Rust Session Manager (PTY, Commands)
 - `src/components/sessions/SessionManagerView.tsx` — Haupt-View
+- **Logs (NDJSON, für Analyse)**: `%LOCALAPPDATA%\smashq\app-log.ndjson` (+ `.1`..`.3` rotiert). Nur wenn "Log-Datei (NDJSON)" in Settings aktiv. Eine JSON-Zeile pro Eintrag: `{ts, level, source, module?, message, stack?}`. Backend-Logs live via `log-line`-Event.
 
 ## Arbeitsweise
 

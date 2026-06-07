@@ -9,12 +9,12 @@ const SUB_TOGGLES: { key: LoggingFlag; label: string; help: string }[] = [
   {
     key: "frontendLogging",
     label: "Frontend-Errors",
-    help: "100-Eintrag-Ringbuffer für die Protokolle-Ansicht. Toasts bleiben unabhängig.",
+    help: "1000-Eintrag-Ringbuffer für die Protokolle-Ansicht. Toasts bleiben unabhängig.",
   },
   {
     key: "backendFileLogging",
-    label: "Backend-Log-Files",
-    help: "Schreibt smashq.log im AppData-Ordner. Größter Disk- und IO-Hebel.",
+    label: "Log-Datei (NDJSON)",
+    help: "Schreibt app-log.ndjson (Frontend + Backend) im AppData-Ordner für spätere Analyse. Größter Disk-/IO-Hebel.",
   },
   {
     key: "performanceProfiler",

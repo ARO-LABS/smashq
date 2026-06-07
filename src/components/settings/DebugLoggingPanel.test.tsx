@@ -48,7 +48,7 @@ describe("DebugLoggingPanel", () => {
       },
     });
     render(<DebugLoggingPanel />);
-    const backendBox = screen.getByRole("checkbox", { name: /Backend-Log-Files/i });
+    const backendBox = screen.getByRole("checkbox", { name: /Log-Datei/i });
     fireEvent.click(backendBox);
     expect(useSettingsStore.getState().preferences.backendFileLogging).toBe(true);
   });
@@ -75,7 +75,7 @@ describe("DebugLoggingPanel", () => {
     render(<DebugLoggingPanel />);
     expect(screen.getByText("Debug-Logging")).toBeTruthy();
     expect(screen.getByText("Frontend-Errors")).toBeTruthy();
-    expect(screen.getByText("Backend-Log-Files")).toBeTruthy();
+    expect(screen.getByText("Log-Datei (NDJSON)")).toBeTruthy();
     expect(screen.getByText("Performance-Profiler")).toBeTruthy();
   });
 
@@ -128,7 +128,7 @@ describe("DebugLoggingPanel", () => {
       },
     });
     render(<DebugLoggingPanel />);
-    for (const name of [/Frontend-Errors/i, /Backend-Log-Files/i, /Performance-Profiler/i]) {
+    for (const name of [/Frontend-Errors/i, /Log-Datei/i, /Performance-Profiler/i]) {
       const box = screen.getByRole("checkbox", { name }) as HTMLInputElement;
       expect(box.disabled).toBe(false);
     }
