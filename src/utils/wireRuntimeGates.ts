@@ -3,6 +3,8 @@ import { useSettingsStore, type AppPreferencesSettings } from "../store/settings
 import { wireLoggingGate, wirePersistenceGate, flushFrontendLogs, logError } from "./errorLogger";
 import { setPerfEnabled } from "./perfLogger";
 import { listenForPreferencesChanges, type BroadcastPartial } from "./preferencesBroadcast";
+import { useTasksStore, sanitizeTasks, type TaskItem } from "../store/tasksStore";
+import { broadcastTasksChange, listenForTasksChanges } from "./tasksBroadcast";
 
 /**
  * Apply a cross-window preferences delta locally. Bypasses the `setPreferences`
@@ -34,6 +36,22 @@ function applyRemotePartial(partial: BroadcastPartial): void {
   );
   if (!changed) return;
   useSettingsStore.setState({ preferences: next });
+}
+
+/**
+ * Apply a cross-window task list locally. Sets a guard flag so the broadcaster
+ * subscription (wired in wireRuntimeGates) does NOT re-emit this change and loop
+ * forever. Re-sanitizes the incoming list — cross-window data is a trust
+ * boundary, and sanitizeTasks is idempotent on already-clean data.
+ */
+let applyingRemoteTasks = false;
+function applyRemoteTasks(tasks: TaskItem[]): void {
+  applyingRemoteTasks = true;
+  try {
+    useTasksStore.setState({ tasks: sanitizeTasks(tasks) });
+  } finally {
+    applyingRemoteTasks = false;
+  }
 }
 
 /**
@@ -74,6 +92,21 @@ export function wireRuntimeGates(): () => void {
     })
     .catch((err) => logError("wireRuntimeGates.crossWindowListen", err));
 
+  // Cross-window task sync. Each webview holds its own tasksStore instance, so
+  // a mutation in the detached "Aufgaben" window would otherwise leave the
+  // main-window session badge stale. Broadcast local task changes to all
+  // windows; apply remote ones via applyRemoteTasks (which guards the echo).
+  const unsubscribeTasks = useTasksStore.subscribe((state, prev) => {
+    if (state.tasks === prev.tasks || applyingRemoteTasks) return;
+    void broadcastTasksChange(state.tasks);
+  });
+  let unlistenTasks: (() => void) | null = null;
+  void listenForTasksChanges(applyRemoteTasks)
+    .then((unlisten) => {
+      unlistenTasks = unlisten;
+    })
+    .catch((err) => logError("wireRuntimeGates.tasksListen", err));
+
   // Flush buffered frontend logs when THIS window closes. Use Tauri's
   // close-requested event (async-aware) — NOT `beforeunload`, which Tauri
   // webviews fire unreliably and cannot await, so the last batch could be lost.
@@ -95,7 +128,9 @@ export function wireRuntimeGates(): () => void {
 
   return () => {
     unsubscribePerf();
+    unsubscribeTasks();
     unlistenCrossWindow?.();
+    unlistenTasks?.();
     unlistenClose?.();
     // Final flush on React unmount (covers HMR + detached-view teardown).
     void flushFrontendLogs();
