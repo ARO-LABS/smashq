@@ -7,6 +7,14 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-06-07 — Hydration-TDZ: unverifizierten Hypothesen-Fix gemerged, der in der echten .exe versagte
+
+**Fehler:** Den TDZ (`Cannot access 'p' before initialization`) auf einer Chunk-Hypothese geschlossen (zustand-`vendor-zustand`-Pin), die der Implementer ehrlich als BLOCKED/nicht-reproduzierbar meldete. Trotzdem gemerged, weil alle automatisierten Gates grün waren — jsdom kann den Bug aber prinzipiell nicht ausführen. Die aufgeschobene `.exe`-Smoke zeigte: Fehler unverändert da, gleicher Stack, nur im neuen Chunk.
+
+**Erkenntnis:** Grüne Unit-Gates beweisen nichts über einen Bug, den die Unit-Umgebung gar nicht durchläuft. Ein als BLOCKED gemeldeter, nie reproduzierter „Fix" ist eine Hypothese, kein Fix. „Verify before done" = den GENAUEN Fehlerpfad reproduzieren, nicht einen Proxy.
+
+**Regel:** (1) Einen Bug NIE als gefixt mergen ohne Reproduktion des echten Pfads. (2) Wenn jsdom es nicht kann: Production-Bundle in echtem Browser laden (Playwright/Chromium); Tauri-only-Pfade per localStorage-Seed oder `__TAURI_INTERNALS__`-Stub erzwingen. (3) Minifizierte Stacks IMMER per Sourcemap dekodieren (`SourceMapConsumer.originalPositionFor`) — die Chunk-Hashes des eigenen Builds matchen den User-Build, also ist dessen Stack direkt dekodierbar. (4) Konkrete Root-Cause: zustand `persist` ruft `onRehydrateStorage` SYNCHRON in `create()`, wenn `storage.getItem` sync liefert → Zugriff auf die noch ungebundene `const useSettingsStore` → TDZ. Fix: das Heal-`setState` in einen Microtask deferren.
+
 ### 2026-06-07 — Logging-Overhaul: drei Plan-Hypothesen, die erst die Implementer/Review-Schleife widerlegte
 
 **Fehler 1 — `import type` als Runtime-Bug-Verdächtiger:** Eine erste Diagnose machte einen zirkulären `import type` für einen Laufzeit-TDZ (`Cannot access 'p' before initialization`) verantwortlich.
