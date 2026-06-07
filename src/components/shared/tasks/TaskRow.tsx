@@ -42,13 +42,12 @@ export interface TaskRowProps {
 // ── Helpers ────────────────────────────────────────────────────────────
 
 /**
- * Returns true when the task is overdue: has a deadline in the past,
+ * Returns true when the task is overdue: startsAt is in the past,
  * is not done, and is not currently selected (selected uses accent border).
  */
 function isOverdue(task: TaskItem, selected: boolean): boolean {
   return (
-    task.deadline !== null &&
-    task.deadline < Date.now() &&
+    task.startsAt < Date.now() &&
     task.status !== "done" &&
     !selected
   );

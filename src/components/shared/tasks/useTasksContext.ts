@@ -35,7 +35,7 @@ export interface TasksContext {
   updateTask: (id: string, fields: UpdateTaskFields) => void;
   completeTask: (id: string) => void;
   reopenTask: (id: string) => void;
-  archiveTask: (id: string) => void;
+  deleteTask: (id: string) => void;
   openCountForProject: (key: string | null) => number;
 }
 
@@ -68,7 +68,7 @@ export function useTasksContext(open?: boolean): TasksContext {
   const updateTask = useTasksStore((s) => s.updateTask);
   const completeTask = useTasksStore((s) => s.completeTask);
   const reopenTask = useTasksStore((s) => s.reopenTask);
-  const archiveTask = useTasksStore((s) => s.archiveTask);
+  const deleteTask = useTasksStore((s) => s.deleteTask);
 
   // ── availableProjects ──────────────────────────────────────────────────
   // Build: favorites ∪ distinct non-null task.projectKey, sorted by label,
@@ -142,7 +142,7 @@ export function useTasksContext(open?: boolean): TasksContext {
     updateTask,
     completeTask,
     reopenTask,
-    archiveTask,
+    deleteTask,
     openCountForProject,
   };
 }

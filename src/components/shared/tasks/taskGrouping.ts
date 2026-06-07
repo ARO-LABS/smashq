@@ -19,7 +19,7 @@ import type { TaskItem } from "../../../store/tasksStore";
 
 export type TaskFilter = "all" | "open" | "done";
 
-export type DeadlineBucket = "overdue" | "today" | "week" | "later" | "none";
+export type DeadlineBucket = "overdue" | "today" | "week" | "later";
 
 export interface ProjectOption {
   key: string | null;
@@ -33,7 +33,6 @@ const BUCKET_LABELS: Record<DeadlineBucket, string> = {
   today: "Heute",
   week: "Diese Woche",
   later: "Später",
-  none: "Ohne Deadline",
 };
 
 // ── Internal helpers ──────────────────────────────────────────────────
@@ -45,16 +44,16 @@ function startOfDay(nowMs: number): number {
   return d.getTime();
 }
 
-/** Classify a non-null deadline epoch into one of the four timed buckets. */
-function classifyDeadline(deadline: number, nowMs: number): DeadlineBucket {
+/** Classify a startsAt epoch into one of the four timed buckets. */
+function classifyDeadline(startsAt: number, nowMs: number): DeadlineBucket {
   const todayStart = startOfDay(nowMs);
   const tomorrowStart = todayStart + 86_400_000;
   // "This week" = next 7 calendar days from today (exclusive of today itself)
   const weekEnd = todayStart + 7 * 86_400_000;
 
-  if (deadline < nowMs) return "overdue";
-  if (deadline < tomorrowStart) return "today";
-  if (deadline < weekEnd) return "week";
+  if (startsAt < nowMs) return "overdue";
+  if (startsAt < tomorrowStart) return "today";
+  if (startsAt < weekEnd) return "week";
   return "later";
 }
 
@@ -187,10 +186,10 @@ export function groupByProject(
 // ── groupByDeadline ───────────────────────────────────────────────────
 
 /**
- * Group a flat list of tasks into five deadline buckets, evaluated against
+ * Group a flat list of tasks into four slot buckets, evaluated against
  * `Date.now()` at call time (pure w.r.t. inputs, but reads the clock).
  *
- * Bucket order: overdue → today → week → later → none.
+ * Bucket order: overdue → today → week → later.
  * Empty buckets are omitted from the result.
  * Task order within each bucket mirrors the input order.
  */
@@ -206,18 +205,13 @@ export function groupByDeadline(tasks: TaskItem[]): {
     today: [],
     week: [],
     later: [],
-    none: [],
   };
 
   for (const task of tasks) {
-    if (task.deadline === null) {
-      buckets.none.push(task);
-    } else {
-      buckets[classifyDeadline(task.deadline, nowMs)].push(task);
-    }
+    buckets[classifyDeadline(task.startsAt, nowMs)].push(task);
   }
 
-  const ORDER: DeadlineBucket[] = ["overdue", "today", "week", "later", "none"];
+  const ORDER: DeadlineBucket[] = ["overdue", "today", "week", "later"];
 
   return ORDER.filter((b) => buckets[b].length > 0).map((b) => ({
     bucket: b,

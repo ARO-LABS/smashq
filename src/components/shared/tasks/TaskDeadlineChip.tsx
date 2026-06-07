@@ -1,20 +1,19 @@
 /**
- * TaskDeadlineChip — relative-time pill rendered next to a task's deadline.
+ * TaskDeadlineChip — relative-time pill rendered next to a task's startsAt slot.
  *
  * Severity logic (compared to wall-clock Date.now()):
- * - past (deadline < now)       → error color  (text-error  bg-error/15)
+ * - past (startsAt < now)       → error color  (text-error  bg-error/15)
  * - ≤ tomorrow                  → warning color (text-warning bg-warning/15)
  * - further in the future       → neutral       (text-neutral-400 bg-neutral-800)
- * - null deadline               → renders nothing
  *
  * Why compare to "end of tomorrow" rather than "next 24 h"?
- * Deadlines are often set as all-day dates. A task due tomorrow at midnight
+ * Appointments are often set as same-day slots. A task starting tomorrow at midnight
  * should already show as a warning when the user wakes up today, not only
  * when 24 h remain. We compute the boundary as the start of the day after
- * tomorrow (i.e. 48 h from midnight tonight), so any deadline on today or
+ * tomorrow (i.e. 48 h from midnight tonight), so any startsAt on today or
  * tomorrow in local time gets the warning style.
  *
- * formatDeadlineRelative(deadline, hasTime, compact?) is exported so callers
+ * formatDeadlineRelative(startsAt, compact?) is exported so callers
  * that need only the string (e.g. aria-labels) don't have to render the chip.
  */
 
@@ -26,26 +25,24 @@ import type { TaskItem } from "../../../store/tasksStore";
 type Severity = "past" | "soon" | "later";
 
 /**
- * Compute the display severity for a deadline epoch-ms value against
- * the current wall clock. Returns null when deadline is null.
+ * Compute the display severity for a startsAt epoch-ms value against
+ * the current wall clock.
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export function computeDeadlineSeverity(
-  deadline: number | null,
+  startsAt: number,
   now: number = Date.now(),
-): Severity | null {
-  if (deadline === null) return null;
+): Severity {
+  if (startsAt < now) return "past";
 
-  if (deadline < now) return "past";
-
-  // "≤ tomorrow" — any deadline that falls on today or tomorrow in local time.
+  // "≤ tomorrow" — any startsAt that falls on today or tomorrow in local time.
   // Build "start of day after tomorrow" as the exclusive boundary.
   const d = new Date();
   d.setHours(0, 0, 0, 0); // midnight tonight (start of today)
   d.setDate(d.getDate() + 2); // start of day after tomorrow
   const endOfTomorrow = d.getTime();
 
-  if (deadline < endOfTomorrow) return "soon";
+  if (startsAt < endOfTomorrow) return "soon";
   return "later";
 }
 
@@ -60,11 +57,9 @@ const SEVERITY_CLASSES: Record<Severity, string> = {
 const MS_PER_DAY = 86_400_000;
 
 /**
- * Format a deadline as a human-readable relative string.
+ * Format a startsAt slot as a human-readable relative string.
  *
- * @param deadline  epoch-ms; must not be null (guard at call site)
- * @param hasTime   when true the deadline is timed, so "überfällig" omits
- *                  a day count because we already know it's past
+ * @param startsAt  epoch-ms
  * @param compact   when true uses the abbreviated form for multi-day values
  *                  (e.g. "5 T." instead of "5 Tage")
  *
@@ -72,33 +67,28 @@ const MS_PER_DAY = 86_400_000;
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export function formatDeadlineRelative(
-  deadline: number,
-  hasTime: boolean,
+  startsAt: number,
   compact?: boolean,
 ): string {
   const now = Date.now();
 
-  if (deadline < now) {
+  if (startsAt < now) {
     return "überfällig";
   }
 
   // Compute calendar-day difference in local time.
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
-  const deadlineDate = new Date(deadline);
-  const deadlineDayStart = new Date(deadlineDate);
-  deadlineDayStart.setHours(0, 0, 0, 0);
+  const startsAtDate = new Date(startsAt);
+  const startsAtDayStart = new Date(startsAtDate);
+  startsAtDayStart.setHours(0, 0, 0, 0);
 
   const diffDays = Math.round(
-    (deadlineDayStart.getTime() - todayStart.getTime()) / MS_PER_DAY,
+    (startsAtDayStart.getTime() - todayStart.getTime()) / MS_PER_DAY,
   );
 
   if (diffDays === 0) return "heute";
   if (diffDays === 1) return "morgen";
-
-  // hasTime is unused for the label when diffDays > 1 (we always show the day
-  // count), but we accept it for API consistency and future timed-format needs.
-  void hasTime;
 
   return compact ? `${diffDays} T.` : `${diffDays} Tage`;
 }
@@ -106,15 +96,14 @@ export function formatDeadlineRelative(
 // ── Component ─────────────────────────────────────────────────────────
 
 export interface TaskDeadlineChipProps {
-  task: Pick<TaskItem, "deadline" | "deadlineHasTime">;
+  task: Pick<TaskItem, "startsAt">;
   compact?: boolean;
 }
 
 export function TaskDeadlineChip({ task, compact }: TaskDeadlineChipProps): JSX.Element | null {
-  const severity = computeDeadlineSeverity(task.deadline);
-  if (severity === null || task.deadline === null) return null;
+  const severity = computeDeadlineSeverity(task.startsAt);
 
-  const label = formatDeadlineRelative(task.deadline, task.deadlineHasTime, compact);
+  const label = formatDeadlineRelative(task.startsAt, compact);
   const ClockIcon = ICONS.tasks.clock;
 
   return (

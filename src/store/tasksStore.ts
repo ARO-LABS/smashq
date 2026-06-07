@@ -20,10 +20,10 @@ export interface TaskItem {
   projectKey: string | null;
   title: string;
   status: TaskStatus;
-  /** epoch ms; null = no deadline. */
-  deadline: number | null;
-  /** all-day vs. timed — drives .ics export later. */
-  deadlineHasTime: boolean;
+  /** Appointment start, epoch ms. Every task is a timed Termin. */
+  startsAt: number;
+  /** Appointment end, epoch ms (>= startsAt). Default startsAt + SLOT_MS. */
+  endsAt: number;
   note?: string;
   subtasks: Subtask[];
   source: TaskSource;
@@ -31,8 +31,17 @@ export interface TaskItem {
   sortIndex: number;
   createdAt: number;
   completedAt: number | null;
-  /** Soft-delete timestamp; null = active. No hard delete. */
-  archivedAt: number | null;
+}
+
+// ── Slot helpers ──────────────────────────────────────────────────────
+
+/** Default appointment length: 30 minutes. */
+export const SLOT_MS = 30 * 60_000;
+
+/** Next half-hour boundary from `now`, plus a 30-min default window. */
+export function defaultSlot(now: number = Date.now()): { startsAt: number; endsAt: number } {
+  const startsAt = Math.ceil(now / SLOT_MS) * SLOT_MS;
+  return { startsAt, endsAt: startsAt + SLOT_MS };
 }
 
 // ── Sanitize (corruption recovery) ────────────────────────────────────
@@ -70,19 +79,34 @@ export function sanitizeTask(value: unknown): TaskItem | null {
     ? v.subtasks.map(sanitizeSubtask).filter((s): s is Subtask => s !== null)
     : [];
 
+  const startsRaw =
+    typeof v.startsAt === "number" && Number.isFinite(v.startsAt) ? v.startsAt : null;
+  const endsRaw =
+    typeof v.endsAt === "number" && Number.isFinite(v.endsAt) ? v.endsAt : null;
+  const legacy =
+    typeof v.deadline === "number" && Number.isFinite(v.deadline) ? v.deadline : null;
+
+  let slot: { startsAt: number; endsAt: number };
+  if (startsRaw !== null) {
+    slot = { startsAt: startsRaw, endsAt: endsRaw !== null && endsRaw >= startsRaw ? endsRaw : startsRaw + SLOT_MS };
+  } else if (legacy !== null) {
+    slot = { startsAt: legacy, endsAt: legacy + SLOT_MS };
+  } else {
+    slot = defaultSlot();
+  }
+
   const result: TaskItem = {
     id: v.id,
     projectKey: typeof v.projectKey === "string" ? v.projectKey : null,
     title: v.title,
     status,
-    deadline: toNullableTimestamp(v.deadline),
-    deadlineHasTime: v.deadlineHasTime === true,
+    startsAt: slot.startsAt,
+    endsAt: slot.endsAt,
     subtasks,
     source,
     sortIndex: toFiniteNumber(v.sortIndex, 0),
     createdAt: toFiniteNumber(v.createdAt, 0),
     completedAt: toNullableTimestamp(v.completedAt),
-    archivedAt: toNullableTimestamp(v.archivedAt),
   };
   if (typeof v.note === "string") result.note = v.note;
   return result;
@@ -99,8 +123,8 @@ export function sanitizeTasks(value: unknown): TaskItem[] {
 export interface AddTaskInput {
   title: string;
   projectKey?: string | null;
-  deadline?: number | null;
-  deadlineHasTime?: boolean;
+  startsAt?: number;
+  endsAt?: number;
   note?: string;
   source?: TaskSource;
 }
@@ -108,7 +132,7 @@ export interface AddTaskInput {
 export type UpdateTaskFields = Partial<
   Pick<
     TaskItem,
-    "title" | "projectKey" | "status" | "deadline" | "deadlineHasTime" | "note" | "subtasks"
+    "title" | "projectKey" | "status" | "startsAt" | "endsAt" | "note" | "subtasks"
   >
 >;
 
@@ -118,7 +142,7 @@ export interface TasksState {
   updateTask: (id: string, fields: UpdateTaskFields) => void;
   completeTask: (id: string) => void;
   reopenTask: (id: string) => void;
-  archiveTask: (id: string) => void;
+  deleteTask: (id: string) => void;
   reorderTask: (id: string, sortIndex: number) => void;
 }
 
@@ -130,29 +154,24 @@ function createTaskId(): string {
 // Curried selectors (project-scoped) return a (state) => T function so they
 // compose with useTasksStore(selectX(key)) without re-creating arrays inline.
 
-/** All non-archived tasks, sorted by sortIndex. */
+/** All tasks, sorted by sortIndex. */
 export const selectActiveTasks = (state: TasksState): TaskItem[] =>
-  state.tasks
-    .filter((t) => t.archivedAt === null)
-    .sort((a, b) => a.sortIndex - b.sortIndex);
+  state.tasks.slice().sort((a, b) => a.sortIndex - b.sortIndex);
 
-/** Non-archived tasks for one projectKey (null = global tasks), sorted by sortIndex. */
+/** Tasks for one projectKey (null = global tasks), sorted by sortIndex. */
 export const selectTasksForProject =
   (projectKey: string | null) =>
   (state: TasksState): TaskItem[] =>
     state.tasks
-      .filter((t) => t.archivedAt === null && t.projectKey === projectKey)
+      .filter((t) => t.projectKey === projectKey)
       .sort((a, b) => a.sortIndex - b.sortIndex);
 
-/** Open (not done) non-archived tasks for one projectKey, sorted by sortIndex. */
+/** Open (not done) tasks for one projectKey, sorted by sortIndex. */
 export const selectOpenTasksForProject =
   (projectKey: string | null) =>
   (state: TasksState): TaskItem[] =>
     state.tasks
-      .filter(
-        (t) =>
-          t.archivedAt === null && t.status !== "done" && t.projectKey === projectKey,
-      )
+      .filter((t) => t.status !== "done" && t.projectKey === projectKey)
       .sort((a, b) => a.sortIndex - b.sortIndex);
 
 /** The derived "nächste" task: lowest-sortIndex open task of a project. */
@@ -173,19 +192,31 @@ export const useTasksStore = create<TasksState>()(
         const now = Date.now();
         const tasks = get().tasks;
         const maxSort = tasks.reduce((m, t) => Math.max(m, t.sortIndex), 0);
+        // Honor an explicit startsAt even without endsAt (default +30 min), and
+        // clamp an inverted slot — keeps addTask's write path consistent with
+        // updateTask/sanitizeTask so no code path can persist endsAt < startsAt.
+        const slot =
+          input.startsAt != null
+            ? {
+                startsAt: input.startsAt,
+                endsAt:
+                  input.endsAt != null && input.endsAt >= input.startsAt
+                    ? input.endsAt
+                    : input.startsAt + SLOT_MS,
+              }
+            : defaultSlot();
         const task: TaskItem = {
           id,
           projectKey: input.projectKey ?? null,
           title: input.title.trim(),
           status: "open",
-          deadline: input.deadline ?? null,
-          deadlineHasTime: input.deadlineHasTime ?? false,
+          startsAt: slot.startsAt,
+          endsAt: slot.endsAt,
           subtasks: [],
           source: input.source ?? "manual",
           sortIndex: maxSort + 1000,
           createdAt: now,
           completedAt: null,
-          archivedAt: null,
         };
         if (typeof input.note === "string") task.note = input.note;
         set({ tasks: [...tasks, task] });
@@ -197,11 +228,15 @@ export const useTasksStore = create<TasksState>()(
           tasks: state.tasks.map((t) => {
             if (t.id !== id) return t;
             const next: TaskItem = { ...t, ...fields };
-            // Live mutations bypass the hydration sanitizer; coerce the two
-            // fields a UI form can realistically corrupt so we never persist
-            // values sanitizeTask would reject on the next load.
-            if ("deadline" in fields) {
-              next.deadline = toNullableTimestamp(fields.deadline);
+            // Live mutations bypass the hydration sanitizer; coerce fields
+            // a UI form can realistically corrupt so we never persist values
+            // sanitizeTask would reject on the next load.
+            if ("startsAt" in fields || "endsAt" in fields) {
+              const s = toFiniteNumber(next.startsAt, t.startsAt);
+              let e = toFiniteNumber(next.endsAt, t.endsAt);
+              if (e < s) e = s + SLOT_MS;
+              next.startsAt = s;
+              next.endsAt = e;
             }
             if ("subtasks" in fields) {
               next.subtasks = Array.isArray(fields.subtasks)
@@ -228,12 +263,8 @@ export const useTasksStore = create<TasksState>()(
           ),
         })),
 
-      archiveTask: (id) =>
-        set((state) => ({
-          tasks: state.tasks.map((t) =>
-            t.id === id ? { ...t, archivedAt: Date.now() } : t,
-          ),
-        })),
+      deleteTask: (id) =>
+        set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) })),
 
       reorderTask: (id, sortIndex) => {
         if (!Number.isFinite(sortIndex)) return;
@@ -246,7 +277,7 @@ export const useTasksStore = create<TasksState>()(
       name: "smashq-tasks",
       storage: createJSONStorage(() => tasksStorage),
       partialize: (state) => ({ tasks: state.tasks }),
-      version: 1,
+      version: 2,
       migrate: (persisted: unknown): { tasks: TaskItem[] } => {
         const p = persisted as { tasks?: unknown } | null;
         return { tasks: sanitizeTasks(p?.tasks) };

@@ -126,7 +126,7 @@ export function TasksView(): JSX.Element {
   };
 
   const handleArchive = (): void => {
-    if (selectedId !== null) ctx.archiveTask(selectedId);
+    if (selectedId !== null) ctx.deleteTask(selectedId);
     // Selection drop-out is handled by the reselect effect on the next render.
   };
 

@@ -13,20 +13,22 @@ import type { ProjectOption } from "./TaskMetaChips";
 
 // ── Factory ────────────────────────────────────────────────────────────
 
+const SLOT_MS = 30 * 60_000;
+
 function makeTask(overrides: Partial<TaskItem> = {}): TaskItem {
+  const startsAt = overrides.startsAt ?? Date.now() + 86_400_000;
   return {
     id: "task-test-1",
     projectKey: null,
     title: "Testaufgabe",
     status: "open",
-    deadline: null,
-    deadlineHasTime: false,
+    startsAt,
+    endsAt: overrides.endsAt ?? startsAt + SLOT_MS,
     subtasks: [],
     source: "manual",
     sortIndex: 1000,
     createdAt: Date.now(),
     completedAt: null,
-    archivedAt: null,
     ...overrides,
   };
 }

@@ -33,55 +33,37 @@ fn ics_escape(s: &str) -> String {
 /// Tauri runtime. The Tauri command calls this and then writes the result.
 ///
 /// # Arguments
-/// * `title`    – Task title (non-empty, ≤500 chars; caller must validate).
-/// * `deadline` – Unix timestamp in milliseconds (> 0; caller must validate).
-/// * `has_time` – When `true` the DTSTART is a local datetime; otherwise
-///   VALUE=DATE (all-day event, DTEND +1 day).
-/// * `note`     – Optional task note placed in DESCRIPTION.
+/// * `title`     – Task title (non-empty, ≤500 chars; caller must validate).
+/// * `starts_at` – Unix timestamp in milliseconds for event start (> 0; caller must validate).
+/// * `ends_at`   – Unix timestamp in milliseconds for event end (≥ starts_at; caller must validate).
+/// * `note`      – Optional task note placed in DESCRIPTION.
 pub fn build_ics(
     title: &str,
-    deadline: i64,
-    has_time: bool,
+    starts_at: i64,
+    ends_at: i64,
     note: Option<&str>,
 ) -> Result<String, ADPError> {
-    // Convert deadline (ms) → DateTime
-    let deadline_secs = deadline / 1000;
-    let deadline_utc: DateTime<Utc> = Utc
-        .timestamp_opt(deadline_secs, 0)
-        .single()
-        .ok_or_else(|| ADPError::validation("Ungültiger Deadline-Timestamp"))?;
-    let deadline_local: DateTime<Local> = deadline_utc.with_timezone(&Local);
-
-    // DTSTAMP — "now" in UTC, always in the full datetime+Z format.
-    let dtstamp = Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
-
-    // DTSTART / DTEND depend on whether the user stored a time component.
-    let (dtstart_line, dtend_line) = if has_time {
-        // Timed event: local wall-clock, no Z suffix, no VALUE= prefix.
-        let start = deadline_local.format("%Y%m%dT%H%M%S").to_string();
-        // DTEND = start + 1 hour
-        let end_dt = deadline_local + chrono::Duration::hours(1);
-        let end = end_dt.format("%Y%m%dT%H%M%S").to_string();
-        (format!("DTSTART:{}", start), format!("DTEND:{}", end))
-    } else {
-        // All-day event: VALUE=DATE, YYYYMMDD, DTEND = next calendar day.
-        let start = deadline_local.format("%Y%m%d").to_string();
-        let end_dt = deadline_local + chrono::Duration::days(1);
-        let end = end_dt.format("%Y%m%d").to_string();
-        (
-            format!("DTSTART;VALUE=DATE:{}", start),
-            format!("DTEND;VALUE=DATE:{}", end),
-        )
+    let to_local = |ms: i64| -> Result<DateTime<Local>, ADPError> {
+        Utc.timestamp_opt(ms / 1000, 0)
+            .single()
+            .map(|u| u.with_timezone(&Local))
+            .ok_or_else(|| ADPError::validation("Ungültiger Timestamp"))
     };
+    let start_local = to_local(starts_at)?;
+    let end_local = to_local(ends_at)?;
+
+    let dtstamp = Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
+    let dtstart_line = format!("DTSTART:{}", start_local.format("%Y%m%dT%H%M%S"));
+    let dtend_line = format!("DTEND:{}", end_local.format("%Y%m%dT%H%M%S"));
 
     let summary = ics_escape(title);
     let description = note
         .map(|n| format!("DESCRIPTION:{}\r\n", ics_escape(n)))
         .unwrap_or_default();
 
-    // UID is deterministic from the deadline so repeated exports do not
+    // UID is deterministic from starts_at so repeated exports do not
     // create duplicate calendar entries in most PIM applications.
-    let uid = format!("smashq-{}@local", deadline);
+    let uid = format!("smashq-{}@local", starts_at);
 
     let ics = format!(
         "BEGIN:VCALENDAR\r\n\
@@ -111,7 +93,6 @@ pub fn build_ics(
         summary = summary,
         description = description,
     );
-
     Ok(ics)
 }
 
@@ -123,15 +104,15 @@ pub mod commands {
     /// Export a task as an .ics file and open it in the OS default calendar app.
     ///
     /// # Parameters
-    /// * `title`             – Task title.
-    /// * `deadline`          – Unix epoch in **milliseconds** (> 0).
-    /// * `deadline_has_time` – Whether a specific time was set on the deadline.
-    /// * `note`              – Optional task note for the DESCRIPTION field.
+    /// * `title`     – Task title.
+    /// * `starts_at` – Unix epoch in **milliseconds** for event start (> 0).
+    /// * `ends_at`   – Unix epoch in **milliseconds** for event end (≥ starts_at).
+    /// * `note`      – Optional task note for the DESCRIPTION field.
     #[tauri::command]
     pub async fn export_task_ics(
         title: String,
-        deadline: i64,
-        deadline_has_time: bool,
+        starts_at: i64,
+        ends_at: i64,
         note: Option<String>,
     ) -> Result<(), ADPError> {
         // ── Validation ──────────────────────────────────────────────────────
@@ -144,19 +125,24 @@ pub mod commands {
                 "Aufgabentitel darf maximal 500 Zeichen haben",
             ));
         }
-        if deadline <= 0 {
+        if starts_at <= 0 {
             return Err(ADPError::validation(
-                "Deadline muss ein positiver Unix-Timestamp (ms) sein",
+                "Startzeit muss ein positiver Unix-Timestamp (ms) sein",
+            ));
+        }
+        if ends_at < starts_at {
+            return Err(ADPError::validation(
+                "Endzeit darf nicht vor der Startzeit liegen",
             ));
         }
 
         // ── Build ICS content ────────────────────────────────────────────────
-        let ics_content = build_ics(&title, deadline, deadline_has_time, note.as_deref())?;
+        let ics_content = build_ics(&title, starts_at, ends_at, note.as_deref())?;
 
         // ── Write to temp dir ────────────────────────────────────────────────
-        // Filename is derived exclusively from the numeric deadline to prevent
+        // Filename is derived exclusively from the numeric starts_at to prevent
         // any path-traversal attack via user-supplied title strings.
-        let file_name = format!("smashq-task-{}.ics", deadline);
+        let file_name = format!("smashq-task-{}.ics", starts_at);
         let temp_path = std::env::temp_dir().join(&file_name);
 
         std::fs::write(&temp_path, ics_content.as_bytes()).map_err(|e| {
@@ -206,13 +192,15 @@ mod tests {
 
     // A fixed timestamp: 2024-06-15 14:30:00 UTC → ms = 1718461800000
     // We use a concrete value so that DTSTART format assertions are stable.
-    const FIXED_DEADLINE_MS: i64 = 1_718_461_800_000;
+    const FIXED_START_MS: i64 = 1_718_461_800_000;
+    // FIXED_END_MS = FIXED_START_MS + 30 minutes
+    const FIXED_END_MS: i64 = FIXED_START_MS + 30 * 60 * 1000;
 
     // ── build_ics: structure ─────────────────────────────────────────────────
 
     #[test]
     fn build_ics_contains_vevent_wrapper() {
-        let ics = build_ics("Test", FIXED_DEADLINE_MS, true, None).unwrap();
+        let ics = build_ics("Test", FIXED_START_MS, FIXED_END_MS, None).unwrap();
         assert!(ics.contains("BEGIN:VCALENDAR"));
         assert!(ics.contains("BEGIN:VEVENT"));
         assert!(ics.contains("END:VEVENT"));
@@ -221,7 +209,7 @@ mod tests {
 
     #[test]
     fn build_ics_contains_required_properties() {
-        let ics = build_ics("Test", FIXED_DEADLINE_MS, false, None).unwrap();
+        let ics = build_ics("Test", FIXED_START_MS, FIXED_END_MS, None).unwrap();
         assert!(ics.contains("PRODID:-//Smashq//Tasks//DE"));
         assert!(ics.contains("VERSION:2.0"));
         assert!(ics.contains("TRANSP:OPAQUE"));
@@ -229,17 +217,17 @@ mod tests {
     }
 
     #[test]
-    fn build_ics_uid_contains_deadline() {
-        let ics = build_ics("Test", FIXED_DEADLINE_MS, false, None).unwrap();
-        assert!(ics.contains(&format!("UID:smashq-{}@local", FIXED_DEADLINE_MS)));
+    fn build_ics_uid_contains_starts_at() {
+        let ics = build_ics("Test", FIXED_START_MS, FIXED_END_MS, None).unwrap();
+        assert!(ics.contains(&format!("UID:smashq-{}@local", FIXED_START_MS)));
     }
 
     // ── DTSTART formatting ───────────────────────────────────────────────────
 
     #[test]
     fn build_ics_timed_dtstart_has_local_datetime_format() {
-        let ics = build_ics("Test", FIXED_DEADLINE_MS, true, None).unwrap();
-        // Timed: must start with "DTSTART:" (no VALUE= prefix) and contain a
+        let ics = build_ics("Test", FIXED_START_MS, FIXED_END_MS, None).unwrap();
+        // Must start with "DTSTART:" (no VALUE= prefix) and contain a
         // datetime token matching YYYYMMDDTHHMMSS (15 digits + T separator).
         assert!(ics.contains("DTSTART:"));
         // The value must NOT carry a VALUE=DATE prefix.
@@ -255,20 +243,6 @@ mod tests {
         assert_eq!(&dtstart_val[8..9], "T");
         // Must NOT end with Z (timed local, not UTC).
         assert!(!dtstart_val.ends_with('Z'));
-    }
-
-    #[test]
-    fn build_ics_date_only_dtstart_uses_value_date() {
-        let ics = build_ics("Test", FIXED_DEADLINE_MS, false, None).unwrap();
-        assert!(ics.contains("DTSTART;VALUE=DATE:"));
-        // DATE value: 8 digits only, no T.
-        let dtstart_val = ics
-            .lines()
-            .find(|l| l.starts_with("DTSTART;VALUE=DATE:"))
-            .unwrap()
-            .trim_start_matches("DTSTART;VALUE=DATE:");
-        assert_eq!(dtstart_val.len(), 8, "YYYYMMDD = 8 chars");
-        assert!(!dtstart_val.contains('T'));
     }
 
     // ── RFC5545 escaping ─────────────────────────────────────────────────────
@@ -303,7 +277,7 @@ mod tests {
     #[test]
     fn build_ics_summary_is_escaped() {
         // Title with a comma — must appear as \, in SUMMARY.
-        let ics = build_ics("Buy milk, eggs", FIXED_DEADLINE_MS, false, None).unwrap();
+        let ics = build_ics("Buy milk, eggs", FIXED_START_MS, FIXED_END_MS, None).unwrap();
         assert!(
             ics.contains("SUMMARY:Buy milk\\, eggs"),
             "comma must be escaped in SUMMARY"
@@ -314,8 +288,8 @@ mod tests {
     fn build_ics_description_is_escaped() {
         let ics = build_ics(
             "Test",
-            FIXED_DEADLINE_MS,
-            false,
+            FIXED_START_MS,
+            FIXED_END_MS,
             Some("Note; with\nnewline"),
         )
         .unwrap();
@@ -326,7 +300,7 @@ mod tests {
 
     #[test]
     fn build_ics_without_note_omits_description() {
-        let ics = build_ics("Test", FIXED_DEADLINE_MS, false, None).unwrap();
+        let ics = build_ics("Test", FIXED_START_MS, FIXED_END_MS, None).unwrap();
         // The VALARM block always emits "DESCRIPTION:Erinnerung".
         // When no note is given, no other DESCRIPTION property must appear.
         // We verify that every "DESCRIPTION:" line in the output is exactly
@@ -344,7 +318,7 @@ mod tests {
 
     #[test]
     fn build_ics_with_note_includes_description() {
-        let ics = build_ics("Test", FIXED_DEADLINE_MS, false, Some("My note")).unwrap();
+        let ics = build_ics("Test", FIXED_START_MS, FIXED_END_MS, Some("My note")).unwrap();
         assert!(ics.contains("DESCRIPTION:My note"));
     }
 
@@ -352,18 +326,17 @@ mod tests {
 
     #[test]
     fn build_ics_rejects_invalid_timestamp() {
-        // Timestamp 0 ms → epoch second 0, which is valid for chrono but we
-        // check deadline > 0 in the command layer. At the builder level, a
-        // clearly-out-of-range value (negative seconds) should also error.
-        let result = build_ics("Test", i64::MIN, false, None);
+        // A clearly-out-of-range value (i64::MIN) should cause chrono to fail
+        // to produce a valid DateTime, triggering the builder-level error.
+        let result = build_ics("Test", i64::MIN, i64::MIN + 1, None);
         assert!(result.is_err());
     }
 
     // ── DTEND is after DTSTART ───────────────────────────────────────────────
 
     #[test]
-    fn build_ics_timed_dtend_is_one_hour_after_dtstart() {
-        let ics = build_ics("Test", FIXED_DEADLINE_MS, true, None).unwrap();
+    fn build_ics_timed_dtend_is_after_dtstart() {
+        let ics = build_ics("Test", FIXED_START_MS, FIXED_END_MS, None).unwrap();
         let start_val: u64 = ics
             .lines()
             .find(|l| l.starts_with("DTSTART:"))
@@ -384,35 +357,35 @@ mod tests {
             .collect::<String>()
             .parse()
             .unwrap();
-        // end > start (exact hour difference is timezone-sensitive; just confirm end > start)
         assert!(end_val > start_val, "DTEND must be after DTSTART");
     }
 
     #[test]
-    fn build_ics_date_only_dtend_is_next_day() {
-        let ics = build_ics("Test", FIXED_DEADLINE_MS, false, None).unwrap();
-        let start_str = ics
-            .lines()
-            .find(|l| l.starts_with("DTSTART;VALUE=DATE:"))
-            .unwrap()
-            .trim_start_matches("DTSTART;VALUE=DATE:");
-        let end_str = ics
-            .lines()
-            .find(|l| l.starts_with("DTEND;VALUE=DATE:"))
-            .unwrap()
-            .trim_start_matches("DTEND;VALUE=DATE:");
-        let start_day: u32 = start_str[6..8].parse().unwrap();
-        let end_day: u32 = end_str[6..8].parse().unwrap();
-        // Same month: end day = start day + 1 (or month rolled over, but for
-        // the fixed mid-month timestamp this holds cleanly).
-        assert_eq!(end_day, start_day + 1, "DTEND must be next calendar day");
+    fn build_ics_dtend_matches_ends_at() {
+        let ics = build_ics("T", FIXED_START_MS, FIXED_END_MS, None).unwrap();
+        let dig = |p: &str| {
+            ics.lines()
+                .find(|l| l.starts_with(p))
+                .unwrap()
+                .trim_start_matches(p)
+                .chars()
+                .filter(|c| c.is_ascii_digit())
+                .collect::<String>()
+        };
+        assert!(dig("DTEND:").parse::<u64>().unwrap() > dig("DTSTART:").parse::<u64>().unwrap());
     }
 
     // ── Temp-file integration (uses tempfile dev-dep indirectly via std) ──────
 
     #[test]
     fn build_ics_output_can_be_written_and_re_read() {
-        let ics = build_ics("Schreiben & Lesen", FIXED_DEADLINE_MS, true, Some("ok")).unwrap();
+        let ics = build_ics(
+            "Schreiben & Lesen",
+            FIXED_START_MS,
+            FIXED_END_MS,
+            Some("ok"),
+        )
+        .unwrap();
         let tmp = std::env::temp_dir().join("smashq-ics-test-roundtrip.ics");
         std::fs::write(&tmp, ics.as_bytes()).unwrap();
         let back = std::fs::read_to_string(&tmp).unwrap();

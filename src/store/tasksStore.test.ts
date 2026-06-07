@@ -1,5 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { sanitizeTask, sanitizeTasks, useTasksStore, selectActiveTasks, selectTasksForProject, selectOpenTasksForProject, selectNextTask, type Subtask } from "./tasksStore";
+import { sanitizeTask, sanitizeTasks, useTasksStore, selectActiveTasks, selectTasksForProject, selectOpenTasksForProject, selectNextTask, defaultSlot, SLOT_MS, type Subtask } from "./tasksStore";
+
+describe("defaultSlot", () => {
+  it("returns a 30-min window on the next half-hour boundary", () => {
+    const { startsAt, endsAt } = defaultSlot(Date.parse("2026-06-07T10:05:00"));
+    expect(new Date(startsAt).getMinutes() % 30).toBe(0);
+    expect(endsAt - startsAt).toBe(SLOT_MS);
+    expect(startsAt).toBeGreaterThanOrEqual(Date.parse("2026-06-07T10:05:00"));
+  });
+});
 
 describe("sanitizeTask", () => {
   const valid = {
@@ -7,15 +16,14 @@ describe("sanitizeTask", () => {
     projectKey: "c:/p",
     title: "Do thing",
     status: "open",
-    deadline: 1000,
-    deadlineHasTime: true,
+    startsAt: 1000,
+    endsAt: 1000 + SLOT_MS,
     note: "n",
     subtasks: [{ id: "s1", title: "step", done: false }],
     source: "manual",
     sortIndex: 1000,
     createdAt: 50,
     completedAt: null,
-    archivedAt: null,
   };
 
   it("passes a fully-valid task through unchanged", () => {
@@ -39,10 +47,6 @@ describe("sanitizeTask", () => {
     expect(sanitizeTask({ ...valid, sortIndex: NaN })?.sortIndex).toBe(0);
   });
 
-  it("coerces an invalid deadline to null", () => {
-    expect(sanitizeTask({ ...valid, deadline: "soon" })?.deadline).toBeNull();
-  });
-
   it("drops malformed subtasks", () => {
     const out = sanitizeTask({
       ...valid,
@@ -53,6 +57,32 @@ describe("sanitizeTask", () => {
 
   it("defaults source to 'manual' for unknown values", () => {
     expect(sanitizeTask({ ...valid, source: "alien" })?.source).toBe("manual");
+  });
+});
+
+describe("sanitizeTask slots", () => {
+  const base = { id: "t1", title: "x" };
+
+  it("keeps a valid startsAt/endsAt window", () => {
+    const t = sanitizeTask({ ...base, startsAt: 1000, endsAt: 1000 + SLOT_MS })!;
+    expect(t.startsAt).toBe(1000);
+    expect(t.endsAt).toBe(1000 + SLOT_MS);
+  });
+
+  it("clamps endsAt below startsAt to startsAt + 30min", () => {
+    const t = sanitizeTask({ ...base, startsAt: 5000, endsAt: 1 })!;
+    expect(t.endsAt).toBe(5000 + SLOT_MS);
+  });
+
+  it("migrates a legacy deadline field into a 30-min window", () => {
+    const t = sanitizeTask({ ...base, deadline: 9000, deadlineHasTime: true })!;
+    expect(t.startsAt).toBe(9000);
+    expect(t.endsAt).toBe(9000 + SLOT_MS);
+  });
+
+  it("drops the obsolete archivedAt field", () => {
+    const t = sanitizeTask({ ...base, startsAt: 1, endsAt: 2, archivedAt: 123 }) as unknown as Record<string, unknown>;
+    expect("archivedAt" in t).toBe(false);
   });
 });
 
@@ -90,9 +120,7 @@ describe("useTasksStore.addTask", () => {
     expect(t.projectKey).toBe("c:/p");
     expect(t.status).toBe("open");
     expect(t.source).toBe("manual");
-    expect(t.deadline).toBeNull();
     expect(t.subtasks).toEqual([]);
-    expect(t.archivedAt).toBeNull();
     expect(t.sortIndex).toBe(1000);
   });
 
@@ -120,10 +148,9 @@ describe("useTasksStore mutations", () => {
 
   it("updateTask merges allowed fields", () => {
     const id = useTasksStore.getState().addTask({ title: "x" });
-    useTasksStore.getState().updateTask(id, { title: "y", deadline: 99, note: "hi" });
+    useTasksStore.getState().updateTask(id, { title: "y", note: "hi" });
     const t = useTasksStore.getState().tasks[0];
     expect(t.title).toBe("y");
-    expect(t.deadline).toBe(99);
     expect(t.note).toBe("hi");
   });
 
@@ -132,12 +159,6 @@ describe("useTasksStore mutations", () => {
     useTasksStore.getState().updateTask("nope", { title: "changed" });
     expect(useTasksStore.getState().tasks[0].title).toBe("x");
     expect(useTasksStore.getState().tasks[0].id).toBe(id);
-  });
-
-  it("updateTask coerces an invalid deadline to null", () => {
-    const id = useTasksStore.getState().addTask({ title: "x", deadline: 100 });
-    useTasksStore.getState().updateTask(id, { deadline: Number.NaN });
-    expect(useTasksStore.getState().tasks[0].deadline).toBeNull();
   });
 
   it("updateTask drops malformed subtasks", () => {
@@ -167,12 +188,36 @@ describe("useTasksStore mutations", () => {
     expect(t.completedAt).toBeNull();
   });
 
-  it("archiveTask sets archivedAt (soft delete, entry stays)", () => {
-    const id = useTasksStore.getState().addTask({ title: "x" });
-    useTasksStore.getState().archiveTask(id);
-    const t = useTasksStore.getState().tasks[0];
-    expect(typeof t.archivedAt).toBe("number");
-    expect(useTasksStore.getState().tasks).toHaveLength(1);
+  it("deleteTask removes the task from the array", () => {
+    const id = useTasksStore.getState().addTask({ title: "A" });
+    useTasksStore.getState().deleteTask(id);
+    expect(useTasksStore.getState().tasks).toHaveLength(0);
+  });
+
+  it("addTask without slot gets a default 30-min window", () => {
+    const id = useTasksStore.getState().addTask({ title: "A" });
+    const t = useTasksStore.getState().tasks.find((x) => x.id === id)!;
+    expect(t.endsAt - t.startsAt).toBe(SLOT_MS);
+  });
+
+  it("addTask honors a lone startsAt with a default 30-min endsAt", () => {
+    const id = useTasksStore.getState().addTask({ title: "A", startsAt: 1000 });
+    const t = useTasksStore.getState().tasks.find((x) => x.id === id)!;
+    expect(t.startsAt).toBe(1000);
+    expect(t.endsAt).toBe(1000 + SLOT_MS);
+  });
+
+  it("addTask clamps an explicitly inverted slot", () => {
+    const id = useTasksStore.getState().addTask({ title: "A", startsAt: 5000, endsAt: 10 });
+    const t = useTasksStore.getState().tasks.find((x) => x.id === id)!;
+    expect(t.endsAt).toBe(5000 + SLOT_MS);
+  });
+
+  it("updateTask clamps endsAt < startsAt", () => {
+    const id = useTasksStore.getState().addTask({ title: "A", startsAt: 1000, endsAt: 1000 + SLOT_MS });
+    useTasksStore.getState().updateTask(id, { startsAt: 5000, endsAt: 10 });
+    const t = useTasksStore.getState().tasks.find((x) => x.id === id)!;
+    expect(t.endsAt).toBe(5000 + SLOT_MS);
   });
 
   it("reorderTask sets the sortIndex directly", () => {
@@ -191,13 +236,13 @@ describe("useTasksStore mutations", () => {
 describe("tasks selectors", () => {
   beforeEach(resetTasks);
 
-  it("selectActiveTasks excludes archived tasks", () => {
-    const a = useTasksStore.getState().addTask({ title: "a" });
+  it("selectActiveTasks returns all tasks sorted by sortIndex", () => {
+    useTasksStore.getState().addTask({ title: "a" });
     useTasksStore.getState().addTask({ title: "b" });
-    useTasksStore.getState().archiveTask(a);
     const active = selectActiveTasks(useTasksStore.getState());
-    expect(active).toHaveLength(1);
-    expect(active[0].title).toBe("b");
+    expect(active).toHaveLength(2);
+    expect(active[0].title).toBe("a");
+    expect(active[1].title).toBe("b");
   });
 
   it("selectTasksForProject returns only that project's active tasks", () => {

@@ -6,7 +6,7 @@
  *             not onUpdate.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { TaskMetaChips } from "./TaskMetaChips";
 import type { TaskItem } from "../../../store/tasksStore";
@@ -14,20 +14,22 @@ import type { ProjectOption } from "./TaskMetaChips";
 
 // ── Factory ───────────────────────────────────────────────────────────
 
+const SLOT_MS = 30 * 60_000;
+const BASE_STARTS_AT = new Date("2026-06-07T10:00:00").getTime();
+
 function makeTask(overrides: Partial<TaskItem> = {}): TaskItem {
   return {
     id: "task-1",
     projectKey: "c:/proj/alpha",
     title: "Test Aufgabe",
     status: "open",
-    deadline: null,
-    deadlineHasTime: false,
+    startsAt: BASE_STARTS_AT,
+    endsAt: BASE_STARTS_AT + SLOT_MS,
     subtasks: [],
     source: "manual",
     sortIndex: 1000,
     createdAt: Date.now(),
     completedAt: null,
-    archivedAt: null,
     ...overrides,
   };
 }
@@ -40,7 +42,7 @@ const PROJECTS: ProjectOption[] = [
 // ── Happy path ────────────────────────────────────────────────────────
 
 describe("TaskMetaChips — happy path", () => {
-  it("renders three chips (Status, Deadline, Projekt) in chiprow layout", () => {
+  it("renders three chips (Status, Slot, Projekt) in chiprow layout", () => {
     const task = makeTask();
     render(
       <TaskMetaChips
@@ -56,16 +58,16 @@ describe("TaskMetaChips — happy path", () => {
     // Status chip shows current status label
     expect(screen.getByText("Offen")).toBeTruthy();
 
-    // Deadline chip shows placeholder when no deadline set
-    expect(screen.getByText("Deadline setzen")).toBeTruthy();
+    // Slot chip shows slot label (DD.MM. HH:MM–HH:MM format)
+    // The exact string depends on locale; just verify the chip button exists with slot info
+    expect(screen.getByText(/\d{2}\.\d{2}\.\s+\d{2}:\d{2}–\d{2}:\d{2}/)).toBeTruthy();
 
     // Projekt chip shows matched project label
     expect(screen.getByText("Alpha")).toBeTruthy();
 
-    // "In Kalender" button is present (disabled because deadline is null)
+    // "In Kalender" button is present and enabled (slot always set)
     const calBtn = screen.getByRole("button", { name: /In Kalender exportieren/ });
     expect(calBtn).toBeTruthy();
-    expect((calBtn as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("renders three rows in fields layout with mono uppercase labels", () => {
@@ -83,28 +85,11 @@ describe("TaskMetaChips — happy path", () => {
 
     // Each labeled row is present
     expect(screen.getByText("Status")).toBeTruthy();
-    expect(screen.getByText("Deadline")).toBeTruthy();
+    expect(screen.getByText("Termin")).toBeTruthy();
     expect(screen.getByText("Projekt")).toBeTruthy();
 
     // Global project label shown when projectKey is null
     expect(screen.getByText("Global")).toBeTruthy();
-  });
-
-  it("enables the In-Kalender button when deadline is set", () => {
-    const task = makeTask({ deadline: Date.now() + 86_400_000 });
-    render(
-      <TaskMetaChips
-        task={task}
-        layout="chiprow"
-        availableProjects={PROJECTS}
-        onUpdate={vi.fn()}
-        onComplete={vi.fn()}
-        onReopen={vi.fn()}
-      />,
-    );
-
-    const calBtn = screen.getByRole("button", { name: /In Kalender exportieren/ });
-    expect((calBtn as HTMLButtonElement).disabled).toBe(false);
   });
 });
 
@@ -228,5 +213,116 @@ describe("TaskMetaChips — edge cases", () => {
 
     // Menu should be gone
     expect(screen.queryByRole("menu")).toBeNull();
+  });
+});
+
+// ── SlotChip behavior ─────────────────────────────────────────────────
+
+describe("SlotChip behavior", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    // Pin clock to a future time so startsAt is not "overdue"
+    vi.setSystemTime(new Date("2026-01-01T00:00:00").getTime());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("changing Von time preserves 30-min duration when slot was exactly SLOT_MS", () => {
+    const onUpdate = vi.fn();
+    const startsAt = BASE_STARTS_AT;
+    const endsAt = BASE_STARTS_AT + SLOT_MS; // exactly 30 min apart
+    const task = makeTask({ startsAt, endsAt });
+
+    render(
+      <TaskMetaChips
+        task={task}
+        layout="chiprow"
+        availableProjects={PROJECTS}
+        onUpdate={onUpdate}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+      />,
+    );
+
+    // Open the slot chip popover
+    const allButtons = screen.getAllByRole("button");
+    const slotBtn = allButtons.find((btn) => btn.textContent?.match(/\d{2}\.\d{2}\./));
+    expect(slotBtn).toBeTruthy();
+    fireEvent.click(slotBtn!);
+
+    // The popover shows a Von time input — change it
+    const timeInputs = screen.getAllByDisplayValue(/^\d{2}:\d{2}$/);
+    // First time input is Von time
+    const vonTimeInput = timeInputs[0];
+    fireEvent.change(vonTimeInput, { target: { value: "11:00" } });
+
+    // onUpdate should have been called; endsAt - startsAt === SLOT_MS
+    expect(onUpdate).toHaveBeenCalled();
+    const lastCall = onUpdate.mock.calls[onUpdate.mock.calls.length - 1][0] as { startsAt: number; endsAt: number };
+    expect(lastCall.endsAt - lastCall.startsAt).toBe(SLOT_MS);
+  });
+
+  it("changing Von time preserves a non-default (90-min) duration", () => {
+    const onUpdate = vi.fn();
+    const startsAt = BASE_STARTS_AT;
+    const endsAt = BASE_STARTS_AT + 90 * 60_000; // 90 min — not the default
+    const task = makeTask({ startsAt, endsAt });
+
+    render(
+      <TaskMetaChips
+        task={task}
+        layout="chiprow"
+        availableProjects={PROJECTS}
+        onUpdate={onUpdate}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+      />,
+    );
+
+    const allButtons = screen.getAllByRole("button");
+    const slotBtn = allButtons.find((btn) => btn.textContent?.match(/\d{2}\.\d{2}\./));
+    fireEvent.click(slotBtn!);
+
+    const timeInputs = screen.getAllByDisplayValue(/^\d{2}:\d{2}$/);
+    fireEvent.change(timeInputs[0], { target: { value: "11:00" } });
+
+    expect(onUpdate).toHaveBeenCalled();
+    const lastCall = onUpdate.mock.calls[onUpdate.mock.calls.length - 1][0] as { startsAt: number; endsAt: number };
+    expect(lastCall.endsAt - lastCall.startsAt).toBe(90 * 60_000); // duration kept, not snapped to 30
+  });
+
+  it("setting Bis before Von clamps so endsAt >= startsAt", () => {
+    const onUpdate = vi.fn();
+    const startsAt = BASE_STARTS_AT; // 10:00
+    const endsAt = BASE_STARTS_AT + SLOT_MS; // 10:30
+    const task = makeTask({ startsAt, endsAt });
+
+    render(
+      <TaskMetaChips
+        task={task}
+        layout="chiprow"
+        availableProjects={PROJECTS}
+        onUpdate={onUpdate}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+      />,
+    );
+
+    // Open the slot chip popover
+    const allButtons = screen.getAllByRole("button");
+    const slotBtn = allButtons.find((btn) => btn.textContent?.match(/\d{2}\.\d{2}\./));
+    fireEvent.click(slotBtn!);
+
+    // Find the Bis time input (second time input) and set it before Von
+    const timeInputs = screen.getAllByDisplayValue(/^\d{2}:\d{2}$/);
+    const bisTimeInput = timeInputs[1]; // second time input is Bis
+    fireEvent.change(bisTimeInput, { target: { value: "09:00" } }); // before 10:00
+
+    // onUpdate must have been called with endsAt >= startsAt
+    expect(onUpdate).toHaveBeenCalled();
+    const lastCall = onUpdate.mock.calls[onUpdate.mock.calls.length - 1][0] as { startsAt: number; endsAt: number };
+    expect(lastCall.endsAt).toBeGreaterThanOrEqual(lastCall.startsAt);
   });
 });

@@ -12,21 +12,23 @@ import type { TaskItem } from "../../../store/tasksStore";
 
 let _idCounter = 0;
 
+const SLOT_MS = 30 * 60_000;
+
 function makeTask(overrides: Partial<TaskItem> = {}): TaskItem {
   const id = `task-${++_idCounter}`;
+  const startsAt = overrides.startsAt ?? Date.now();
   return {
     id,
     projectKey: null,
     title: "Aufgabe",
     status: "open",
-    deadline: null,
-    deadlineHasTime: false,
+    startsAt,
+    endsAt: overrides.endsAt ?? startsAt + SLOT_MS,
     subtasks: [],
     source: "manual",
     sortIndex: _idCounter * 1000,
     createdAt: 0,
     completedAt: null,
-    archivedAt: null,
     ...overrides,
   };
 }
@@ -287,46 +289,38 @@ describe("groupByDeadline", () => {
     vi.setSystemTime(NOW);
   }
 
-  it("overdue: deadline strictly before now → 'overdue' bucket", () => {
+  it("overdue: startsAt strictly before now → 'overdue' bucket", () => {
     pinClock();
-    const tasks = [makeTask({ deadline: NOW - ONE_HOUR })];
+    const tasks = [makeTask({ startsAt: NOW - ONE_HOUR })];
     const groups = groupByDeadline(tasks);
     expect(groups).toHaveLength(1);
     expect(groups[0].bucket).toBe("overdue");
     expect(groups[0].label).toBe("Überfällig");
   });
 
-  it("today: deadline on the same calendar day but after now → 'today' bucket", () => {
+  it("today: startsAt on the same calendar day but after now → 'today' bucket", () => {
     pinClock();
     // Later today (same calendar day)
-    const tasks = [makeTask({ deadline: NOW + ONE_HOUR })];
+    const tasks = [makeTask({ startsAt: NOW + ONE_HOUR })];
     const groups = groupByDeadline(tasks);
     expect(groups[0].bucket).toBe("today");
     expect(groups[0].label).toBe("Heute");
   });
 
-  it("week: deadline 2 days from now → 'week' bucket", () => {
+  it("week: startsAt 2 days from now → 'week' bucket", () => {
     pinClock();
-    const tasks = [makeTask({ deadline: NOW + 2 * ONE_DAY })];
+    const tasks = [makeTask({ startsAt: NOW + 2 * ONE_DAY })];
     const groups = groupByDeadline(tasks);
     expect(groups[0].bucket).toBe("week");
     expect(groups[0].label).toBe("Diese Woche");
   });
 
-  it("later: deadline >7 days from now → 'later' bucket", () => {
+  it("later: startsAt >7 days from now → 'later' bucket", () => {
     pinClock();
-    const tasks = [makeTask({ deadline: NOW + 8 * ONE_DAY })];
+    const tasks = [makeTask({ startsAt: NOW + 8 * ONE_DAY })];
     const groups = groupByDeadline(tasks);
     expect(groups[0].bucket).toBe("later");
     expect(groups[0].label).toBe("Später");
-  });
-
-  it("none: null deadline → 'none' bucket", () => {
-    pinClock();
-    const tasks = [makeTask({ deadline: null })];
-    const groups = groupByDeadline(tasks);
-    expect(groups[0].bucket).toBe("none");
-    expect(groups[0].label).toBe("Ohne Deadline");
   });
 
   it("empty input yields empty output", () => {
@@ -338,22 +332,21 @@ describe("groupByDeadline", () => {
     pinClock();
     // Only overdue tasks → only 'overdue' group in output
     const tasks = [
-      makeTask({ deadline: NOW - ONE_HOUR }),
-      makeTask({ deadline: NOW - 2 * ONE_HOUR }),
+      makeTask({ startsAt: NOW - ONE_HOUR }),
+      makeTask({ startsAt: NOW - 2 * ONE_HOUR }),
     ];
     const groups = groupByDeadline(tasks);
     expect(groups).toHaveLength(1);
     expect(groups[0].bucket).toBe("overdue");
   });
 
-  it("output respects bucket order: overdue → today → week → later → none", () => {
+  it("output respects bucket order: overdue → today → week → later", () => {
     pinClock();
     const tasks = [
-      makeTask({ deadline: null }),
-      makeTask({ deadline: NOW + 8 * ONE_DAY }),
-      makeTask({ deadline: NOW + 2 * ONE_DAY }),
-      makeTask({ deadline: NOW + ONE_HOUR }),
-      makeTask({ deadline: NOW - ONE_HOUR }),
+      makeTask({ startsAt: NOW + 8 * ONE_DAY }),
+      makeTask({ startsAt: NOW + 2 * ONE_DAY }),
+      makeTask({ startsAt: NOW + ONE_HOUR }),
+      makeTask({ startsAt: NOW - ONE_HOUR }),
     ];
     const groups = groupByDeadline(tasks);
     expect(groups.map((g) => g.bucket)).toEqual([
@@ -361,14 +354,13 @@ describe("groupByDeadline", () => {
       "today",
       "week",
       "later",
-      "none",
     ]);
   });
 
   it("task order within each bucket mirrors the input order", () => {
     pinClock();
-    const a = makeTask({ deadline: NOW - ONE_HOUR, title: "A" });
-    const b = makeTask({ deadline: NOW - 2 * ONE_HOUR, title: "B" });
+    const a = makeTask({ startsAt: NOW - ONE_HOUR, title: "A" });
+    const b = makeTask({ startsAt: NOW - 2 * ONE_HOUR, title: "B" });
     const tasks = [a, b];
     const groups = groupByDeadline(tasks);
     expect(groups[0].tasks.map((t) => t.title)).toEqual(["A", "B"]);

@@ -19,6 +19,7 @@ import type { JSX } from "react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ICONS } from "../../../utils/icons";
 import type { TaskItem, UpdateTaskFields } from "../../../store/tasksStore";
+import { SLOT_MS } from "../../../store/tasksStore";
 import { StatusDot } from "./StatusDot";
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -39,7 +40,7 @@ export interface TaskMetaChipsProps {
   onExportIcs?: () => void;
 }
 
-type OpenEditor = "status" | "deadline" | "project" | null;
+type OpenEditor = "status" | "slot" | "project" | null;
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -74,24 +75,21 @@ function dateTimeInputToEpoch(dateStr: string, timeStr: string): number {
   return d.getTime();
 }
 
-/** Return a human-readable label for the current deadline state. */
-function deadlineDisplayLabel(task: TaskItem): string {
-  if (task.deadline === null) return "Deadline setzen";
-  const d = new Date(task.deadline);
-  if (task.deadlineHasTime) {
-    return d.toLocaleString("de-DE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
-  return d.toLocaleDateString("de-DE", {
+/** Return a human-readable label for the slot: "DD.MM. HH:MM–HH:MM". */
+function slotDisplayLabel(task: TaskItem): string {
+  const datePart = new Date(task.startsAt).toLocaleDateString("de-DE", {
     day: "2-digit",
     month: "2-digit",
-    year: "numeric",
   });
+  const startTime = new Date(task.startsAt).toLocaleTimeString("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const endTime = new Date(task.endsAt).toLocaleTimeString("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${datePart} ${startTime}–${endTime}`;
 }
 
 /** Find the label for the current project key. */
@@ -274,9 +272,9 @@ function StatusChip({
   );
 }
 
-// ── Deadline chip + editor ────────────────────────────────────────────
+// ── Slot chip + editor ────────────────────────────────────────────────
 
-interface DeadlineChipProps {
+interface SlotChipProps {
   task: TaskItem;
   layout: "chiprow" | "fields";
   open: boolean;
@@ -285,71 +283,76 @@ interface DeadlineChipProps {
   onUpdate: (fields: UpdateTaskFields) => void;
 }
 
-function DeadlineChip({
+function SlotChip({
   task,
   layout,
   open,
   onToggle,
   onClose,
   onUpdate,
-}: DeadlineChipProps): JSX.Element {
+}: SlotChipProps): JSX.Element {
   const containerRef = useClickOutside<HTMLDivElement>(open, onClose);
-  const DeadlineIcon = ICONS.tasks.deadline;
+  const SlotIcon = ICONS.tasks.deadline;
   const ChevronDown = ICONS.action.collapse;
 
   // Local editor state — initialized from task when popover opens
-  const [dateValue, setDateValue] = useState<string>("");
-  const [timeValue, setTimeValue] = useState<string>("");
-  const [hasTime, setHasTime] = useState<boolean>(false);
+  const [vonDate, setVonDate] = useState<string>("");
+  const [vonTime, setVonTime] = useState<string>("");
+  const [bisTime, setBisTime] = useState<string>("");
+  const [bisHint, setBisHint] = useState<boolean>(false);
 
   // Sync local state when the popover opens
   useEffect(() => {
     if (!open) return;
-    if (task.deadline !== null) {
-      setDateValue(epochToDateInput(task.deadline));
-      setTimeValue(epochToTimeInput(task.deadline));
-    } else {
-      // Pre-fill with today
-      setDateValue(epochToDateInput(Date.now()));
-      setTimeValue("09:00");
-    }
-    setHasTime(task.deadlineHasTime);
-  }, [open, task.deadline, task.deadlineHasTime]);
+    setVonDate(epochToDateInput(task.startsAt));
+    setVonTime(epochToTimeInput(task.startsAt));
+    setBisTime(epochToTimeInput(task.endsAt));
+    setBisHint(false);
+  }, [open, task.startsAt, task.endsAt]);
 
-  const handleDateChange = (newDate: string): void => {
-    setDateValue(newDate);
+  const handleVonDateChange = (newDate: string): void => {
+    setVonDate(newDate);
     if (!newDate) return;
-    const epoch = dateTimeInputToEpoch(newDate, hasTime ? timeValue : "");
-    onUpdate({ deadline: epoch, deadlineHasTime: hasTime });
+    const newStartsAt = dateTimeInputToEpoch(newDate, vonTime);
+    // Preserve the existing duration when the user shifts the start.
+    const newEndsAt = newStartsAt + (task.endsAt - task.startsAt);
+    setBisTime(epochToTimeInput(newEndsAt));
+    setBisHint(false);
+    onUpdate({ startsAt: newStartsAt, endsAt: newEndsAt });
   };
 
-  const handleTimeChange = (newTime: string): void => {
-    setTimeValue(newTime);
-    if (!dateValue) return;
-    const epoch = dateTimeInputToEpoch(dateValue, newTime);
-    onUpdate({ deadline: epoch, deadlineHasTime: hasTime });
+  const handleVonTimeChange = (newTime: string): void => {
+    setVonTime(newTime);
+    if (!vonDate) return;
+    const newStartsAt = dateTimeInputToEpoch(vonDate, newTime);
+    // Preserve the existing duration when the user shifts the start.
+    const newEndsAt = newStartsAt + (task.endsAt - task.startsAt);
+    setBisTime(epochToTimeInput(newEndsAt));
+    setBisHint(false);
+    onUpdate({ startsAt: newStartsAt, endsAt: newEndsAt });
   };
 
-  const handleHasTimeToggle = (): void => {
-    const next = !hasTime;
-    setHasTime(next);
-    if (!dateValue) return;
-    const epoch = dateTimeInputToEpoch(dateValue, next ? timeValue : "");
-    onUpdate({ deadline: epoch, deadlineHasTime: next });
+  const handleBisTimeChange = (newBisTime: string): void => {
+    setBisTime(newBisTime);
+    if (!vonDate) return;
+    const startsAt = dateTimeInputToEpoch(vonDate, vonTime);
+    let endsAt = dateTimeInputToEpoch(vonDate, newBisTime);
+    if (endsAt < startsAt) {
+      endsAt = startsAt + SLOT_MS;
+      setBisTime(epochToTimeInput(endsAt));
+      setBisHint(true);
+    } else {
+      setBisHint(false);
+    }
+    onUpdate({ startsAt, endsAt });
   };
 
-  const handleRemove = (): void => {
-    onUpdate({ deadline: null, deadlineHasTime: false });
-    onClose();
-  };
-
-  const displayLabel = deadlineDisplayLabel(task);
-  const hasDeadline = task.deadline !== null;
+  const displayLabel = slotDisplayLabel(task);
 
   const chipContent = (
     <>
-      <DeadlineIcon className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
-      <span className={hasDeadline ? "font-mono" : ""}>{displayLabel}</span>
+      <SlotIcon className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
+      <span className="font-mono">{displayLabel}</span>
       <ChevronDown className="w-2.5 h-2.5 text-neutral-500" aria-hidden="true" />
     </>
   );
@@ -369,7 +372,7 @@ function DeadlineChip({
       ) : (
         <div className="flex items-center gap-2">
           <span className="font-mono text-[10px] tracking-wide uppercase text-neutral-500 w-[66px] shrink-0">
-            Deadline
+            Termin
           </span>
           <button
             type="button"
@@ -386,55 +389,44 @@ function DeadlineChip({
       {open && (
         <Popover>
           <div className="flex flex-col gap-2 p-1.5">
-            {/* Date input */}
+            {/* Von: date + time */}
             <div className="flex flex-col gap-1">
               <label className="font-mono text-[9.5px] tracking-wide uppercase text-neutral-500">
-                Datum
+                Von
               </label>
-              <input
-                type="date"
-                value={dateValue}
-                onChange={(e) => handleDateChange(e.target.value)}
-                className="bg-surface-base rounded-md px-2 py-1 text-xs text-neutral-200 font-mono shadow-hairline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-              />
-            </div>
-
-            {/* Mit Uhrzeit toggle */}
-            <label className="flex items-center gap-2 cursor-pointer select-none text-[10.5px] text-neutral-400">
-              <input
-                type="checkbox"
-                checked={hasTime}
-                onChange={handleHasTimeToggle}
-                className="rounded accent-[var(--color-accent)] focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-              />
-              Mit Uhrzeit
-            </label>
-
-            {/* Time input — only when Mit Uhrzeit is on */}
-            {hasTime && (
-              <div className="flex flex-col gap-1">
-                <label className="font-mono text-[9.5px] tracking-wide uppercase text-neutral-500">
-                  Uhrzeit
-                </label>
+              <div className="flex gap-1">
                 <input
-                  type="time"
-                  value={timeValue}
-                  onChange={(e) => handleTimeChange(e.target.value)}
+                  type="date"
+                  value={vonDate}
+                  onChange={(e) => handleVonDateChange(e.target.value)}
                   className="bg-surface-base rounded-md px-2 py-1 text-xs text-neutral-200 font-mono shadow-hairline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
                 />
+                <input
+                  type="time"
+                  value={vonTime}
+                  onChange={(e) => handleVonTimeChange(e.target.value)}
+                  className="bg-surface-base rounded-md px-2 py-1 text-xs text-neutral-200 font-mono shadow-hairline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 w-[80px]"
+                />
               </div>
-            )}
+            </div>
 
-            {/* Entfernen */}
-            {hasDeadline && (
-              <button
-                type="button"
-                onClick={handleRemove}
-                className="text-left text-[10.5px] text-neutral-500 hover:text-error px-1 py-0.5 rounded-md hover:bg-hover-overlay transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-              >
-                Entfernen
-              </button>
-            )}
+            {/* Bis: time only (same calendar day) */}
+            <div className="flex flex-col gap-1">
+              <label className="font-mono text-[9.5px] tracking-wide uppercase text-neutral-500">
+                Bis
+              </label>
+              <input
+                type="time"
+                value={bisTime}
+                onChange={(e) => handleBisTimeChange(e.target.value)}
+                className="bg-surface-base rounded-md px-2 py-1 text-xs text-neutral-200 font-mono shadow-hairline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 w-[80px]"
+              />
+              {bisHint && (
+                <span className="text-[9.5px] text-warning">
+                  Bis muss nach Von liegen
+                </span>
+              )}
+            </div>
           </div>
         </Popover>
       )}
@@ -611,11 +603,11 @@ export function TaskMetaChips({
           onComplete={onComplete}
           onReopen={onReopen}
         />
-        <DeadlineChip
+        <SlotChip
           task={task}
           layout="chiprow"
-          open={openEditor === "deadline"}
-          onToggle={() => toggle("deadline")}
+          open={openEditor === "slot"}
+          onToggle={() => toggle("slot")}
           onClose={close}
           onUpdate={onUpdate}
         />
@@ -629,10 +621,9 @@ export function TaskMetaChips({
           onUpdate={onUpdate}
         />
 
-        {/* "In Kalender" calmini — disabled when no deadline */}
+        {/* "In Kalender" calmini */}
         <button
           type="button"
-          disabled={task.deadline === null}
           onClick={onExportIcs}
           title="In Kalender exportieren"
           aria-label="In Kalender exportieren"
@@ -657,11 +648,11 @@ export function TaskMetaChips({
         onComplete={onComplete}
         onReopen={onReopen}
       />
-      <DeadlineChip
+      <SlotChip
         task={task}
         layout="fields"
-        open={openEditor === "deadline"}
-        onToggle={() => toggle("deadline")}
+        open={openEditor === "slot"}
+        onToggle={() => toggle("slot")}
         onClose={close}
         onUpdate={onUpdate}
       />

@@ -20,20 +20,22 @@ function tomorrow(): number {
   return d.getTime();
 }
 
+const SLOT_MS = 30 * 60_000;
+
 function makeTask(overrides: Partial<TaskItem> = {}): TaskItem {
+  const startsAt = overrides.startsAt ?? tomorrow();
   return {
     id: "task-1",
     projectKey: null,
     title: "Beispiel-Aufgabe",
     status: "open",
-    deadline: null,
-    deadlineHasTime: false,
+    startsAt,
+    endsAt: overrides.endsAt ?? startsAt + SLOT_MS,
     subtasks: [],
     source: "manual",
     sortIndex: 1000,
     createdAt: Date.now(),
     completedAt: null,
-    archivedAt: null,
     ...overrides,
   };
 }
@@ -43,8 +45,8 @@ function makeTask(overrides: Partial<TaskItem> = {}): TaskItem {
 describe("TaskRow", () => {
   // ── Happy path ───────────────────────────────────────────────────────
 
-  it("renders the task title and a deadline chip when a deadline is set", () => {
-    const task = makeTask({ deadline: tomorrow(), deadlineHasTime: false });
+  it("renders the task title and a deadline chip for a task with a slot", () => {
+    const task = makeTask({ startsAt: tomorrow() });
     const onSelect = vi.fn();
 
     render(
@@ -133,7 +135,7 @@ describe("TaskRow", () => {
   });
 
   it("does not render the footer in compact density", () => {
-    const task = makeTask({ source: "session", deadline: tomorrow() });
+    const task = makeTask({ source: "session", startsAt: tomorrow() });
 
     render(<TaskRow task={task} onSelect={vi.fn()} density="compact" showSource />);
 
@@ -155,7 +157,7 @@ describe("TaskRow", () => {
 
   it("applies error border for overdue non-done non-selected task", () => {
     const yesterday = Date.now() - 86_400_000;
-    const task = makeTask({ deadline: yesterday, status: "open" });
+    const task = makeTask({ startsAt: yesterday, status: "open" });
 
     const { container } = render(
       <TaskRow task={task} onSelect={vi.fn()} selected={false} />,
@@ -167,7 +169,7 @@ describe("TaskRow", () => {
 
   it("does NOT apply error border when task is overdue but selected", () => {
     const yesterday = Date.now() - 86_400_000;
-    const task = makeTask({ deadline: yesterday, status: "open" });
+    const task = makeTask({ startsAt: yesterday, status: "open" });
 
     const { container } = render(
       <TaskRow task={task} onSelect={vi.fn()} selected />,
