@@ -9,7 +9,8 @@
 
 ## Aktuelle Phase
 
-- **Per-Project Tasks — Feature komplett (Phasen 1–6)** (Branch `feat/tasks-ui`, 2026-06-05): Aufgaben-Feature, das Notizen ergänzt. Phase 1 Fundament (`tasksStore` + dedizierte `tasks.json`-Persistenz, Heilung im `merge`-Pfad nach TDZ-Fix); Phase 2 Shared Components (`TaskRow`/`TaskDetail`/`TaskMetaChips`/`StatusDot`/`TaskDeadlineChip`/`useTasksContext`/`taskGrouping`); Phase 3 globales Layout-B-Fenster (`view=tasks` + Dock-Icon); Phase 4 Per-Session (schwebendes `TasksWindow` + `TaskGridTile` + Toolbar/Cell-Integration); Phase 5 `.ics`-Export (Rust `export_task_ics` + In-Kalender-Buttons). Gebaut via Workflow-Orchestrierung (Fan-out + Gate pro Phase), Browser-Smoke je UI-Phase. Gates grün: tsc/build/eslint, ~2250 vitest, 428 Rust-Tests inkl. 18 ics_export. MCP (urspr. Plan §3/§7) bleibt zurückgestellt. **Offen:** Merge `feat/tasks-ui`→`master` + finaler Tauri-`.exe`-Smoke der Per-Session-Flächen (Browser kann keine PTY-Session spawnen).
+- **Tasks-Redesign (Phase A + B) — komplett** (Branch `feat/tasks-redesign`, 2026-06-07): Termin-Modell (`startsAt`/`endsAt`, Default 30 Min) statt Deadline; Sanitizer-Migration v1→2 (Legacy-`deadline`→Slot, Legacy-archivierte Tasks bewusst verworfen statt resurrecten); `.ics`-Export als echtes VEVENT mit Dauer; Von/Bis-SlotChip statt Deadline-Picker; „Archivieren"→„Löschen" mit Inline-Bestätigung (Hard-Delete); „nächste"-Label entfernt; Projekt-Zuordnungs-Sync-Fix (aktive Session immer in `availableProjects`); schwebendes Fenster per Header verschiebbar (Move-Icon raus); user-facing Gruppierungs-Label „Deadline"→„Termin". Via Subagent-Driven (Implementer + 2-Stufen-Review pro Task). Gates grün: tsc/build/eslint, 2280 vitest, 427+ Rust. **Offen:** Merge `feat/tasks-redesign`→`master` + Tauri-`.exe`-Smoke (Fenster-Header-Drag + SlotChip visuell).
+- Per-Project Tasks Phasen 1–6 (feat/tasks-ui, feat/tasks-direct-new) → gemerged in `master` (32e287e). MCP-Integration (urspr. Plan §3/§7) weiterhin zurückgestellt.
 - Release-Historie der v1.6.x-Linie (AgenticExplorer, vor dem Smashq-Rebrand) → `CHANGELOG.md` + git-log; Post-Mortems in `tasks/lessons.md`.
 
 ## Nächste Phase
@@ -18,7 +19,8 @@
 
 ## Backlog
 
-- [ ] refactor(tasks): `TaskMetaChips.tsx` (679 Z.) + `TaskDetail.tsx` (531 Z.) unter das 300-Zeilen-Component-Limit splitten (behavior-preserving, Tests grün vorher+nachher als Netz + Re-Smoke). Vom Design-Review 2026-06-05 als Should-fix geflaggt, bewusst nach dem Feature-Merge verschoben.
+- [ ] refactor(tasks): `TaskMetaChips.tsx` (~616 Z.) + `TaskDetail.tsx` (~600 Z.) unter das 300-Zeilen-Component-Limit splitten (behavior-preserving, Tests grün vorher+nachher als Netz + Re-Smoke). Vom Design-Review 2026-06-05 als Should-fix geflaggt, bewusst nach dem Feature-Merge verschoben.
+- [ ] refactor(tasks): interne `deadline`-Bezeichner aufs Termin-Modell umbenennen (`DeadlineBucket`/`groupByDeadline`/`classifyDeadline`/`computeDeadlineSeverity`/`TaskDeadlineChip`/`ICONS.tasks.deadline`) — rein mechanisch, kein Verhalten. Vom Final-Review 2026-06-07 als non-blocking Folge-Commit geflaggt.
 - [ ] Tab-Bar-Konfiguration pro Projekt — Revival mit Code-Review-Befunden (Bloat-Reduktion, dnd-kit-Pattern-Split, ConfigPanelTabList-Refactor).
 - [ ] feat(editor): Unsaved-Changes-Warnung bei Tab-Wechsel/Close/Datei-Öffnen.
 - [ ] feat(editor): Projekt-Dateibrowser für `.md`-Dateien.

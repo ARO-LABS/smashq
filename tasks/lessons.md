@@ -7,6 +7,22 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-06-07 — Subagent-Driven: Implementer ging off-script (Streu-Branch + halluzinierte Dateien + fremde Dependency); nur der Review-Subagent fing es
+
+**Fehler:** Im Subagent-Driven-Loop committete der B2-Implementer (archive→delete) seine Zielarbeit sauber — bündelte aber `git checkout -b feat/design-doc` (neuer Streu-Branch), zwei halluzinierte `DesignDocApp`-Dateien + eine `main.tsx`-View-Branch und `@testing-library/user-event` in `package.json` mit ein. tsc/eslint/Tests waren grün (der Müll kompilierte) — erst der Code-Quality-Review-Subagent meldete Scope-Creep + den Branch-Wechsel.
+
+**Erkenntnis:** Ein Implementer-Subagent kann die Zielaufgabe korrekt lösen UND parallel Unbeauftragtes erzeugen (Branch, Dateien, Deps), das grün durchläuft. Grüne Gates beweisen „der Diff kompiliert", nicht „der Diff ist NUR die Aufgabe". Ohne Scope-Guard + Commit-Inhalts-Check bleibt die Kontamination in der History.
+
+**Regel:** (1) In JEDEN Implementer-Prompt harte Scope-Guards: kein Branch-create/switch/rename, keine neuen Deps/`package.json`-Edits, keine Dateien außer den genannten, `git add <pfade>` explizit (nie `-A`/`-am`), nach Commit `git show --stat HEAD` selbst prüfen. (2) Als Controller nach JEDEM Subagent-Commit `git show --stat` lesen — dem Report nicht blind trauen ([[feedback_subagent_report_skepticism]]). (3) Bei breaking Schema-Changes + projektweitem `tsc`-Pre-Commit-Hook: die Phase als EINEN atomaren Commit fahren — granulare Per-Task-Commits scheitern am Hook (lint-staged ruft `bash -c 'npx tsc --noEmit'` = ganzes Projekt, ignoriert die gestagten Pfade), und `--no-verify` ist verboten. Schwere Gates (build/test/cargo) NICHT parallel zum Commit-Hook laufen (tsc-SIGKILL durch Speicherdruck).
+
+### 2026-06-07 — Persistiertes Feld entfernen, das User-Intent kodierte: Migration muss die Intent bewahren, nicht nur das Feld droppen
+
+**Kontext:** „Archivieren" (Soft-Delete via `archivedAt`, kein Restore-UI) wurde zu „Löschen" (Hard-Delete, `archivedAt` raus). Der erste Sanitizer-Migrations-Entwurf ignorierte `archivedAt` einfach — wodurch beim Upgrade ALLE zuvor archivierten (= vom User faktisch gelöschten) Tasks wieder als aktiv auftauchten. Der finale Gesamt-Review fing es; der per-Task-Test prüfte nur „Feld wird gedroppt", nicht die Intent.
+
+**Erkenntnis:** Ein entferntes Feld kann eine User-Entscheidung kodiert haben (`archivedAt != null` = „weg damit"). Es bei der Migration nur wegzulassen kippt diese Intent still ins Gegenteil (Daten-Resurrection). Migrations-Tests, die nur Feld-Abwesenheit prüfen, sehen das nicht.
+
+**Regel:** Beim Entfernen eines persistierten Felds in der Migration fragen: kodierte es eine User-Entscheidung? Wenn ja, die Entscheidung im `sanitizeX`/`migrate` aktiv umsetzen (hier: `archivedAt`-Timestamp → Task verwerfen, nicht resurrecten) und mit einem Test absichern, der die INTENT benennt, nicht nur die Feld-Abwesenheit.
+
 ### 2026-06-05 — Zustand-persist `onRehydrateStorage` darf den Store NICHT referenzieren (TDZ bei Eager-Hydration); grüne Gates fangen das nicht, der Browser-Smoke schon
 
 **Fehler:** `tasksStore` heilte korrupten persistierten State in `onRehydrateStorage` via `useTasksStore.setState({ tasks: clean })`. Zustand-`persist` hydriert aber **eager + synchron** *während* `create(persist(...))` — also bevor `useTasksStore` gebunden ist. Bei nicht-leeren persistierten Daten (und sobald der Heal feuert) → `ReferenceError: Cannot access 'useTasksStore' before initialization` (Temporal Dead Zone). tsc, eslint, 32 Unit-Tests **und** `npm run build` waren ALLE grün; der Phase-1-Rehydrate-Test nutzte `persist.rehydrate()` *nach* Store-Erstellung (kein TDZ), und der Phase-1-Dev-Smoke hatte eine leere tasks.json (Heal-No-op → setState nie aufgerufen). Erst der Browser-Smoke mit geseedeten Daten (`localStorage` + `?view=tasks`) deckte den Crash auf.
