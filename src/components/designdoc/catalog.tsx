@@ -32,8 +32,8 @@ export interface CatalogSection {
 // Helpers
 // ============================================================================
 
-/** noop matching SessionCard's (sessionId: string) => void signature */
-const noop = (_id: string): void => {};
+/** Zero-arg noop — assignable to any handler signature (onClick, onClose, onLayoutChange, …). */
+const noop = (): void => {};
 
 function sessionByStatus(status: SessionStatus) {
   const sessions = useSessionStore.getState().sessions;
@@ -203,7 +203,7 @@ export const catalog: CatalogSection[] = [
           <div style={{ position: "relative", height: 40, width: 300 }}>
             <TerminalToolbar
               layoutMode="single"
-              onLayoutChange={noop as unknown as (mode: "single" | "grid") => void}
+              onLayoutChange={noop}
               folder="C:/Projects/smashq"
               sessionId="ds-1"
             />
