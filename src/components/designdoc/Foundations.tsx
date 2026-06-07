@@ -17,7 +17,7 @@ export function Foundations(): JSX.Element {
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
       {COLOR_TOKENS.map((t) => (
-        <div key={t} data-testid={testIdFor(t)} style={{ display: "flex", flexDirection: "column", gap: "6px", width: "84px" }}>
+        <div key={t} data-testid={testIdFor(t)} style={{ display: "flex", flexDirection: "column", gap: "6px", width: "112px" }}>
           <div style={{ width: "56px", height: "56px", borderRadius: "var(--radius-md)", border: "1px solid var(--neutral-700)", background: `var(${t})` }} />
           <code style={{ fontSize: "10px", color: "var(--neutral-400)" }}>{t}</code>
           <code style={{ fontSize: "9px", color: "var(--neutral-500)" }}>{readVar(t)}</code>
