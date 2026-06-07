@@ -42,6 +42,13 @@ Promise.all([initTauriStorage(), initTasksStorage()]).then(async () => {
         </ErrorBoundary>
       </React.StrictMode>
     );
+  } else if (import.meta.env.DEV && view === "designdoc") {
+    const { default: DesignDocApp } = await import("./components/designdoc/DesignDocApp");
+    ReactDOM.createRoot(document.getElementById("root")!).render(
+      <React.StrictMode>
+        <DesignDocApp />
+      </React.StrictMode>
+    );
   } else if (view && DETACHED_VIEWS.has(view)) {
     const { ErrorBoundary } = await import("./components/shared/ErrorBoundary");
     ReactDOM.createRoot(document.getElementById("root")!).render(

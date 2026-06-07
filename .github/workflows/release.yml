@@ -57,6 +57,39 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
 
+  # Regeneriert docs/developer-doc.html und committed das Ergebnis zurueck auf
+  # master. Best-effort: schlaegt der Push fehl (z.B. Branch-Protection), fehlt
+  # nur der aktualisierte Doc-Stand im Repo — Release und Updater sind unberuehrt.
+  refresh-design-doc:
+    needs: build-windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright browser (chromium)
+        run: npx playwright install --with-deps chromium
+
+      - name: Regenerate design section
+        run: npm run docs:design
+
+      - name: Commit refreshed developer-doc.html
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/developer-doc.html
+          git diff --staged --quiet || git commit -m "docs: refresh design section [skip ci]"
+          git push || true
+
   # Mac ist best-effort: laeuft NACH Windows (needs:), laedt die universal DMG in
   # dasselbe Release. Schlaegt er fehl, fehlt nur die DMG - das Windows-Release
   # plus Updater sind da bereits publiziert und voellig unberuehrt.
