@@ -7,7 +7,6 @@
  *     header [flex gap-2 items-start]
  *       StatusDot [mt-1 shrink-0]
  *       title [flex-1] ← done: neutral-500; compact done adds line-through
- *       isNext marker [shrink-0 mt-0.5]  ← ICONS.tasks.next + "nächste"
  *     footer [pl-[17px] flex items-center justify-between] (comfortable only)
  *       source label:
  *         active → "in Arbeit" text-accent
@@ -23,7 +22,6 @@
  * horizontal space from the title.
  */
 
-import { ICONS } from "../../../utils/icons";
 import type { TaskItem } from "../../../store/tasksStore";
 import { StatusDot } from "./StatusDot";
 import { TaskDeadlineChip } from "./TaskDeadlineChip";
@@ -33,7 +31,6 @@ import { TaskDeadlineChip } from "./TaskDeadlineChip";
 export interface TaskRowProps {
   task: TaskItem;
   selected?: boolean;
-  isNext?: boolean;
   showSource?: boolean;
   density?: "comfortable" | "compact";
   onSelect: (id: string) => void;
@@ -82,7 +79,6 @@ function SourceLabel({ task }: { task: TaskItem }): JSX.Element | null {
 export function TaskRow({
   task,
   selected = false,
-  isNext = false,
   showSource = true,
   density = "comfortable",
   onSelect,
@@ -104,8 +100,6 @@ export function TaskRow({
       ? "text-neutral-500 line-through"
       : "text-neutral-500"
     : "text-neutral-200";
-
-  const NextIcon = ICONS.tasks.next;
 
   return (
     <button
@@ -136,12 +130,7 @@ export function TaskRow({
           {task.title}
         </span>
 
-        {isNext && (
-          <span className="inline-flex items-center gap-1 text-[9px] text-accent shrink-0 mt-0.5">
-            <NextIcon className="w-2.5 h-2.5" aria-hidden="true" />
-            nächste
-          </span>
-        )}
+
       </div>
 
       {/* Footer row — comfortable only */}

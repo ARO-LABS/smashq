@@ -193,7 +193,6 @@ function OpenGroups({
                 key={task.id}
                 task={task}
                 selected={task.id === selectedId}
-                isNext={task.id === group.nextId}
                 onSelect={onSelect}
               />
             ))}

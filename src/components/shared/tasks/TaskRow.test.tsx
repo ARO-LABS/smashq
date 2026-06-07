@@ -78,19 +78,8 @@ describe("TaskRow", () => {
 
   // ── Edge cases ───────────────────────────────────────────────────────
 
-  it("shows the nächste marker when isNext is true", () => {
-    const task = makeTask();
-
-    render(<TaskRow task={task} onSelect={vi.fn()} isNext />);
-
-    expect(screen.getByText("nächste")).toBeTruthy();
-  });
-
-  it("does not show the nächste marker when isNext is false (default)", () => {
-    const task = makeTask();
-
-    render(<TaskRow task={task} onSelect={vi.fn()} />);
-
+  it("never renders a 'nächste' label", () => {
+    render(<TaskRow task={makeTask()} onSelect={() => {}} />);
     expect(screen.queryByText("nächste")).toBeNull();
   });
 

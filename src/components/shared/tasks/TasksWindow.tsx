@@ -125,7 +125,6 @@ function TaskListBody({
   ctx,
 }: TaskListBodyProps): JSX.Element {
   const { openActive, done } = partitionTasks(tasks);
-  const nextId = openActive[0]?.id ?? null;
   const allSorted = [...openActive, ...done];
 
   if (allSorted.length === 0) {
@@ -153,7 +152,6 @@ function TaskListBody({
               <TaskRow
                 task={task}
                 selected={isExpanded}
-                isNext={task.id === nextId && task.status !== "done"}
                 showSource={false}
                 density="compact"
                 onSelect={onToggleExpand}
