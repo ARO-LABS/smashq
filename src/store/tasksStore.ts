@@ -71,6 +71,12 @@ export function sanitizeTask(value: unknown): TaskItem | null {
   if (typeof v.id !== "string" || !v.id) return null;
   if (typeof v.title !== "string") return null;
 
+  // Legacy migration: a task that was "archived" in the pre-delete model carried
+  // an archivedAt timestamp and was hidden from every list. With no restore UI,
+  // the user treated that as deletion — so drop it under the new hard-delete
+  // model instead of resurrecting it as an active task.
+  if (typeof v.archivedAt === "number" && Number.isFinite(v.archivedAt)) return null;
+
   const status: TaskStatus = VALID_STATUS.has(v.status as string)
     ? (v.status as TaskStatus)
     : "open";

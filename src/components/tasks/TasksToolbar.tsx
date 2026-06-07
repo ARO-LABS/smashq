@@ -76,7 +76,7 @@ export interface TasksSubBarProps {
 
 const GROUPINGS: { value: TaskGrouping; label: string }[] = [
   { value: "project", label: "Projekt" },
-  { value: "deadline", label: "Deadline" },
+  { value: "deadline", label: "Termin" },
 ];
 
 const FILTERS: { value: TaskFilter; label: string }[] = [

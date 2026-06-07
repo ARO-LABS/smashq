@@ -80,8 +80,14 @@ describe("sanitizeTask slots", () => {
     expect(t.endsAt).toBe(9000 + SLOT_MS);
   });
 
-  it("drops the obsolete archivedAt field", () => {
-    const t = sanitizeTask({ ...base, startsAt: 1, endsAt: 2, archivedAt: 123 }) as unknown as Record<string, unknown>;
+  it("drops a legacy archived task (archive→delete migration)", () => {
+    // archivedAt set = the user archived (≈ deleted) it pre-redesign → do not resurrect.
+    expect(sanitizeTask({ ...base, startsAt: 1, endsAt: 2, archivedAt: 123 })).toBeNull();
+  });
+
+  it("keeps a legacy non-archived task and drops the obsolete archivedAt field", () => {
+    const t = sanitizeTask({ ...base, startsAt: 1, endsAt: 2, archivedAt: null }) as unknown as Record<string, unknown>;
+    expect(t).not.toBeNull();
     expect("archivedAt" in t).toBe(false);
   });
 });

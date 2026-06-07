@@ -17,7 +17,7 @@
  * options and pre-bound actions. Selection (`selectedId`) is local:
  * - default-select the first open task once tasks exist,
  * - reselect when the current selection leaves the visible set
- *   (archived, filtered out, or search-excluded),
+ *   (deleted, filtered out, or search-excluded),
  * - empty pane "Aufgabe wählen" when nothing is selectable.
  *
  * This file stays an orchestrator: the header/sub-bar live in TasksToolbar,
