@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
+import { seedDesignDocState } from "./mockState";
+import { useThemeEffect } from "../../hooks/useThemeEffect";
+import { DesignDocShell } from "./DesignDocShell";
 
 export function DesignDocApp(): JSX.Element {
-  const [ready, setReady] = useState(false);
+  const [seeded, setSeeded] = useState(false);
   useEffect(() => {
-    setReady(true);
+    seedDesignDocState();
+    setSeeded(true);
   }, []);
+  useThemeEffect();
   return (
-    <div data-testid="designdoc-root" data-ready={ready}>
-      Design Doc
+    <div data-testid="designdoc-root" data-ready={seeded}>
+      {seeded ? <DesignDocShell /> : null}
     </div>
   );
 }
