@@ -1,11 +1,11 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::OnceLock;
 
 pub mod error;
 pub mod github;
-pub mod log_reader;
 pub mod session;
 pub mod settings;
+pub mod structured_log;
 pub mod util;
 pub mod validation;
 
@@ -16,24 +16,9 @@ pub mod validation;
 /// install never creates a log file at all.
 pub static LOGGING_ENABLED: AtomicBool = AtomicBool::new(false);
 
-/// Lazy-opened log file. Created on the FIRST allowed write. Opt-out users
-/// (gate stays `false`) never create the file, never spend any disk.
-static LOG_FILE: OnceLock<Option<Mutex<std::fs::File>>> = OnceLock::new();
-
-fn open_log_file_lazy() -> Option<Mutex<std::fs::File>> {
-    let path = log_file_path();
-    match std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-    {
-        Ok(f) => Some(Mutex::new(f)),
-        Err(e) => {
-            eprintln!("[smashq] Failed to open log file {}: {}", path.display(), e);
-            None
-        }
-    }
-}
+/// Set once in setup(); lets the log format-closure emit live `log-line`
+/// events to open log windows. None during early boot (file-only).
+pub static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 
 /// Reads the persisted `preferences.backendFileLogging` from settings.json.
 /// Returns `Some(true)`/`Some(false)` if the user has an explicit setting,
@@ -74,13 +59,21 @@ fn init_logging() {
         );
         writeln!(buf, "{}", msg)?;
 
-        // File write only when the gate is on (any build). Lazy-open so that
-        // opt-out users do not even create the file.
+        // Structured NDJSON sink (any build) + live event when the gate is on.
+        // Replaces the legacy text file; stderr above stays for dev console.
         if gate_on {
-            if let Some(file_mutex) = LOG_FILE.get_or_init(open_log_file_lazy) {
-                if let Ok(mut f) = file_mutex.lock() {
-                    let _ = writeln!(f, "{}", msg);
-                }
+            let entry = crate::structured_log::StructuredEntry {
+                ts: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+                level: record.level().to_string().to_lowercase(),
+                source: "backend".into(),
+                module: record.module_path().map(str::to_string),
+                message: record.args().to_string(),
+                stack: None,
+            };
+            crate::structured_log::write_entries(std::slice::from_ref(&entry));
+            if let Some(app) = crate::APP_HANDLE.get() {
+                use tauri::Emitter;
+                let _ = app.emit("log-line", &entry);
             }
         }
         Ok(())
@@ -96,19 +89,6 @@ fn init_logging() {
     if builder.try_init().is_err() {
         eprintln!("[smashq] Logger already initialized, skipping.");
     }
-}
-
-fn log_file_path() -> std::path::PathBuf {
-    // Try to use the app's local data dir, fallback to cwd
-    if let Some(data_dir) = std::env::var_os("LOCALAPPDATA") {
-        let dir = std::path::PathBuf::from(data_dir).join("smashq");
-        if std::fs::create_dir_all(&dir).is_ok() {
-            return dir.join("smashq.log");
-        }
-    }
-    std::env::current_dir()
-        .unwrap_or_else(|_| std::path::PathBuf::from("."))
-        .join("smashq.log")
 }
 
 mod commands {
@@ -213,6 +193,12 @@ pub fn run() {
         })
         .plugin(tauri_plugin_process::init())
         .manage(session_manager)
+        .setup(|app| {
+            // Capture the handle so the log format-closure can emit live
+            // `log-line` events to open log windows. Set exactly once.
+            let _ = crate::APP_HANDLE.set(app.handle().clone());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::open_log_window,
             commands::open_detached_window,
@@ -253,8 +239,9 @@ pub fn run() {
             github::project::commands::list_user_projects,
             github::project::commands::get_project_board,
             github::project::commands::move_project_item,
-            // Log reader
-            log_reader::commands::read_backend_log,
+            // Structured NDJSON log sink (backend + frontend)
+            structured_log::commands::append_frontend_logs,
+            structured_log::commands::read_structured_log,
             // ICS calendar export
             session::ics_export::commands::export_task_ics,
             // User settings (Documents/Smashq/)
