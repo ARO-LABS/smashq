@@ -7,6 +7,20 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-06-07 — Logging-Overhaul: drei Plan-Hypothesen, die erst die Implementer/Review-Schleife widerlegte
+
+**Fehler 1 — `import type` als Runtime-Bug-Verdächtiger:** Eine erste Diagnose machte einen zirkulären `import type` für einen Laufzeit-TDZ (`Cannot access 'p' before initialization`) verantwortlich.
+**Erkenntnis:** `import type` wird vom Compiler **vollständig gelöscht** — es erzeugt keinen Laufzeit-Import und kann keine TDZ verursachen. Die echte Ursache war ein **Cross-Chunk-Zyklus** auf dem zustand-`persist`-Binding (Rollup co-bundelte es in einen Store-Chunk). Der minifizierte Name (`p`) ist **nicht** der Quell-Bezeichner.
+**Regel:** Bei Runtime-Init-Bugs nur **Wert-Importe** verfolgen, nie `import type`. Geteilte Lib-Bindings (zustand) per `manualChunks` in eigenen Leaf-Vendor-Chunk pinnen. Minifizierte Variablennamen nie 1:1 auf Quellcode mappen — Sourcemap-Build zum Decodieren.
+
+**Fehler 2 — Guard-Test, der den Bug maskiert:** Der geplante Perf-Gate-Test rief `setPerfEnabled(false)` *nach* `initPerf()` — er wäre auch gegen den kaputten Code (Auto-Enable) grün gewesen.
+**Erkenntnis:** Ein Test, der gegen den fehlerhaften Code grün läuft, sichert nichts ab. Der Subagent verschärfte ihn (`vi.resetModules()` + `initPerf()` ohne Override → echtes RED).
+**Regel:** Jeder Regression-Guard MUSS zuerst RED gegen den Bug laufen. „RED→GREEN beweisen" ist Pflicht, nicht Deko.
+
+**Fehler 3 — Plan-Code-Snippet mit veralteter Lib-API:** Der Plan schrieb `tauri::Manager::emit(...)` — kompiliert in Tauri v2.10 nicht (`emit` wanderte in den `Emitter`-Trait).
+**Erkenntnis:** Ein Plan ist eine Hypothese; Lib-APIs driften zwischen Versionen. Der Implementer verifizierte gegen die installierte Version und korrigierte zu `use tauri::Emitter; app.emit(...)`.
+**Regel:** Implementer prüfen Lib-API-Aufrufe aus dem Plan gegen die **installierte** Version, statt Snippets blind zu übernehmen. Plan-Genauigkeit ist nicht garantiert — die Verify-Schleife ist der Filter.
+
 ### 2026-06-07 — Subagent-Driven: Implementer ging off-script (Streu-Branch + halluzinierte Dateien + fremde Dependency); nur der Review-Subagent fing es
 
 **Fehler:** Im Subagent-Driven-Loop committete der B2-Implementer (archive→delete) seine Zielarbeit sauber — bündelte aber `git checkout -b feat/design-doc` (neuer Streu-Branch), zwei halluzinierte `DesignDocApp`-Dateien + eine `main.tsx`-View-Branch und `@testing-library/user-event` in `package.json` mit ein. tsc/eslint/Tests waren grün (der Müll kompilierte) — erst der Code-Quality-Review-Subagent meldete Scope-Creep + den Branch-Wechsel.
