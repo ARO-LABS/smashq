@@ -67,8 +67,6 @@ export interface AppPreferencesSettings {
   backendFileLogging: boolean;
   /** perfLogger (IPC-Latenz, Render-Zeit) aktiv? Bereits DEV-only, dieses Toggle gated zusätzlich. */
   performanceProfiler: boolean;
-  /** Protokolle-Tab in SideNav sichtbar? */
-  showProtokolleTab: boolean;
   /**
    * xterm-Scrollback-Limit pro Terminal (Zeilen). Default 25_000 — eine
    * Claude-CLI-Session mit Tool-Calls + TUI-Repaints kann 5-10× mehr
@@ -329,7 +327,6 @@ const defaultPreferences: AppPreferencesSettings = {
   frontendLogging: false,
   backendFileLogging: false,
   performanceProfiler: false,
-  showProtokolleTab: false,
   scrollbackLines: 25_000,
 };
 
@@ -486,6 +483,15 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
   if (!persisted || typeof persisted !== "object") return defaults as unknown as SettingsState;
   const p = persisted as Record<string, unknown>;
 
+  // showProtokolleTab (v8) entfällt ab v9 — Tab-Sichtbarkeit leitet sich jetzt
+  // aus frontendLogging || backendFileLogging ab (SessionPanelDock). Altfeld aus
+  // der persistierten preferences strippen, damit der Defaults-Spread es nicht
+  // wieder einsetzt und settings.json sauber bleibt.
+  const rawPrefs = (p.preferences && typeof p.preferences === "object" && !Array.isArray(p.preferences)
+    ? (p.preferences as Record<string, unknown>)
+    : {});
+  const { showProtokolleTab: _dropShowProtokolleTab, ...prefsWithoutLegacy } = rawPrefs;
+
   // Validate pinnedDocs structure: Record<string, PinnedDoc[]>
   const validatePinnedDocs = (raw: unknown): Record<string, PinnedDoc[]> => {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
@@ -551,7 +557,7 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
     notifications: { ...defaults.notifications, ...(p.notifications && typeof p.notifications === "object" ? p.notifications : {}) },
     sound: { ...defaults.sound, ...(p.sound && typeof p.sound === "object" ? p.sound : {}) },
     pipeline: { ...defaults.pipeline, ...(p.pipeline && typeof p.pipeline === "object" ? p.pipeline : {}) },
-    preferences: { ...defaults.preferences, ...(p.preferences && typeof p.preferences === "object" ? p.preferences : {}) },
+    preferences: { ...defaults.preferences, ...prefsWithoutLegacy },
     apiKeys: Array.isArray(p.apiKeys) ? p.apiKeys : defaults.apiKeys,
     favorites: migratedFavorites,
     favoriteGroups: migratedGroups,
@@ -1122,7 +1128,7 @@ export const useSettingsStore = create<SettingsState>()(
         notesWindowSize: state.notesWindowSize,
         tasksWindowSize: state.tasksWindowSize,
       }),
-      version: 8,
+      version: 9,
       migrate: (persisted: unknown, fromVersion: number) => _settingsMigrate(persisted, fromVersion),
       // SYNCHRONOUS heal of the rehydrated state. This runs DURING rehydration
       // and its return value feeds the very first render — unlike

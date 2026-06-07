@@ -14,7 +14,6 @@ describe("DebugLoggingPanel", () => {
         frontendLogging: false,
         backendFileLogging: false,
         performanceProfiler: false,
-        showProtokolleTab: false,
         scrollbackLines: 25_000,
       },
     });
@@ -45,7 +44,6 @@ describe("DebugLoggingPanel", () => {
         frontendLogging: true,
         backendFileLogging: false,
         performanceProfiler: false,
-        showProtokolleTab: false,
         scrollbackLines: 25_000,
       },
     });
@@ -61,7 +59,6 @@ describe("DebugLoggingPanel", () => {
         frontendLogging: true,
         backendFileLogging: true,
         performanceProfiler: true,
-        showProtokolleTab: false,
         scrollbackLines: 25_000,
       },
     });
@@ -94,7 +91,6 @@ describe("DebugLoggingPanel", () => {
         frontendLogging: false,
         backendFileLogging: true,
         performanceProfiler: false,
-        showProtokolleTab: false,
         scrollbackLines: 25_000,
       },
     });
@@ -111,7 +107,6 @@ describe("DebugLoggingPanel", () => {
         frontendLogging: false,
         backendFileLogging: false,
         performanceProfiler: false,
-        showProtokolleTab: false,
         scrollbackLines: 25_000,
       },
     });
@@ -129,7 +124,6 @@ describe("DebugLoggingPanel", () => {
         frontendLogging: true,
         backendFileLogging: false,
         performanceProfiler: false,
-        showProtokolleTab: false,
         scrollbackLines: 25_000,
       },
     });
@@ -146,7 +140,6 @@ describe("DebugLoggingPanel", () => {
         frontendLogging: true,
         backendFileLogging: false,
         performanceProfiler: true,
-        showProtokolleTab: false,
         scrollbackLines: 25_000,
       },
     });
@@ -163,7 +156,6 @@ describe("DebugLoggingPanel", () => {
         frontendLogging: true,
         backendFileLogging: false,
         performanceProfiler: false,
-        showProtokolleTab: false,
         scrollbackLines: 25_000,
       },
     });
@@ -182,7 +174,6 @@ describe("DebugLoggingPanel", () => {
         frontendLogging: true,
         backendFileLogging: false,
         performanceProfiler: false,
-        showProtokolleTab: false,
         scrollbackLines: 25_000,
       },
     });
@@ -200,14 +191,13 @@ describe("DebugLoggingPanel", () => {
         frontendLogging: false,
         backendFileLogging: false,
         performanceProfiler: false,
-        showProtokolleTab: true,
         scrollbackLines: 12_345,
       },
     });
     render(<DebugLoggingPanel />);
     fireEvent.click(screen.getByRole("radio", { name: /Aktiviert/i }));
     const prefs = useSettingsStore.getState().preferences;
-    expect(prefs.showProtokolleTab).toBe(true);
+    // scrollbackLines is unrelated to the logging master toggle and must survive.
     expect(prefs.scrollbackLines).toBe(12_345);
   });
 });

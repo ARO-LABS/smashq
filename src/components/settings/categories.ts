@@ -1,6 +1,6 @@
 import type { ComponentType, LazyExoticComponent } from "react";
 import { lazy } from "react";
-import { Palette, Monitor, Terminal as TerminalIcon, Bell, Workflow, Bug } from "lucide-react";
+import { Palette, Monitor, Terminal as TerminalIcon, Bell, Bug } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export interface SettingsCategory {
@@ -39,12 +39,6 @@ export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
     label: "Benachrichtigungen",
     icon: Bell,
     Panel: lazy(() => import("./panels/NotificationsPanel").then((m) => ({ default: m.NotificationsPanel }))),
-  },
-  {
-    id: "sidebar",
-    label: "Sidebar",
-    icon: Workflow,
-    Panel: lazy(() => import("./SidebarTogglesPanel").then((m) => ({ default: m.SidebarTogglesPanel }))),
   },
   {
     id: "advanced",

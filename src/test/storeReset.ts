@@ -67,7 +67,6 @@ export function resetAllStores(): void {
         frontendLogging: false,
         backendFileLogging: false,
         performanceProfiler: false,
-        showProtokolleTab: false,
         scrollbackLines: 25_000,
       },
     },

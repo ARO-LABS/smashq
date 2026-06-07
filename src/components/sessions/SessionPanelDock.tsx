@@ -50,7 +50,9 @@ export function SessionPanelDock({ onNewSession, onAddFavorite }: SessionPanelDo
   const removeToast = useUIStore((s) => s.removeToast);
   const mode = useSettingsStore((s) => s.theme.mode);
   const setTheme = useSettingsStore((s) => s.setTheme);
-  const showProtokolleTab = useSettingsStore((s) => s.preferences.showProtokolleTab);
+  const loggingActive = useSettingsStore(
+    (s) => s.preferences.frontendLogging || s.preferences.backendFileLogging,
+  );
   const { status, progress, newVersion, lastChecked, checkForUpdate, downloadAndInstall, confirmRelaunch } = useAutoUpdate();
 
   // Track previous status to fire toast exactly once per transition.
@@ -191,7 +193,7 @@ export function SessionPanelDock({ onNewSession, onAddFavorite }: SessionPanelDo
     { view: "library", label: "Bibliothek", icon: ICONS.nav.library },
     { view: "editor", label: "Editor", icon: ICONS.nav.editor },
   ];
-  if (showProtokolleTab) {
+  if (loggingActive) {
     launchers.push({ view: "logs", label: "Protokolle", icon: ICONS.nav.logs });
   }
 

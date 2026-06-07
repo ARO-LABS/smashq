@@ -11,15 +11,16 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 }));
 
 describe("PreferencesView", () => {
-  it("renders the page header and the CategoryNav with all 6 categories", () => {
+  it("renders the page header and the CategoryNav with all 5 categories", () => {
     render(<PreferencesView />);
     expect(screen.getByRole("heading", { level: 2, name: /Einstellungen/i })).toBeTruthy();
-    // The left nav exposes all 6 category labels at all times.
+    // The left nav exposes all 5 category labels at all times. (The former
+    // "Sidebar" category was dropped — Protokolle-Tab visibility now derives
+    // from the logging switches, no standalone toggle.)
     expect(screen.getByRole("button", { name: /Darstellung/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Sessions/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Terminal/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Benachrichtigungen/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^Sidebar/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Erweitert/i })).toBeTruthy();
   });
 

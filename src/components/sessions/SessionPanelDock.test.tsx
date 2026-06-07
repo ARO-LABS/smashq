@@ -35,7 +35,6 @@ const PREFS_DEFAULT = {
   frontendLogging: false,
   backendFileLogging: false,
   performanceProfiler: false,
-  showProtokolleTab: false,
   scrollbackLines: 25_000,
 };
 
@@ -78,8 +77,14 @@ describe("SessionPanelDock", () => {
     expect(screen.queryByLabelText("Protokolle")).toBeNull();
   });
 
-  it("shows the Protokolle launcher when preferences.showProtokolleTab is true", () => {
-    useSettingsStore.setState({ preferences: { ...PREFS_DEFAULT, showProtokolleTab: true } });
+  it("shows the Protokolle launcher when frontendLogging is on", () => {
+    useSettingsStore.setState({ preferences: { ...PREFS_DEFAULT, frontendLogging: true } });
+    renderDock();
+    expect(screen.getByLabelText("Protokolle")).toBeTruthy();
+  });
+
+  it("shows the Protokolle launcher when backendFileLogging is on", () => {
+    useSettingsStore.setState({ preferences: { ...PREFS_DEFAULT, backendFileLogging: true } });
     renderDock();
     expect(screen.getByLabelText("Protokolle")).toBeTruthy();
   });

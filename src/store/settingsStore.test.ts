@@ -1241,6 +1241,18 @@ describe("favorites groups migration v4 → v5", () => {
   });
 });
 
+describe("settingsStore migrate v8->v9 — showProtokolleTab entfernt", () => {
+  it("strips the legacy showProtokolleTab key from preferences", () => {
+    const persisted = {
+      preferences: { frontendLogging: true, showProtokolleTab: true },
+    } as unknown;
+    const migrated = useSettingsStoreMigrateForTest(persisted, 8);
+    expect("showProtokolleTab" in (migrated.preferences as object)).toBe(false);
+    // frontendLogging must survive the strip.
+    expect(migrated.preferences.frontendLogging).toBe(true);
+  });
+});
+
 // ============================================================================
 // favoriteGroups actions
 // ============================================================================

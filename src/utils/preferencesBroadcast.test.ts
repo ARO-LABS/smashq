@@ -64,10 +64,10 @@ describe("preferencesBroadcast", () => {
 
     // Event from "log-viewer" — different window, must be applied.
     listenCallback?.({
-      payload: { partial: { showProtokolleTab: true }, sourceWindow: "log-viewer" },
+      payload: { partial: { performanceProfiler: true }, sourceWindow: "log-viewer" },
     });
 
-    expect(apply).toHaveBeenCalledWith({ showProtokolleTab: true });
+    expect(apply).toHaveBeenCalledWith({ performanceProfiler: true });
   });
 
   it("applies a theme partial from another window", async () => {
@@ -111,18 +111,18 @@ describe("preferencesBroadcast", () => {
   it("broadcast carries the current window label as sourceWindow", async () => {
     getCurrentWindowMock.mockReturnValue({ label: "log-viewer" });
     const { broadcastPreferencesChange } = await import("./preferencesBroadcast");
-    await broadcastPreferencesChange({ showProtokolleTab: true });
+    await broadcastPreferencesChange({ performanceProfiler: true });
     expect(emitMock).toHaveBeenCalledWith("preferences-changed", {
-      partial: { showProtokolleTab: true },
+      partial: { performanceProfiler: true },
       sourceWindow: "log-viewer",
     });
   });
 
   it("broadcast forwards the exact partial object", async () => {
     const { broadcastPreferencesChange } = await import("./preferencesBroadcast");
-    await broadcastPreferencesChange({ frontendLogging: true, showProtokolleTab: false });
+    await broadcastPreferencesChange({ frontendLogging: true, performanceProfiler: false });
     expect(emitMock.mock.calls[0][1]).toMatchObject({
-      partial: { frontendLogging: true, showProtokolleTab: false },
+      partial: { frontendLogging: true, performanceProfiler: false },
     });
   });
 
