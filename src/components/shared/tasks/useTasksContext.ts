@@ -89,13 +89,19 @@ export function useTasksContext(open?: boolean): TasksContext {
       }
     }
 
+    // Ensure the active session's project is always assignable, even when it
+    // is not a favorite and has no tasks yet (fixes window↔session task sync).
+    if (effectiveProjectKey !== null && !projectMap.has(effectiveProjectKey)) {
+      projectMap.set(effectiveProjectKey, folderLabel(effectiveProjectKey));
+    }
+
     const named: ProjectOption[] = Array.from(projectMap.entries())
       .map(([key, label]) => ({ key, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
 
     // Global sentinel always first
     return [{ key: null, label: "Global" }, ...named];
-  }, [favorites, tasks]);
+  }, [favorites, tasks, effectiveProjectKey]);
 
   // ── Derived labels / flags ─────────────────────────────────────────────
   const projectTabLabel = effectiveProjectKey
