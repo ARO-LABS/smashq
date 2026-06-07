@@ -3,7 +3,8 @@
  *
  * Measures IPC invoke latency, event throughput, store updates, and render times.
  * Ring buffer of 500 entries. Zero overhead when disabled (production).
- * Enable via import.meta.env.DEV or localStorage "agenticexplorer-perf" = "1".
+ * Capture is controlled exclusively by the Settings toggle via setPerfEnabled()
+ * (wired in wireRuntimeGates). Manual dev override: window.__perf.enable().
  */
 
 import { invoke } from "@tauri-apps/api/core";
@@ -55,9 +56,10 @@ type PerfSubscriber = (entry: PerfEntry) => void;
 let subscriber: PerfSubscriber | null = null;
 
 export function initPerf(): void {
-  if (import.meta.env.DEV || localStorage.getItem("agenticexplorer-perf") === "1") {
-    enabled = true;
-  }
+  // Capture is controlled exclusively by setPerfEnabled() (wired from the
+  // Settings toggle). DEV/localStorage no longer auto-enable — that was a
+  // second source of truth that broke "disable actually skips work".
+  // Manual dev override remains via window.__perf.enable().
   window.__perf = {
     dump: dumpPerf,
     clear: clearPerf,

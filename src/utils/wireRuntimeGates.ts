@@ -4,9 +4,6 @@ import { wireLoggingGate, logError } from "./errorLogger";
 import { setPerfEnabled } from "./perfLogger";
 import { listenForPreferencesChanges, type BroadcastPartial } from "./preferencesBroadcast";
 
-const isPerfEnv =
-  import.meta.env.DEV || localStorage.getItem("agenticexplorer-perf") === "1";
-
 /**
  * Apply a cross-window preferences delta locally. Bypasses the `setPreferences`
  * setter to avoid retriggering the broadcast (echo loop) and to avoid invoking
@@ -52,10 +49,10 @@ export function wireRuntimeGates(): () => void {
   // no subscription needed, just inject the closure once.
   wireLoggingGate(() => useSettingsStore.getState().preferences.frontendLogging);
 
-  // Perf is a hot-path boolean. OR the user preference with the existing
-  // DEV / localStorage opt-ins so devs don't silently lose perf data.
+  // Settings toggle is the single source of truth. No DEV/localStorage OR —
+  // disabling must actually skip work. Manual override: window.__perf.enable().
   const computePerfEnabled = () =>
-    useSettingsStore.getState().preferences.performanceProfiler || isPerfEnv;
+    useSettingsStore.getState().preferences.performanceProfiler;
   setPerfEnabled(computePerfEnabled());
 
   const unsubscribePerf = useSettingsStore.subscribe((state, prev) => {

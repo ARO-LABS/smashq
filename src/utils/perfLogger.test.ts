@@ -41,10 +41,28 @@ describe("when disabled (default)", () => {
   });
 });
 
+describe("perf gate authority", () => {
+  it("initPerf does NOT force-enable capture", async () => {
+    // Fresh module state: `enabled` starts at its module default (false).
+    // initPerf() must NOT flip it — only setPerfEnabled (Settings toggle) may.
+    // Under the old code initPerf set enabled=true because import.meta.env.DEV
+    // is true in vitest, so this asserts the bug is fixed.
+    vi.resetModules();
+    const perf = await import("./perfLogger");
+    perf.clearPerf();
+    perf.initPerf(); // must not enable on its own
+    perf.recordPerf("custom", "x", 5);
+    expect(perf.getPerfSummaries().length).toBe(0);
+  });
+});
+
 describe("when enabled", () => {
   beforeEach(() => {
     clearPerf();
     initPerf();
+    // initPerf no longer auto-enables capture — the Settings toggle (via
+    // setPerfEnabled) is the single source of truth. Enable explicitly here.
+    setPerfEnabled(true);
   });
 
   it("recordPerf adds entry to buffer", () => {
