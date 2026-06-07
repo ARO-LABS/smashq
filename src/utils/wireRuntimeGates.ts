@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useSettingsStore, type AppPreferencesSettings } from "../store/settingsStore";
-import { wireLoggingGate, logError } from "./errorLogger";
+import { wireLoggingGate, wirePersistenceGate, flushFrontendLogs, logError } from "./errorLogger";
 import { setPerfEnabled } from "./perfLogger";
 import { listenForPreferencesChanges, type BroadcastPartial } from "./preferencesBroadcast";
 
@@ -48,6 +48,14 @@ export function wireRuntimeGates(): () => void {
   // Frontend gate is a function reference re-read on every log call —
   // no subscription needed, just inject the closure once.
   wireLoggingGate(() => useSettingsStore.getState().preferences.frontendLogging);
+
+  // Persistence gate follows the master disk toggle (backendFileLogging) — both
+  // log sources persist to the one NDJSON file. Flush any buffered frontend
+  // entries on window unload so a close does not lose the last batch.
+  wirePersistenceGate(() => useSettingsStore.getState().preferences.backendFileLogging);
+  if (typeof window !== "undefined") {
+    window.addEventListener("beforeunload", () => void flushFrontendLogs());
+  }
 
   // Settings toggle is the single source of truth. No DEV/localStorage OR —
   // disabling must actually skip work. Manual override: window.__perf.enable().

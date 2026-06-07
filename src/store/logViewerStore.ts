@@ -161,3 +161,24 @@ export function parseBackendLogLine(
     message,
   };
 }
+
+/** Shape returned by the Rust `read_structured_log` command / `log-line` event. */
+export interface StructuredEntry {
+  ts: string;
+  level: string;
+  source: string;
+  module?: string;
+  message: string;
+  stack?: string;
+}
+
+const SEVERITIES: readonly LogSeverity[] = ["trace", "debug", "info", "warn", "error"];
+
+/** Map a structured (NDJSON) entry to a store entry, defensively. */
+export function structuredToUnified(e: StructuredEntry): Omit<UnifiedLogEntry, "id"> {
+  const severity = (SEVERITIES as readonly string[]).includes(e.level)
+    ? (e.level as LogSeverity)
+    : "info";
+  const source: LogSource = e.source === "backend" ? "backend" : "frontend";
+  return { timestamp: e.ts, severity, source, module: e.module, message: e.message, stack: e.stack };
+}

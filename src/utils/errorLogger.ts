@@ -12,8 +12,9 @@
  * coupling bugs. One store, one truth, one gate.
  */
 
+import { invoke } from "@tauri-apps/api/core";
 import { useLogViewerStore } from "../store/logViewerStore";
-import type { LogSeverity } from "../store/logViewerStore";
+import type { LogSeverity, StructuredEntry } from "../store/logViewerStore";
 
 export type { LogSeverity };
 
@@ -38,6 +39,46 @@ export function wireLoggingGate(gate: LoggingGate): void {
   isLoggingEnabled = gate;
 }
 
+/**
+ * Persistence gate — when ON, frontend entries are batched and flushed to the
+ * Rust NDJSON sink via `append_frontend_logs`. Follows the same master disk
+ * toggle (backendFileLogging) so both log sources persist to one file.
+ * Independent of the in-memory logging gate above.
+ */
+let isPersistenceEnabled: LoggingGate = () => false;
+export function wirePersistenceGate(gate: LoggingGate): void {
+  isPersistenceEnabled = gate;
+}
+
+const FLUSH_INTERVAL_MS = 2000;
+const FLUSH_THRESHOLD = 25;
+let pending: StructuredEntry[] = [];
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleFlush(): void {
+  if (flushTimer !== null) return;
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    void flushFrontendLogs();
+  }, FLUSH_INTERVAL_MS);
+}
+
+/** Flush buffered frontend entries to the NDJSON sink. Best-effort. */
+export async function flushFrontendLogs(): Promise<void> {
+  if (flushTimer !== null) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+  if (pending.length === 0) return;
+  const batch = pending;
+  pending = [];
+  try {
+    await invoke("append_frontend_logs", { entries: batch });
+  } catch {
+    console.debug("[errorLogger] frontend log flush failed"); // eslint-disable-line no-console
+  }
+}
+
 function formatEntry(entry: LogEntry): string {
   return `[${entry.timestamp}] [${entry.severity.toUpperCase()}] [${entry.source}] ${entry.message}`;
 }
@@ -59,6 +100,21 @@ function addEntry(entry: LogEntry): void {
       stack: entry.stack,
     },
   ]);
+
+  // Persist to the NDJSON sink when the disk-logging toggle is on. Batched by
+  // count (threshold) and time (interval) to avoid an IPC call per log line.
+  if (isPersistenceEnabled()) {
+    pending.push({
+      ts: entry.timestamp,
+      level: entry.severity,
+      source: "frontend",
+      module: entry.source,
+      message: entry.message,
+      stack: entry.stack,
+    });
+    if (pending.length >= FLUSH_THRESHOLD) void flushFrontendLogs();
+    else scheduleFlush();
+  }
 
   // Mirror to console (intentional — DevTools is the dev's debugging surface).
   const formatted = formatEntry(entry);

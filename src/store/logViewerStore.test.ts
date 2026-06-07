@@ -3,6 +3,7 @@ import {
   useLogViewerStore,
   parseBackendLogLine,
   groupConsecutiveEntries,
+  structuredToUnified,
   type UnifiedLogEntry,
   type LogSeverity,
 } from "./logViewerStore";
@@ -786,5 +787,25 @@ describe("groupConsecutiveEntries — extended", () => {
     const grouped = groupConsecutiveEntries(entries);
     expect(grouped).toHaveLength(1);
     expect(grouped[0].count).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// structuredToUnified (Task 7)
+// ---------------------------------------------------------------------------
+
+describe("structuredToUnified", () => {
+  it("maps a StructuredEntry to a store entry shape", () => {
+    const u = structuredToUnified({
+      ts: "2026-06-07T10:00:00.000Z", level: "warn", source: "backend", module: "mod::x", message: "hi",
+    });
+    expect(u).toEqual({
+      timestamp: "2026-06-07T10:00:00.000Z", severity: "warn", source: "backend", module: "mod::x", message: "hi", stack: undefined,
+    });
+  });
+  it("falls back to info for unknown level and frontend for unknown source", () => {
+    const u = structuredToUnified({ ts: "t", level: "weird", source: "??", message: "m" });
+    expect(u.severity).toBe("info");
+    expect(u.source).toBe("frontend");
   });
 });

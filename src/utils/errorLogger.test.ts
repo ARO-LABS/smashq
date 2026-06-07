@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mockIPC, clearMocks } from "@tauri-apps/api/mocks";
 import {
   logError,
   logWarn,
@@ -6,6 +7,8 @@ import {
   logDebug,
   logTrace,
   wireLoggingGate,
+  wirePersistenceGate,
+  flushFrontendLogs,
 } from "./errorLogger";
 import { useLogViewerStore } from "../store/logViewerStore";
 
@@ -362,5 +365,43 @@ describe("logDebug/logTrace", () => {
     logTrace("test.source", "a trace message");
     expect(useLogViewerStore.getState().entries.at(-1)?.severity).toBe("trace");
     expect(useLogViewerStore.getState().entries.at(-1)?.message).toBe("a trace message");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// frontend log persistence flush (Task 7)
+// ---------------------------------------------------------------------------
+
+describe("frontend log persistence flush", () => {
+  beforeEach(() => {
+    clearMocks();
+    wireLoggingGate(() => true);
+  });
+  afterEach(() => {
+    // Reset persistence gate so it does not leak into other suites.
+    wirePersistenceGate(() => false);
+    clearMocks();
+  });
+  it("batches entries and flushes via append_frontend_logs when persistence is on", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const received: unknown[] = [];
+    mockIPC((cmd, args) => {
+      if (cmd === "append_frontend_logs") received.push((args as { entries: unknown[] }).entries);
+      return undefined;
+    });
+    wirePersistenceGate(() => true);
+    logError("test", new Error("boom"));
+    await flushFrontendLogs();
+    expect(received.length).toBe(1);
+    expect((received[0] as unknown[]).length).toBe(1);
+  });
+  it("does NOT flush when persistence gate is off (skips work)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    let called = false;
+    mockIPC((cmd) => { if (cmd === "append_frontend_logs") called = true; return undefined; });
+    wirePersistenceGate(() => false);
+    logError("test", new Error("boom"));
+    await flushFrontendLogs();
+    expect(called).toBe(false);
   });
 });

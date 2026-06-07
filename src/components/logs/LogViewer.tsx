@@ -1,12 +1,14 @@
 import { useEffect, useRef, useMemo, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   useLogViewerStore,
-  parseBackendLogLine,
+  structuredToUnified,
   groupConsecutiveEntries,
   type LogSeverity,
   type LogSource,
+  type StructuredEntry,
 } from "../../store/logViewerStore";
 import { logError } from "../../utils/errorLogger";
 import { ICONS, ICON_SIZE } from "../../utils/icons";
@@ -63,22 +65,36 @@ export function LogViewer() {
   // automatically on mount). addEntries dedupes incoming entries against
   // those already in the store, so re-reading the same file is a no-op.
   const loadBackendLogs = useCallback(() => {
-    invoke<string[]>("read_backend_log", { maxLines: 500 })
-      .then((lines) => {
-        const parsed = lines
-          .map(parseBackendLogLine)
-          .filter((e): e is NonNullable<typeof e> => e !== null);
+    invoke<StructuredEntry[]>("read_structured_log", { maxLines: 500 })
+      .then((rows) => {
+        const parsed = rows.map(structuredToUnified);
         if (parsed.length > 0) addEntries(parsed);
       })
-      .catch((err) => logError("LogViewer.readBackendLog", err));
+      .catch((err) => logError("LogViewer.readStructuredLog", err));
   }, [addEntries]);
 
   useEffect(() => {
     // Frontend logs flow into logViewerStore directly via errorLogger —
-    // no separate subscription needed. Just refresh the on-disk backend
+    // no separate subscription needed. Just refresh the on-disk structured
     // log on every mount; the store handles dedup.
     loadBackendLogs();
   }, [loadBackendLogs]);
+
+  // Live event subscription: each backend log line arrives as a `log-line`
+  // event (gated by backendFileLogging on the Rust side). Only subscribe while
+  // live-tail is on; the store dedups any overlap with the initial read batch.
+  useEffect(() => {
+    if (!liveTail) return;
+    let unlisten: (() => void) | undefined;
+    void listen<StructuredEntry>("log-line", (e) => {
+      addEntries([structuredToUnified(e.payload)]);
+    })
+      .then((u) => {
+        unlisten = u;
+      })
+      .catch((err) => logError("LogViewer.listenLogLine", err));
+    return () => unlisten?.();
+  }, [liveTail, addEntries]);
 
   // Filter entries, then group consecutive identical ones
   const grouped = useMemo(() => {

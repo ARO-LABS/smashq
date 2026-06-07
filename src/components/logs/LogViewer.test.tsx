@@ -101,7 +101,7 @@ describe("LogViewer", () => {
 
     // After dropping the dual-store dance, we ALWAYS refetch on mount —
     // the 1000-cap + timestamp ordering keep dupes bounded.
-    expect(mockInvoke).toHaveBeenCalledWith("read_backend_log", { maxLines: 500 });
+    expect(mockInvoke).toHaveBeenCalledWith("read_structured_log", { maxLines: 500 });
   });
 
   it("displays entry count correctly", () => {
@@ -334,7 +334,7 @@ describe("LogViewer — toolbar interactions", () => {
     expect(useLogViewerStore.getState().liveTail).toBe(true);
   });
 
-  it("re-invokes read_backend_log when the refresh button is clicked", async () => {
+  it("re-invokes read_structured_log when the refresh button is clicked", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     const mockInvoke = vi.mocked(invoke);
 
@@ -343,7 +343,7 @@ describe("LogViewer — toolbar interactions", () => {
 
     fireEvent.click(screen.getByTitle("Backend-Logs aktualisieren"));
 
-    expect(mockInvoke).toHaveBeenCalledWith("read_backend_log", { maxLines: 500 });
+    expect(mockInvoke).toHaveBeenCalledWith("read_structured_log", { maxLines: 500 });
   });
 
   it("invokes open_log_window when the external-window button is clicked", async () => {
@@ -364,11 +364,11 @@ describe("LogViewer — toolbar interactions", () => {
 // ---------------------------------------------------------------------------
 
 describe("LogViewer — backend log loading", () => {
-  it("parses backend log lines returned by the invoke mock and renders them", async () => {
+  it("maps structured rows returned by the invoke mock and renders them", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     const mockInvoke = vi.mocked(invoke);
     mockInvoke.mockResolvedValueOnce([
-      "[2025-01-15 10:30:00.000] [ERROR] [pty] PTY spawn failed",
+      { ts: "2025-01-15T10:30:00.000Z", level: "error", source: "backend", module: "pty", message: "PTY spawn failed" },
     ]);
 
     render(<LogViewer />);
@@ -378,18 +378,20 @@ describe("LogViewer — backend log loading", () => {
     expect(screen.getByText(/von 1 Einträgen/)).toBeInTheDocument();
   });
 
-  it("ignores unparseable backend log lines without crashing", async () => {
+  it("renders a structured row with an unknown level (falls back to info) without crashing", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     const mockInvoke = vi.mocked(invoke);
-    mockInvoke.mockResolvedValueOnce(["garbage line with no structure"]);
+    mockInvoke.mockResolvedValueOnce([
+      { ts: "2025-01-15T10:30:00.000Z", level: "weird", source: "backend", message: "odd line" },
+    ]);
 
     render(<LogViewer />);
 
-    expect(await screen.findByText("Keine Logs vorhanden")).toBeInTheDocument();
-    expect(useLogViewerStore.getState().entries).toHaveLength(0);
+    expect(await screen.findByText("odd line")).toBeInTheDocument();
+    expect(useLogViewerStore.getState().entries[0].severity).toBe("info");
   });
 
-  it("logs an error and stays empty when read_backend_log rejects", async () => {
+  it("logs an error and stays empty when read_structured_log rejects", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     const mockInvoke = vi.mocked(invoke);
     mockInvoke.mockRejectedValueOnce(new Error("disk read failed"));
@@ -400,7 +402,7 @@ describe("LogViewer — backend log loading", () => {
 
     await vi.waitFor(() => {
       expect(vi.mocked(logError)).toHaveBeenCalledWith(
-        "LogViewer.readBackendLog",
+        "LogViewer.readStructuredLog",
         expect.any(Error),
       );
     });
