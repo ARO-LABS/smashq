@@ -3,8 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AgenticExplorer — Developer Documentation</title>
+    <title>Smashq — Developer Documentation</title>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"
+      integrity="sha384-yc/c2Lk1s2V2ir1rxvjo8YyVD9PlOlYTqpNr3Wm1WIuAA30GlDYNx6U5104OiavY"
+      crossorigin="anonymous"
+    ></script>
     <style>
       :root {
         /* Helles Theme — Default */
@@ -105,7 +110,40 @@
         padding: 20px;
         margin: 18px 0;
         overflow-x: auto;
-        cursor: zoom-in;
+      }
+      /* svg-pan-zoom viewport: feste Hoehe + clipping, damit Pan einen Rahmen hat. */
+      .diagram.panzoom-ready {
+        overflow: hidden;
+        cursor: grab;
+      }
+      .diagram.panzoom-ready:active {
+        cursor: grabbing;
+      }
+      .diagram.panzoom-ready .panzoom-viewport {
+        position: relative;
+        width: 100%;
+        height: 460px;
+      }
+      .diagram.panzoom-ready .panzoom-viewport svg {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: none !important;
+        display: block;
+      }
+      /* svg-pan-zoom Control-Icons an Cyan-Teal-Theme angleichen. */
+      .svg-pan-zoom-control {
+        opacity: 0.55;
+        transition: opacity 0.15s ease;
+      }
+      .svg-pan-zoom-control:hover {
+        opacity: 1;
+      }
+      .svg-pan-zoom-control-background {
+        fill: var(--surface-2);
+        stroke: var(--border);
+      }
+      .svg-pan-zoom-control-element {
+        fill: var(--accent);
       }
       .diagram-title {
         font-size: 12px;
@@ -258,8 +296,10 @@
         <h2>Inhalt</h2>
         <a href="#overview">1 · Überblick</a>
         <a href="#architecture">2 · Architektur</a>
-        <a href="#components" class="sub">2.1 Komponentendiagramm</a>
-        <a href="#stack" class="sub">2.2 Tech-Stack</a>
+        <a href="#context-scope" class="sub">2.1 Scope &amp; Context</a>
+        <a href="#components" class="sub">2.2 Bausteinsicht L1</a>
+        <a href="#building-l2" class="sub">2.3 Bausteinsicht L2</a>
+        <a href="#stack" class="sub">2.4 Tech-Stack</a>
         <a href="#frontend">3 · Frontend</a>
         <a href="#stores" class="sub">3.1 Stores</a>
         <a href="#views" class="sub">3.2 Views &amp; Komponenten</a>
@@ -268,13 +308,6 @@
         <a href="#modules" class="sub">4.1 Module</a>
         <a href="#ipc" class="sub">4.2 IPC-Commands</a>
         <a href="#uiflow">5 · UI-Flow-Referenz</a>
-        <a href="#flow-sessions" class="sub">5.1 Session-Manager</a>
-        <a href="#flow-terminal" class="sub">5.2 Terminal &amp; Config-Panel</a>
-        <a href="#flow-kanban" class="sub">5.3 Kanban</a>
-        <a href="#flow-library" class="sub">5.4 Library</a>
-        <a href="#flow-editor" class="sub">5.5 Editor</a>
-        <a href="#flow-logs" class="sub">5.6 Logs &amp; Diff-Fenster</a>
-        <a href="#flow-shell" class="sub">5.7 Navigation &amp; Einstellungen</a>
         <a href="#runtime">6 · Laufzeit-Diagramme</a>
         <a href="#seq-session" class="sub">6.1 Session-Lifecycle</a>
         <a href="#seq-persist" class="sub">6.2 Settings-Persistenz</a>
@@ -294,7 +327,7 @@
 
       <main>
         <header class="hero">
-          <h1><span class="accent">Agentic</span>Explorer — Developer Documentation</h1>
+          <h1><span class="accent">Smash</span>q — Developer Documentation</h1>
           <p>Desktop-App zum Verwalten und Überwachen von Claude-CLI-Sessions. Multi-Session-Terminal mit Projekt-Kontext, Kanban, Library und Notizen.</p>
           <div class="meta">
             Tauri v2 + React 18 + TypeScript &nbsp;·&nbsp; 74 Komponenten · 12 Stores · 9 Hooks · 23 Rust-Module · 47 IPC-Commands
@@ -305,7 +338,7 @@
         <section id="overview">
           <h2 class="section"><span class="num">01</span>Überblick</h2>
           <p>
-            <strong>AgenticExplorer</strong> ist eine Tauri-v2-Desktop-App. Das <strong>Frontend</strong>
+            <strong>Smashq</strong> ist eine Tauri-v2-Desktop-App. Das <strong>Frontend</strong>
             (React 18 + TypeScript + Vite) rendert die UI und hält State in Zustand-Stores. Das
             <strong>Backend</strong> (Rust) spawnt PTY-Sessions, liest Dateien sandboxed, und kapselt
             <code>git</code> / <code>gh</code>. Beide Seiten kommunizieren ausschliesslich über die
@@ -340,7 +373,35 @@
             kennt kein DOM. Die einzige Brücke ist die typisierte IPC-Schicht.
           </p>
 
-          <h3 id="components">2.1 Komponentendiagramm</h3>
+          <h3 id="context-scope">2.1 Scope &amp; Context</h3>
+          <p>
+            Äusserste Sicht: Smashq als Black-Box zwischen Benutzer:in und den Nachbarsystemen
+            (Claude CLI, GitHub, Git, Dateisystem, Update-Server). Sie verortet, welche externen
+            Schnittstellen die App bedient, bevor 2.2 ihren inneren Aufbau aufschlüsselt.
+          </p>
+          <div class="diagram">
+            <div class="diagram-title">Scope &amp; Context — Smashq und Nachbarsysteme</div>
+            <pre class="mermaid">
+flowchart TB
+  user(["Entwickler:in"])
+  smashq["Smashq<br/>Desktop-App (Tauri v2)"]
+  claude["Claude CLI<br/>(PTY-Subprozess)"]
+  gh["GitHub<br/>via gh CLI"]
+  git["Git<br/>(lokal)"]
+  fs[("Dateisystem<br/>Documents/Smashq · %LOCALAPPDATA%")]
+  proj[("Projekt-Repo<br/>.claude/ · ROADMAP.md")]
+  upd["Update-Server<br/>GitHub Releases · latest.json"]
+  user <-->|"UI · Terminal-Eingabe"| smashq
+  smashq -->|"spawnt · stdin/stdout"| claude
+  smashq -->|"pr / issue / project list"| gh
+  smashq -->|"diff · worktree · branch"| git
+  smashq <-->|"settings·tasks·notes (JSON) · NDJSON-Logs"| fs
+  smashq -->|"liest sandboxed"| proj
+  smashq -->|"prüft Signatur · latest.json"| upd
+            </pre>
+          </div>
+
+          <h3 id="components">2.2 Bausteinsicht — Level 1 (Whitebox)</h3>
           <div class="diagram">
             <div class="diagram-title">Komponenten- &amp; Schichtendiagramm</div>
             <pre class="mermaid">
@@ -354,11 +415,11 @@ flowchart TB
       LIBV["LibraryView"]
       EDV["MarkdownEditorView"]
     end
-    subgraph STORES["Zustand Stores (10) + Helpers"]
+    subgraph STORES["Zustand Stores (12) + Helpers"]
       SS["sessionStore<br/>(ephemer)"]
-      SETT["settingsStore<br/>(persist v4)"]
+      SETT["settingsStore<br/>(persist v9)"]
       UIS["uiStore"]
-      MISC["configDiscovery · library · logViewer<br/>editor · project · projectConfig · sessionHistory"]
+      MISC["configDiscovery · library · logViewer · tasks<br/>editor · project · projectConfig · sessionHistory"]
       HELP["tauriStorage · sessionRestoreSync"]
     end
     subgraph HOOKS["Hooks"]
@@ -381,7 +442,7 @@ flowchart TB
 
   subgraph IPC["TAURI IPC-BRIDGE"]
     INV["invoke()<br/>47 Commands"]
-    EMIT["emit() Channels<br/>session-output · -status · -exit<br/>-claude-id-resolved · -deleted/&lt;id&gt;<br/>adp-event · preferences-changed"]
+    EMIT["emit() Channels<br/>session-output · -status · -exit<br/>-claude-id-resolved · -deleted/&lt;id&gt;<br/>adp-event · preferences-changed · log-line · tasks-changed"]
   end
 
   subgraph BE["RUST-BACKEND — Tauri v2"]
@@ -390,7 +451,7 @@ flowchart TB
       LIBRS["lib.rs<br/>App-Builder + Command-Registry"]
       ERR["error.rs · util.rs<br/>validation.rs"]
       SETTRS["settings.rs"]
-      LOGR["log_reader.rs"]
+      LOGR["structured_log.rs<br/>(NDJSON + Rotation)"]
     end
     subgraph SESS["session/"]
       SCMD["commands.rs"]
@@ -452,7 +513,41 @@ flowchart TB
             <code>listen()</code> im Hook → Store-Update → Re-Render.
           </div>
 
-          <h3 id="stack">2.2 Tech-Stack</h3>
+          <h3 id="building-l2">2.3 Bausteinsicht — Level 2 (Session/PTY)</h3>
+          <div class="diagram">
+            <div class="diagram-title">Level 2 — Session-/PTY-Subsystem</div>
+            <pre class="mermaid">
+flowchart LR
+  subgraph fe["Frontend"]
+    sc["useSessionCreation"]
+    se["useSessionEvents"]
+    term["SessionTerminal<br/>(xterm.js)"]
+  end
+  subgraph be["session/ (Rust)"]
+    cmd["commands.rs<br/>create · write · resize · close"]
+    mgr["manager.rs<br/>SessionManager · HashMap&lt;id,Handle&gt;"]
+    reader["Reader-Thread"]
+    det["AgentDetector<br/>(Regex)"]
+  end
+  pty["portable-pty<br/>Shell + Claude CLI"]
+  sc -->|"invoke create_session"| cmd
+  cmd --> mgr
+  mgr -->|"openpty + spawn"| pty
+  pty --> reader
+  reader -->|"strip ANSI"| det
+  reader -->|"emit session-output"| term
+  det -->|"emit adp-event"| se
+  mgr -->|"emit session-status / -exit"| se
+  term -->|"invoke write_session"| cmd
+            </pre>
+          </div>
+          <div class="note">
+            arc42-Bausteinsicht — Level 1 zeigt die Gesamtstruktur, Level 2 zoomt in das
+            Session-Subsystem (analog weitere Bausteine wie <code>github/</code> oder die
+            Cross-Window-Synchronisation, siehe 6.8).
+          </div>
+
+          <h3 id="stack">2.4 Tech-Stack</h3>
           <table>
             <tr><th>Schicht</th><th>Technologie</th></tr>
             <tr><td>UI</td><td>React 18, TypeScript, Vite, Tailwind CSS, Framer Motion</td></tr>
@@ -534,8 +629,8 @@ flowchart TB
             <tr><td><code>session/win_job.rs</code></td><td>Windows-Job-Object-Wrapper — bindet PTY-Child-Prozesse an die App, sodass beim App-Crash alle Sessions vom OS aufgeräumt werden (verhindert verwaiste PowerShell-/Claude-Prozesse).</td></tr>
             <tr><td><code>github/commands.rs</code> · <code>project.rs</code></td><td><code>gh</code>-CLI-Wrapper: Git-Info, PRs, Issues, Checks, Kommentare, Projects-v2-Board.</td></tr>
             <tr><td><code>library/commands.rs</code></td><td>Library-Items lesen/schreiben/indexieren, an Projekte anheften.</td></tr>
-            <tr><td><code>settings.rs</code></td><td>User-Settings / Favoriten / Notizen — Datei-IO in <code>Documents/AgenticExplorer/</code>.</td></tr>
-            <tr><td><code>log_reader.rs</code></td><td>Liest das On-Disk-Backend-Log für den Log-Viewer.</td></tr>
+            <tr><td><code>settings.rs</code></td><td>User-Settings / Favoriten / Notizen — Datei-IO in <code>Documents/Smashq/</code>.</td></tr>
+            <tr><td><code>structured_log.rs</code></td><td>Schreibt das Backend-Log als NDJSON (Größen-Rotation); vom Log-Viewer über <code>read_structured_log</code> gelesen und live via <code>log-line</code>-Event gestreamt.</td></tr>
             <tr><td><code>adp/</code> (emitter, envelope)</td><td>ADP — strukturiertes Error-/Event-Protokoll. Alle Envelopes gehen über den separaten Kanal <code>adp-event</code> (typisiert), getrennt von den Session-Lifecycle-Events.</td></tr>
             <tr><td><code>util.rs</code></td><td><code>timed_output</code> (Prozess mit Timeout, Pipe-Drain), <code>silent_command</code> (kein Konsolen-Flash auf Windows).</td></tr>
             <tr><td><code>validation.rs</code> · <code>error.rs</code></td><td>Input-Validierung (Session-IDs, Repos, Pfade) · <code>ADPError</code>-Typ.</td></tr>
@@ -551,13 +646,13 @@ flowchart TB
           <div class="note">
             <strong>Unified Logging:</strong> <code>logViewerStore</code> führt Frontend- und
             Backend-Logs in einem <code>UnifiedLogEntry</code>-Strom zusammen (max. 1000 Einträge).
-            Backend-Zeilen liest <code>log_reader.rs</code> aus dem On-Disk-Log;
-            <code>parseBackendLogLine</code> parst das Format
-            <code>[Zeit] [LEVEL] [Modul] Nachricht</code>. Da dieselbe Datei bei jedem Refresh
-            neu eingelesen wird, dedupliziert der Store über <code>timestamp + source + message</code>.
-            <code>NOISE_PATTERNS</code> stufen bekanntes Rauschen (Updater-Timeouts,
-            Windows-Ctrl+C-Codes) auf <code>info</code> herab; <code>groupConsecutiveEntries</code>
-            faltet identische Folge-Einträge zu einem Eintrag mit Zähler.
+            Das Backend schreibt seine Zeilen über <code>structured_log.rs</code> als NDJSON
+            (eine JSON-Zeile pro Eintrag); der Viewer liest sie via <code>read_structured_log</code>
+            und empfängt neue Zeilen live über das <code>log-line</code>-Event. Da dieselbe Datei bei
+            jedem Refresh neu eingelesen wird, dedupliziert der Store über
+            <code>timestamp + source + message</code>. <code>NOISE_PATTERNS</code> stufen bekanntes
+            Rauschen (Updater-Timeouts, Windows-Ctrl+C-Codes) auf <code>debug</code> herab;
+            <code>groupConsecutiveEntries</code> faltet identische Folge-Einträge zu einem Eintrag mit Zähler.
           </div>
 
           <h3 id="ipc">4.2 IPC-Commands (47)</h3>
@@ -580,140 +675,43 @@ flowchart TB
         <section id="uiflow">
           <h2 class="section"><span class="num">05</span>UI-Flow-Referenz</h2>
           <p>
-            Diese Sektion ist nach der <strong>sichtbaren Oberfläche</strong> indexiert: navigiert man die
-            App, findet man hier zu jedem Bedienelement den dahinterliegenden Code-Fluss. Jede Zeile zeigt
-            den Pfad <em>DOM-Event → Handler → Hook → Store-Action → <code>invoke()</code> → Rust-Command →
-            <code>emit()</code>-Rückkanal</em>, die konkreten Methodennamen sowie den Querverweis ins
-            Komponenten-, Laufzeit- oder UML-Diagramm.
+            Kompakter Index von der sichtbaren Oberfläche zum Code: jede Zeile bildet ein UI-Element
+            auf den ausgelösten <code>invoke()</code>-Command und das zugehörige Sequenzdiagramm in
+            Sektion 6 ab. Den genauen Nachrichtenfluss zeigt das jeweils referenzierte Diagramm —
+            <em>„— (FE)“</em> markiert reine Frontend-Flows ohne Backend-Aufruf.
           </p>
-          <div class="note">
-            <strong>Lesehilfe:</strong> Spalte <em>Flow &amp; Methoden</em> nennt die Aufrufkette mit
-            konkreten Funktionen; <em>IPC → Rust</em> den <code>invoke()</code>-Command und das Rust-Modul;
-            <em>Diagramm</em> verweist auf das passende Diagramm in Sektion 6 / 7 bzw. das
-            Komponentendiagramm (2.1). „— (FE)“ = reiner Frontend-Flow ohne Backend-Aufruf.
-          </div>
-
-          <h3 id="flow-sessions">5.1 Session-Manager</h3>
-          <p>Haupt-View <code>SessionManagerView</code> — Sidebar-Liste, Terminal-Render-Baum, Session-Karten,
-            Grid-Layout. Drei Spawn-Pfade laufen über <code>useSessionCreation</code>; vier Backend-Events
-            über <code>useSessionEvents</code>.</p>
           <table>
-            <tr><th>UI-Element</th><th>Aktion</th><th>Flow &amp; Methoden</th><th>IPC → Rust</th><th>Diagramm</th></tr>
-            <tr><td>„Neue Session“ (<code>+</code> / EmptyState)</td><td>Klick</td><td><code>onNewSession</code> → <code>handleNewSessionFromDefaults</code> → ohne Default-Pfad: Dialog <code>open({directory})</code>, dann <code>wrapInvoke("create_session")</code> → <code>sessionStore.addSession</code></td><td><code>create_session</code> → <code>session/commands.rs</code></td><td>6.1</td></tr>
-            <tr><td>Favoriten-Karte (Play)</td><td>Klick</td><td><code>onQuickStart</code> → <code>handleQuickStart</code> → <code>wrapInvoke("create_session")</code> → <code>addSession</code> + <code>updateFavoriteLastUsed</code> + <code>closePreview</code></td><td><code>create_session</code> → <code>session/commands.rs</code></td><td>6.1</td></tr>
-            <tr><td>„Resume“ (Preview / Config-Panel)</td><td>Klick</td><td><code>onResumeSession</code> → <code>handleResumeSession</code> → <code>generateSessionId</code> → <code>wrapInvoke("create_session",{resumeSessionId})</code> → <code>addSession</code></td><td><code>create_session</code> (Resume-Param) → <code>session/commands.rs</code></td><td>6.1</td></tr>
-            <tr><td>Session-Karte (Body)</td><td>Klick</td><td><code>SessionList.handleClick</code> → Single: <code>setActiveSession</code> + <code>uiStore.closePreview</code>; Grid: <code>addToGrid</code> / <code>setFocusedGridSession</code> / <code>maximizeGridSession</code></td><td>— (FE)</td><td>UML 7.1 <code>sessionStore</code></td></tr>
-            <tr><td>Session-Titel</td><td>Doppelklick</td><td><code>startRename</code> → Edit-Modus; Enter/Blur → <code>commitRename</code> → <code>renameSession</code> (+ <code>settingsStore.setSessionTitleOverride</code> falls Claude-ID bekannt)</td><td>— (FE + Persist)</td><td>6.2</td></tr>
-            <tr><td>Schliessen-Button (Karte)</td><td>Klick</td><td><code>onClose</code> → <code>SessionList.handleClose</code> → <code>removeSession</code> (optimistisch, sofort) ∥ <code>invoke("close_session")</code> (fire-and-forget)</td><td><code>close_session</code> → <code>session/commands.rs</code></td><td>6.1</td></tr>
-            <tr><td>Diff-Button (Karte / Grid)</td><td>Klick</td><td><code>DiffActionButton</code> → <code>invoke("open_session_diff_window",{sessionId})</code> — öffnet eigenes Diff-Fenster</td><td><code>open_session_diff_window</code> → <code>session/commands.rs</code></td><td>6.7</td></tr>
-            <tr><td>Ordner-/Terminal-Button</td><td>Klick</td><td><code>stopPropagation</code> → <code>invoke(...)</code> fire-and-forget</td><td><code>open_folder_in_explorer</code> / <code>open_terminal_in_folder</code> → <code>session/folder_actions.rs</code></td><td>Komp. 2.1</td></tr>
-            <tr><td>Layout-Umschalter (Toolbar)</td><td>Klick</td><td><code>onLayoutChange</code> → <code>sessionStore.setLayoutMode("single"|"grid")</code> — Terminals bleiben gemountet (xterm-Scrollback erhalten)</td><td>— (FE)</td><td>UML 7.1 <code>sessionStore</code></td></tr>
-            <tr><td>Grid-Zelle: Maximieren / Entfernen / Fokus</td><td>Klick</td><td><code>maximizeGridSession</code> / <code>removeFromGrid</code> (Auto-Fallback <code>single</code> bei leerem Grid) / <code>setFocusedGridSession</code></td><td>— (FE)</td><td>UML 7.1 <code>sessionStore</code></td></tr>
-            <tr><td>Terminal-Tastatureingabe</td><td>Tippen</td><td><code>term.onData</code> → Paste-Dedup-Guard → <code>wrapInvoke("write_session")</code> → PTY-stdin</td><td><code>write_session</code> → <code>session/commands.rs</code></td><td>6.1</td></tr>
-            <tr><td>Terminal-Resize</td><td>Fenster/Panel</td><td><code>ResizeObserver</code> → <code>debouncedFit</code> (100&nbsp;ms) → <code>fitAddon.fit()</code> → <code>wrapInvoke("resize_session")</code></td><td><code>resize_session</code> → <code>session/commands.rs</code></td><td>6.1</td></tr>
-            <tr><td>(Rückkanal) PTY-Ausgabe / Status / Exit / Claude-ID</td><td>Backend-Push</td><td><code>useSessionEvents</code> abonniert <code>session-status|-exit|-claude-id-resolved</code> → <code>updateLastOutput</code> (Karten-Preview) / <code>updateStatus</code> / <code>setExitCode</code> / <code>setClaudeSessionId</code>; <code>SessionTerminal</code> hat einen eigenen <code>session-output</code>-Listener → <code>term.write</code></td><td><code>emit()</code> ← <code>session/manager.rs</code></td><td>6.1 · 6.9</td></tr>
-          </table>
-
-          <h3 id="flow-terminal">5.2 Terminal &amp; Config-Panel</h3>
-          <p>Das Config-Panel zeigt projektbezogene Konfiguration in lazy geladenen Tabs. Jeder Viewer folgt
-            demselben Muster: <code>useEffect([folder])</code> → <code>invoke()</code> → lokaler
-            <code>useState</code> (kein Zustand-Store). Einzige Store-Berührungen: <code>uiStore</code> und
-            <code>settingsStore</code>.</p>
-          <table>
-            <tr><th>UI-Element</th><th>Aktion</th><th>Flow &amp; Methoden</th><th>IPC → Rust</th><th>Diagramm</th></tr>
-            <tr><td>Config-Panel-Tabs (Sichtbarkeit)</td><td>Mount / Folder-Wechsel</td><td><code>ConfigPanelTabList</code> useEffect → <code>invoke("resolve_project_root")</code> → <code>Promise.all</code> [<code>read_project_file</code>×2, <code>list_skill_dirs</code>, <code>list_project_dir</code>, <code>check_project_presence</code>] → <code>setPresence</code> filtert <code>visibleTabs</code></td><td>5× File-Reader / GitHub → <code>file_reader.rs</code>, <code>github/</code></td><td>6.3</td></tr>
-            <tr><td>Tab-Button</td><td>Klick</td><td><code>setConfigSubTab</code> → Dirty-Guard (<code>window.confirm</code> falls <code>hasDirtyEditor</code>) → <code>uiStore.setConfigSubTabRaw</code> → lazy Viewer-Chunk</td><td>— (FE)</td><td>UML 7.1 <code>uiStore</code></td></tr>
-            <tr><td>Pin hinzufügen (<code>+</code>)</td><td>Klick</td><td><code>handleAddPin</code> → Dialog <code>open()</code> → Pfad-Prefix-Validierung → <code>settingsStore.addPinnedDoc</code> → <code>setConfigSubTab("pin:"+id)</code></td><td>— (FE + Persist)</td><td>6.2</td></tr>
-            <tr><td>ClaudeMd- / PinnedDoc-Viewer: Laden</td><td>Mount / Refresh</td><td><code>load()</code> → <code>invoke("resolve_project_root")</code> → <code>invoke("read_project_file")</code> → Gen-Counter-Check → <code>setContent</code></td><td><code>read_project_file</code> → <code>file_reader.rs</code></td><td>6.3</td></tr>
-            <tr><td>ClaudeMd- / PinnedDoc-Viewer: Speichern</td><td>Klick „Speichern“ / Ctrl+S</td><td><code>saveFile</code> → <code>invoke("write_project_file")</code> → <code>setContent</code> → <code>uiStore.addToast</code></td><td><code>write_project_file</code> → <code>file_reader.rs</code></td><td>6.6</td></tr>
-            <tr><td>Skills- / Agents-Viewer: Laden</td><td>Mount / Refresh</td><td><code>loadSkills</code>/<code>loadAgents</code> → <code>invoke("list_skill_dirs")</code> bzw. <code>list_project_dir</code> + <code>read_project_file</code>×N → <code>parseSkillFrontmatter</code>/<code>parseAgentFrontmatter</code></td><td><code>list_skill_dirs</code> / <code>list_project_dir</code> / <code>read_project_file</code> → <code>file_reader.rs</code></td><td>6.3</td></tr>
-            <tr><td>Hooks- / Settings-Viewer: Laden</td><td>Mount / Refresh</td><td><code>useClaudeSettingsRaws</code> → <code>Promise.allSettled</code> [<code>read_project_file</code>×2, <code>read_user_claude_file</code>] → <code>buildEventGroups</code>/<code>buildSettingsSections</code></td><td><code>read_project_file</code>, <code>read_user_claude_file</code> → <code>file_reader.rs</code></td><td>6.3</td></tr>
-            <tr><td>Worktree-Viewer: Laden</td><td>Mount / Refresh</td><td><code>load()</code> → Modul-Cache (TTL 60&nbsp;s) → bei Miss <code>invoke("scan_worktrees")</code></td><td><code>scan_worktrees</code> → <code>session/commands.rs</code> (Logik: <code>worktree.rs</code>)</td><td>Komp. 2.1</td></tr>
-            <tr><td>History-Viewer: Resume</td><td>Klick „Play“</td><td><code>onResumeSession(id,cwd,title)</code> → Parent <code>handleResumeSession</code> → neue PTY-Session</td><td><code>create_session</code> (Resume) → <code>session/commands.rs</code></td><td>6.1</td></tr>
-            <tr><td>History-Viewer: Löschen</td><td>Klick „Trash“</td><td><code>handleDelete</code> → optimistisches <code>setSessions</code> → <code>invoke("delete_claude_session")</code> → bei Fehler Rollback; Toast</td><td><code>delete_claude_session</code> → <code>file_reader.rs</code></td><td>6.3</td></tr>
-            <tr><td>Editor (CodeMirror): Tippen / Ctrl+S</td><td>Eingabe</td><td><code>onChange</code> → <code>setEditContent</code> (<code>isDirty</code>); Ctrl+S (capture) → <code>saveFile</code></td><td><code>write_project_file</code> → <code>file_reader.rs</code></td><td>6.6</td></tr>
-          </table>
-
-          <h3 id="flow-kanban">5.3 Kanban</h3>
-          <p><code>KanbanDashboardView</code> wählt Board-Modus (global/folder) und Projekt; <code>KanbanBoard</code>
-            lädt das Projects-v2-Board über <code>gh</code> und behandelt Drag&amp;Drop optimistisch. Zwei
-            In-Memory-Caches (Projektliste 30&nbsp;s, Board 60&nbsp;s).</p>
-          <table>
-            <tr><th>UI-Element</th><th>Aktion</th><th>Flow &amp; Methoden</th><th>IPC → Rust</th><th>Diagramm</th></tr>
-            <tr><td>Modus-Toggle global/Projekt</td><td>Klick</td><td><code>setBoardMode</code> → conditional <code>&lt;KanbanBoard folder={null|path}/&gt;</code></td><td>— (FE)</td><td>Komp. 2.1</td></tr>
-            <tr><td>Board laden</td><td>Mount / Projektwahl</td><td><code>resolveProject</code> → <code>loadProjects</code> (<code>list_user_projects</code>) → Auto-Select → <code>loadBoard</code> (<code>get_project_board</code>)</td><td><code>list_user_projects</code>, <code>get_project_board</code> → <code>github/project.rs</code></td><td>6.4</td></tr>
-            <tr><td>Projekt-Picker-Dropdown</td><td>Klick</td><td><code>handleSelectProject</code> → <code>projectStore.setGlobalProject</code>/<code>setFolderProject</code> → useEffect → <code>loadBoard</code></td><td><code>get_project_board</code> → <code>github/project.rs</code></td><td>6.4 · UML 7.1 <code>projectStore</code></td></tr>
-            <tr><td>Refresh-Button</td><td>Klick</td><td><code>loadBoard(signal, forceRefresh=true)</code> — Cache umgangen</td><td><code>get_project_board</code> → <code>github/project.rs</code></td><td>6.4</td></tr>
-            <tr><td>Karte in andere Lane ziehen</td><td>Drag &amp; Drop</td><td><code>handleDropLane</code> → optimistisches <code>setBoard</code> → <code>invoke("move_project_item")</code> → Erfolg: Cache-Invalidate; Fehler: Rollback + <code>moveError</code>-Toast</td><td><code>move_project_item</code> → <code>github/project.rs</code></td><td>6.4</td></tr>
-            <tr><td>Karte (Body)</td><td>Klick (kein Drag)</td><td>5&nbsp;px-Threshold unterscheidet Klick/Drag → <code>setSelectedIssue</code> → <code>KanbanDetailModal</code></td><td>— (FE)</td><td>6.4</td></tr>
-            <tr><td>Detail-Modal öffnen</td><td>(Folge Karten-Klick)</td><td><code>loadDetail</code> → <code>Promise.all</code> [<code>get_issue_detail</code>, <code>get_issue_checks</code>] → <code>setDetail</code> + <code>setLinkedPRs</code></td><td><code>get_issue_detail</code>, <code>get_issue_checks</code> → <code>github/commands.rs</code></td><td>6.4</td></tr>
-            <tr><td>Kommentar abschicken</td><td>Klick / Ctrl+Enter</td><td><code>submitComment</code> → <code>invoke("post_issue_comment")</code> → <code>onCommentPosted</code> → <code>loadDetail</code> + <code>onIssueChanged</code> → Board-Reload</td><td><code>post_issue_comment</code> → <code>github/commands.rs</code></td><td>6.4</td></tr>
-            <tr><td>PR-/Issue-Link</td><td>Klick</td><td><code>open(url)</code> (Plugin <code>shell</code>) — Browser</td><td>Plugin <code>shell.open</code></td><td>—</td></tr>
-          </table>
-
-          <h3 id="flow-library">5.4 Library</h3>
-          <p>Zwei getrennte Implementierungen: <code>LibraryView</code> (read-only Config-Scanner über
-            <code>configDiscoveryStore</code>) und <code>LibraryViewer</code> (CRUD über <code>libraryStore</code>,
-            Dateien unter <code>~/.claude/library/items/</code>).</p>
-          <table>
-            <tr><th>UI-Element</th><th>Aktion</th><th>Flow &amp; Methoden</th><th>IPC → Rust</th><th>Diagramm</th></tr>
-            <tr><td>LibraryView: Konfiguration scannen</td><td>Mount / Refresh</td><td><code>discoverGlobal</code> + <code>discoverProject</code> + <code>discoverFavorites</code> → <code>Promise.allSettled</code> über viele <code>read_user_claude_file</code>/<code>list_user_claude_dir</code></td><td><code>read_user_claude_file</code>, <code>list_user_claude_dir</code> → <code>file_reader.rs</code></td><td>6.3</td></tr>
-            <tr><td>Skill-/Memory-Karte</td><td>Klick / Expand</td><td><code>openDetail</code> → <code>LibraryDetailModal</code>; Memory-Expand → <code>loadContent</code> → <code>invoke("read_user_claude_file")</code></td><td><code>read_user_claude_file</code> → <code>file_reader.rs</code></td><td>UML 7.1 <code>configDiscoveryStore</code></td></tr>
-            <tr><td>LibraryViewer: Items laden</td><td>Mount</td><td><code>fetchItems</code> (TTL 30&nbsp;s) → <code>wrapInvoke("list_library_items")</code> + <code>invoke("rebuild_library_index")</code></td><td><code>list_library_items</code>, <code>rebuild_library_index</code> → <code>library/commands.rs</code></td><td>Komp. 2.1</td></tr>
-            <tr><td>Item-Karte</td><td>Klick</td><td><code>selectItem</code> → useEffect → <code>loadItemContent</code> → <code>invoke("read_library_item")</code></td><td><code>read_library_item</code> → <code>library/commands.rs</code></td><td>UML 7.1 <code>libraryStore</code></td></tr>
-            <tr><td>„Erstellen“ (NewItemForm)</td><td>Klick</td><td><code>handleSave</code> → Frontmatter bauen → <code>saveItem</code> → <code>invoke("save_library_item")</code> → Toast + <code>selectItem</code></td><td><code>save_library_item</code> → <code>library/commands.rs</code></td><td>6.6</td></tr>
-            <tr><td>„Verknüpfen“ / „Trennen“</td><td>Klick</td><td><code>handleToggleAttach</code> → <code>attachToProject</code>/<code>detachFromProject</code> → <code>invoke(...)</code> → Usage-Update</td><td><code>attach_library_item</code> / <code>detach_library_item</code> → <code>library/commands.rs</code></td><td>UML 7.1 <code>libraryStore</code></td></tr>
-            <tr><td>„Löschen“</td><td>2× Klick (Confirm)</td><td>1. Klick <code>setConfirmDelete(true)</code>; 2. Klick <code>deleteItem</code> → <code>invoke("delete_library_item")</code></td><td><code>delete_library_item</code> → <code>library/commands.rs</code></td><td>UML 7.1 <code>libraryStore</code></td></tr>
-            <tr><td>„Copy Path“</td><td>Klick</td><td><code>handleCopyPath</code> → <code>invoke("get_library_item_path")</code> → <code>clipboard.writeText</code> → Toast</td><td><code>get_library_item_path</code> → <code>library/commands.rs</code></td><td>—</td></tr>
-          </table>
-
-          <h3 id="flow-editor">5.5 Editor</h3>
-          <p>Markdown-Editor (<code>editorStore</code>): CodeMirror links, sanitisierte Preview rechts.
-            Zwei Save-Trigger (CodeMirror-Keymap + globaler <code>window</code>-Listener) konvergieren auf
-            <code>saveFile</code>.</p>
-          <table>
-            <tr><th>UI-Element</th><th>Aktion</th><th>Flow &amp; Methoden</th><th>IPC → Rust</th><th>Diagramm</th></tr>
-            <tr><td>„Öffnen“ / EmptyState</td><td>Klick</td><td><code>openFileFromDialog</code> → Dialog <code>open()</code> → Pfad zerlegen → <code>openFileFromProject</code> → <code>invoke("read_project_file")</code> → <code>addToRecent</code></td><td><code>read_project_file</code> → <code>file_reader.rs</code></td><td>6.3</td></tr>
-            <tr><td>Text-Eingabe (CodeMirror)</td><td>Tippen</td><td><code>handleChange</code> → <code>updateContent</code> → <code>openFile.content</code> (<code>isDirty</code>)</td><td>— (FE)</td><td>UML 7.1 <code>editorStore</code></td></tr>
-            <tr><td>„Speichern“ / Ctrl+S</td><td>Klick / Tastatur</td><td><code>saveFile</code> → <code>wrapInvoke("write_project_file")</code> → <code>savedContent</code>-Sync → Success-Toast</td><td><code>write_project_file</code> → <code>file_reader.rs</code></td><td>6.6</td></tr>
-            <tr><td>Preview-Toggle (Auge)</td><td>Klick</td><td><code>togglePreview</code> → <code>isPreviewVisible</code></td><td>— (FE)</td><td>UML 7.1 <code>editorStore</code></td></tr>
-            <tr><td>„Schliessen“ (X)</td><td>Klick</td><td><code>closeFile</code> → <code>openFile = null</code> <em>(kein Dirty-Guard — ungespeicherte Änderung verfällt)</em></td><td>— (FE)</td><td>UML 7.1 <code>editorStore</code></td></tr>
-            <tr><td>Split-Resize-Griff</td><td>Drag / Pfeiltasten</td><td><code>onPointerDown</code> → rAF-gedrosselt <code>setSplitRatio</code> (Clamp 0.2–0.8)</td><td>— (FE)</td><td>—</td></tr>
-            <tr><td>Preview-Render</td><td>(Content-Änderung)</td><td>300&nbsp;ms-Debounce → <code>renderMarkdown</code> → <code>markdown-it</code> → <code>DOMPurify.sanitize</code> → <code>dangerouslySetInnerHTML</code></td><td>— (FE)</td><td>—</td></tr>
-          </table>
-
-          <h3 id="flow-logs">5.6 Logs &amp; Diff-Fenster</h3>
-          <p>Log-Viewer und Diff-View leben auch in <strong>eigenständigen Tauri-Fenstern</strong> (eigener
-            React-Root, <code>?view=</code>-Pivot in <code>main.tsx</code>). Frontend-Logs fliessen über
-            <code>errorLogger</code> direkt in <code>logViewerStore</code>, Backend-Logs werden von Disk gelesen.</p>
-          <table>
-            <tr><th>UI-Element</th><th>Aktion</th><th>Flow &amp; Methoden</th><th>IPC → Rust</th><th>Diagramm</th></tr>
-            <tr><td>Log: Severity-/Source-Filter, Suche</td><td>Klick / Eingabe</td><td>Komponenten-Handler <code>toggleSeverity</code>/<code>toggleSource</code> → Store-Actions <code>logViewerStore.setSeverityFilter</code>/<code>setSourceFilter</code>/<code>setSearchText</code> → <code>useMemo grouped</code> re-filtert</td><td>— (FE)</td><td>UML 7.1 <code>logViewerStore</code></td></tr>
-            <tr><td>Log: Refresh</td><td>Klick</td><td><code>loadBackendLogs</code> → <code>invoke("read_backend_log",{maxLines:500})</code> → <code>parseBackendLogLine</code> → <code>addEntries</code> (Dedup, Noise-Downgrade, FIFO-1000)</td><td><code>read_backend_log</code> → <code>log_reader.rs</code></td><td>UML 7.1 <code>logViewerStore</code></td></tr>
-            <tr><td>Log: Live-Tail / Leeren</td><td>Klick</td><td><code>toggleLiveTail</code> → Auto-Scroll; <code>clearEntries</code> → <code>entries = []</code></td><td>— (FE)</td><td>—</td></tr>
-            <tr><td>Log-Fenster öffnen</td><td>Klick</td><td><code>invoke("open_log_window")</code> — existiert → Fokus; sonst neues <code>WebviewWindow</code> <code>index.html?view=logs</code></td><td><code>open_log_window</code> → <code>lib.rs</code></td><td>Komp. 2.1</td></tr>
-            <tr><td>Diff-Fenster: Laden</td><td>Mount / Fokus</td><td><code>loadDiff</code> → <code>invoke("get_session_diff",{sessionId})</code> → <code>setDiff</code>; <code>tauri://focus</code> löst Re-Load aus (ausser <code>frozen</code>)</td><td><code>get_session_diff</code> → <code>session/commands.rs</code> + <code>session/diff.rs</code></td><td>6.7</td></tr>
-            <tr><td>Diff: Datei wählen</td><td>Klick</td><td><code>DiffFileList.onSelect</code> → <code>setSelectedFileIndex</code> → <code>DiffMergeView</code> rendert <code>MergeView</code></td><td>— (FE)</td><td>—</td></tr>
-            <tr><td>Diff: Side/Inline + Refresh</td><td>Klick</td><td><code>onModeChange</code> → <code>setViewMode</code>; <code>onRefresh</code> → <code>loadDiff</code> (deaktiviert bei <code>frozen</code>)</td><td><code>get_session_diff</code> → <code>session/commands.rs</code></td><td>6.7</td></tr>
-            <tr><td>(Rückkanal) Session beendet</td><td>Backend-Push</td><td><code>listen("session-deleted/&lt;id&gt;")</code> → <code>frozen = true</code> → Diff eingefroren, Refresh deaktiviert</td><td><code>emit()</code> ← <code>session/commands.rs</code></td><td>6.7</td></tr>
-          </table>
-
-          <h3 id="flow-shell">5.7 Navigation &amp; Einstellungen</h3>
-          <p>App-Rahmen <code>AppShell</code> (View-Router) + <code>SideNav</code>. Einstellungen schreiben über
-            <code>settingsStore.setPreferences</code>, das persistiert <em>und</em> per
-            <code>emit("preferences-changed")</code> an alle Fenster broadcastet.</p>
-          <table>
-            <tr><th>UI-Element</th><th>Aktion</th><th>Flow &amp; Methoden</th><th>IPC → Rust</th><th>Diagramm</th></tr>
-            <tr><td>SideNav-Tab (Sitzungen/Kanban/…)</td><td>Klick</td><td><code>setActiveTab(id)</code> → <code>uiStore.setActiveTab</code> → <code>AppShell</code> rendert lazy View</td><td>— (FE)</td><td>Komp. 2.1</td></tr>
-            <tr><td>Tab-Rechtsklick → „In eigenem Fenster“</td><td>Kontextmenü</td><td><code>handleDetachFromMenu</code> → <code>invoke("open_detached_window",{view,title})</code> → Rust spawnt Webview (<code>DetachedViewApp</code>)</td><td><code>open_detached_window</code> → <code>lib.rs</code></td><td>Komp. 2.1</td></tr>
-            <tr><td>Theme-Toggle (Sonne/Mond)</td><td>Klick</td><td><code>setTheme</code> → <code>settingsStore</code> → <code>useThemeEffect</code> → <code>&lt;html&gt;.classList</code> <code>dark</code></td><td>— (FE + Persist)</td><td>6.2</td></tr>
-            <tr><td>Versions-Badge</td><td>Klick</td><td><code>handleVersionClick</code> — status-abhängig: <code>checkForUpdate</code> / Installations-Toast / Restart-Toast</td><td>Plugin <code>updater.check</code></td><td>6.5</td></tr>
-            <tr><td>Favorit hinzufügen</td><td>Klick</td><td><code>handleAddFavorite</code> → Dialog <code>open()</code> → <code>addFavorite</code> → <code>saveFavoritesFile</code> → <code>invoke("save_favorites_file")</code></td><td><code>save_favorites_file</code> → <code>settings.rs</code></td><td>6.2</td></tr>
-            <tr><td>Notiz bearbeiten (NotesPanel)</td><td>Eingabe</td><td><code>setProjectNotes</code>/<code>setGlobalNotes</code> → <code>set(...)</code> + <code>debouncedSaveNoteFile</code> (800&nbsp;ms) → <code>invoke("save_note_file")</code></td><td><code>save_note_file</code> → <code>settings.rs</code></td><td>6.2</td></tr>
-            <tr><td>Einstellung ändern (Preferences-Panels)</td><td>Select / Checkbox</td><td><code>setPreferences(partial)</code> → <code>settingsStore</code> → Persist + <code>broadcastPreferencesChange</code> → <code>emit("preferences-changed")</code></td><td>ggf. <code>set_file_logging_enabled</code> → <code>lib.rs</code></td><td>6.8</td></tr>
-            <tr><td>Default-Projektordner wählen</td><td>Klick</td><td><code>handlePickFolder</code> → Dialog <code>open({directory})</code> → <code>setDefaultProjectPath</code></td><td>Plugin <code>dialog.open</code></td><td>6.2</td></tr>
-            <tr><td>GitHub-Viewer: Laden</td><td>Mount / Refresh</td><td><code>load()</code> → Cache (60&nbsp;s) → <code>Promise.allSettled</code> [<code>get_git_info</code>, <code>Promise.all</code>[<code>get_github_prs</code>, <code>get_github_issues</code>]]</td><td>3× → <code>github/commands.rs</code></td><td>6.4</td></tr>
-            <tr><td>(Rückkanal) Fenster schliessen</td><td>OS-Event</td><td><code>onCloseRequested</code> → <code>flushPendingSaves</code> → sofortiges Schreiben pendenter Debounces (Settings + Notizen). Favoriten werden ohnehin synchron gespeichert.</td><td><code>save_user_settings</code>, <code>save_note_file</code> → <code>settings.rs</code></td><td>6.2</td></tr>
+            <tr><th>Bereich</th><th>UI-Element / Auslöser</th><th>IPC-Command</th><th>Sequenz</th></tr>
+            <tr><td>Session-Manager</td><td>„Neue Session“ / Favoriten-Play / „Resume“</td><td><code>create_session</code></td><td>6.1</td></tr>
+            <tr><td>Session-Manager</td><td>Schliessen-Button (Karte)</td><td><code>close_session</code></td><td>6.1</td></tr>
+            <tr><td>Session-Manager</td><td>Terminal-Eingabe / Resize</td><td><code>write_session</code> · <code>resize_session</code></td><td>6.1</td></tr>
+            <tr><td>Session-Manager</td><td>Diff-Button (Karte / Grid)</td><td><code>open_session_diff_window</code></td><td>6.7</td></tr>
+            <tr><td>Session-Manager</td><td>Ordner-/Terminal-Button</td><td><code>open_folder_in_explorer</code> · <code>open_terminal_in_folder</code></td><td>2.2</td></tr>
+            <tr><td>Session-Manager</td><td>Karte/Titel/Layout/Grid (Klick, Rename)</td><td>— (FE)</td><td>7.1</td></tr>
+            <tr><td>Session-Manager</td><td>(Rückkanal) Output / Status / Exit / Claude-ID</td><td><code>emit session-*</code></td><td>6.1 · 6.9</td></tr>
+            <tr><td>Config-Panel</td><td>Tab-Sichtbarkeit (Mount / Folder-Wechsel)</td><td><code>resolve_project_root</code> + Reader×5</td><td>6.3</td></tr>
+            <tr><td>Config-Panel</td><td>ClaudeMd-/PinnedDoc-Viewer laden</td><td><code>read_project_file</code></td><td>6.3</td></tr>
+            <tr><td>Config-Panel</td><td>ClaudeMd-/PinnedDoc-Viewer speichern (Ctrl+S)</td><td><code>write_project_file</code></td><td>6.6</td></tr>
+            <tr><td>Config-Panel</td><td>Skills-/Agents-/Hooks-/Settings-Viewer laden</td><td><code>list_skill_dirs</code> · <code>read_user_claude_file</code></td><td>6.3</td></tr>
+            <tr><td>Config-Panel</td><td>Worktree-Viewer laden</td><td><code>scan_worktrees</code></td><td>2.2</td></tr>
+            <tr><td>Config-Panel</td><td>History-Viewer: Resume / Löschen</td><td><code>create_session</code> · <code>delete_claude_session</code></td><td>6.1 · 6.3</td></tr>
+            <tr><td>Kanban</td><td>Board laden / Projekt-Picker / Refresh</td><td><code>list_user_projects</code> · <code>get_project_board</code></td><td>6.4</td></tr>
+            <tr><td>Kanban</td><td>Karte in andere Lane ziehen</td><td><code>move_project_item</code></td><td>6.4</td></tr>
+            <tr><td>Kanban</td><td>Detail-Modal öffnen</td><td><code>get_issue_detail</code> · <code>get_issue_checks</code></td><td>6.4</td></tr>
+            <tr><td>Kanban</td><td>Kommentar abschicken (Ctrl+Enter)</td><td><code>post_issue_comment</code></td><td>6.4</td></tr>
+            <tr><td>Library</td><td>LibraryView: Konfiguration scannen</td><td><code>read_user_claude_file</code> · <code>list_user_claude_dir</code></td><td>6.3</td></tr>
+            <tr><td>Library</td><td>LibraryViewer: Items laden</td><td><code>list_library_items</code> · <code>rebuild_library_index</code></td><td>2.2</td></tr>
+            <tr><td>Library</td><td>Item erstellen / lesen</td><td><code>save_library_item</code> · <code>read_library_item</code></td><td>6.6</td></tr>
+            <tr><td>Library</td><td>Verknüpfen / Trennen / Löschen</td><td><code>attach_library_item</code> · <code>detach_library_item</code> · <code>delete_library_item</code></td><td>7.1</td></tr>
+            <tr><td>Editor</td><td>Öffnen / Speichern (Ctrl+S)</td><td><code>read_project_file</code> · <code>write_project_file</code></td><td>6.3 · 6.6</td></tr>
+            <tr><td>Logs</td><td>Refresh (Backend-Logs lesen)</td><td><code>read_backend_log</code></td><td>7.1</td></tr>
+            <tr><td>Logs</td><td>Log-Fenster öffnen</td><td><code>open_log_window</code></td><td>2.2</td></tr>
+            <tr><td>Diff-Fenster</td><td>Laden / Refresh (auf Fokus)</td><td><code>get_session_diff</code></td><td>6.7</td></tr>
+            <tr><td>Diff-Fenster</td><td>(Rückkanal) Session beendet</td><td><code>emit session-deleted/&lt;id&gt;</code></td><td>6.7</td></tr>
+            <tr><td>Shell &amp; Settings</td><td>Tab-Rechtsklick → „In eigenem Fenster“</td><td><code>open_detached_window</code></td><td>2.2</td></tr>
+            <tr><td>Shell &amp; Settings</td><td>Theme / Favorit / Notiz / Default-Ordner</td><td><code>save_favorites_file</code> · <code>save_note_file</code></td><td>6.2</td></tr>
+            <tr><td>Shell &amp; Settings</td><td>Einstellung ändern (Preferences)</td><td><code>set_file_logging_enabled</code> · <code>emit preferences-changed</code></td><td>6.8</td></tr>
+            <tr><td>Shell &amp; Settings</td><td>GitHub-Viewer laden</td><td><code>get_git_info</code> · <code>get_github_prs</code> · <code>get_github_issues</code></td><td>6.4</td></tr>
           </table>
           <div class="note">
             <strong>Muster-Befund aus der Trace-Analyse:</strong> Config-Panel-Viewer halten ihren State
@@ -803,7 +801,7 @@ sequenceDiagram
   ST->>PM: State-Update
   PM->>TS: setItem(key, json) — 300 ms-Debounce
   TS->>IPC: invoke("save_user_settings")
-  IPC->>FS: settings.json schreiben (Documents/AgenticExplorer/)
+  IPC->>FS: settings.json schreiben (Documents/Smashq/)
 
   Note over C,FS: Favoriten — direkter Pfad (umgeht persist, eigene Datei)
   User->>C: Favorit hinzufügen
@@ -817,7 +815,7 @@ sequenceDiagram
   ST->>IPC: invoke("save_note_file", {noteKey, content})
   IPC->>FS: Notiz-Datei schreiben
 
-  Note over ST,FS: Beim Start: initTauriStorage() lädt parallel<br/>load_user_settings + load_favorites_file + load_notes;<br/>danach getItem (sync, aus Cache) → migrate() + onRehydrateStorage()
+  Note over ST,FS: Beim Start: initTauriStorage() lädt parallel<br/>load_user_settings + load_favorites_file + load_notes,<br/>danach getItem (sync, aus Cache) → migrate() + onRehydrateStorage()
   Note over TS: Beim App-Close: flushPendingSaves() leert die Debounce-Queue
             </pre>
           </div>
@@ -843,7 +841,7 @@ sequenceDiagram
   FR-->>CD: Rohdaten
   CD->>CD: parse Skills · Agents · Hooks + settingsRaw bewahren
   CD->>CP: ScopeConfig → Render
-  Note over CD: Orthogonale Flows: discoverGlobal() liest via<br/>read_user_claude_file + list_user_claude_dir aus ~/.claude/;<br/>discoverFavorites(folders[]) scannt mehrere Projekte parallel
+  Note over CD: Orthogonale Flows: discoverGlobal() liest via<br/>read_user_claude_file + list_user_claude_dir aus ~/.claude/,<br/>discoverFavorites(folders[]) scannt mehrere Projekte parallel
             </pre>
           </div>
 
@@ -14665,7 +14663,7 @@ html.reduce-motion *, html.reduce-motion ::before, html.reduce-motion ::after { 
         </section>
 
         <footer>
-          AgenticExplorer Developer Documentation · App-Version 1.6.32 · Stand 2026-05-27 ·
+          Smashq Developer Documentation · App-Version 1.6.32 · Stand 2026-05-27 ·
           8 Sektionen inkl. UI-Flow-Referenz (5) &amp; 9 Laufzeit-Diagrammen (6) ·
           Diagramme: Mermaid.js · Diese Datei ist self-contained — einfach im Browser öffnen.
         </footer>
@@ -14725,9 +14723,18 @@ html.reduce-motion *, html.reduce-motion ::before, html.reduce-motion ::after { 
       }
 
       // Diagramme passend zum aktuellen Theme (neu) rendern.
-      function renderDiagrams() {
+      // WICHTIG: pro Diagramm einzeln UND sequenziell rendern.
+      // (1) mermaid.run() ueber alle Nodes bricht beim ersten Parse-Fehler ab
+      //     (zwei Quell-Diagramme haben Syntaxfehler) — das wuerde die restlichen
+      //     Diagramme UND das Pan/Zoom-Setup verschlucken. Einzel-Render isoliert.
+      // (2) Parallele run()-Aufrufe (Promise.all) triggern in Mermaid v11 eine
+      //     Race um internen Mess-Scratch im DOM — manche Sequence-/Class-
+      //     Diagramme kamen dann als leeres <svg> heraus. Sequenziell (await in
+      //     Reihe) rendern alle Diagramme deterministisch durch.
+      async function renderDiagrams() {
         const dark = isDark();
-        document.querySelectorAll(".diagram .mermaid").forEach((el, i) => {
+        const nodes = [...document.querySelectorAll(".diagram .mermaid")];
+        nodes.forEach((el, i) => {
           el.removeAttribute("data-processed");
           el.textContent = SOURCES[i];
         });
@@ -14738,7 +14745,19 @@ html.reduce-motion *, html.reduce-motion ::before, html.reduce-motion ::after { 
           sequence: { useMaxWidth: true },
           flowchart: { useMaxWidth: true, htmlLabels: true },
         });
-        return mermaid.run();
+        for (const el of nodes) {
+          try {
+            await mermaid.run({ nodes: [el] });
+          } catch (err) {
+            // Fehlerhaftes Quell-Diagramm: sichtbaren Hinweis statt stiller Leere.
+            el.innerHTML =
+              '<pre style="white-space:pre-wrap;color:var(--text-faint);' +
+              'font-family:var(--mono);font-size:12px;margin:0">' +
+              "Diagramm konnte nicht gerendert werden:\n" +
+              String(err && err.message ? err.message : err).replace(/[<>&]/g, "") +
+              "</pre>";
+          }
+        }
       }
 
       function applyTheme(theme) {
@@ -14764,132 +14783,224 @@ html.reduce-motion *, html.reduce-motion ::before, html.reduce-motion ::after { 
       document.getElementById("theme-toggle").addEventListener("click", () => {
         closeZoom();
         applyTheme(isDark() ? "light" : "dark");
-        renderDiagrams();
+        renderDiagrams().then(setupPanZoom).catch(setupPanZoom);
       });
 
-      renderDiagrams().then(setupZoom);
+      renderDiagrams().then(setupPanZoom).catch(setupPanZoom);
 
-      /* ---- Zoom: SVG-Resize statt CSS-scale → gestochen scharfer Text ---- */
-      const overlay = document.getElementById("zoom-overlay");
-      const stage = document.getElementById("zoom-stage");
-      let activeSvg = null;
-      let activeHome = null;
-      let baseW = 0;
-      let baseH = 0;
-      let scale = 1;
-      let tx = 0;
-      let ty = 0;
-      let dragging = false;
-      let startX = 0;
-      let startY = 0;
+      /* ====================================================================
+         In-Place Pan/Zoom via svg-pan-zoom (CDN).
+         Wheel-Scroll-Entscheidung: mouseWheelZoomEnabled = FALSE in-place,
+         damit das Mausrad in diesem langen Dokument NIEMALS das Seiten-Scroll
+         kapert. Zoom laeuft ueber die +/- Control-Icons, Pan ueber Ziehen.
+         Im Fullscreen-Overlay ist Wheel-Zoom dagegen aktiv (kein Seiten-Scroll
+         dahinter, das es stoeren koennte).
+         ==================================================================== */
 
-      function apply() {
-        stage.style.transform = "translate(" + tx + "px," + ty + "px)";
-        // Zoom = echte SVG-Breite ändern → Vektor wird neu gerastert, kein Pixelmatsch.
-        if (activeSvg) activeSvg.style.width = baseW * scale + "px";
+      // Instanzen merken, damit wir sie beim Re-Render (Theme-Wechsel) zerstoeren.
+      let inPlaceInstances = [];
+      let panZoomObserver = null;
+
+      function destroyInPlace() {
+        inPlaceInstances.forEach((inst) => {
+          try {
+            inst.destroy();
+          } catch (e) {
+            /* Instanz evtl. schon entfernt — ignorieren */
+          }
+        });
+        inPlaceInstances = [];
+        if (panZoomObserver) {
+          panZoomObserver.disconnect();
+          panZoomObserver = null;
+        }
+        // Stale "panzoom-ready"-Klassen entfernen: sonst ueberspringt der
+        // Observer beim Re-Render (Theme-Wechsel) die Re-Initialisierung, weil
+        // er die Diagramme faelschlich fuer schon-initialisiert haelt.
+        document
+          .querySelectorAll(".diagram.panzoom-ready")
+          .forEach((d) => d.classList.remove("panzoom-ready"));
       }
 
+      // Einzelnes Diagramm mit svg-pan-zoom ausstatten. Wird LAZY aufgerufen,
+      // sobald das Diagramm sichtbar ist — denn nur ein gerendertes (gepaintetes)
+      // SVG liefert eine finite getBBox(). Bei einem Off-Screen-SVG ist die BBox
+      // 0x0, svg-pan-zoom rechnet daraus 1/0 = Infinity und wirft "Failed to set
+      // 'a' on SVGMatrix". Lazy-Init via IntersectionObserver umgeht das sauber.
+      function initOne(svg, d) {
+        if (!svg.isConnected) return false;
+        // Vorab-Check: ohne finite, nicht-leere BBox wuerde svg-pan-zoom eine
+        // non-finite Matrix erzeugen. Dann gar nicht erst initialisieren (sonst
+        // bliebe ein verwaister Viewport-<g> zurueck) — Aufrufer re-observed.
+        let bb;
+        try {
+          bb = svg.getBBox();
+        } catch (e) {
+          return false;
+        }
+        if (!bb || !isFinite(bb.width) || !isFinite(bb.height) || bb.width < 1 || bb.height < 1) {
+          return false;
+        }
+        try {
+          const inst = svgPanZoom(svg, {
+            zoomEnabled: true,
+            controlIconsEnabled: true,
+            panEnabled: true,
+            dblClickZoomEnabled: true,
+            mouseWheelZoomEnabled: false, // Seiten-Scroll nicht kapern
+            fit: true,
+            center: true,
+            minZoom: 0.3,
+            maxZoom: 12,
+            zoomScaleSensitivity: 0.3,
+          });
+          inPlaceInstances.push(inst);
+          d.classList.add("panzoom-ready");
+          return true;
+        } catch (e) {
+          // Degenerierte Geometrie: dieses eine Diagramm ohne Pan/Zoom lassen,
+          // ohne die anderen mitzureissen.
+          return false;
+        }
+      }
+
+      function setupPanZoom() {
+        destroyInPlace();
+        panZoomObserver = new IntersectionObserver(
+          (entries, obs) => {
+            entries.forEach((entry) => {
+              if (!entry.isIntersecting) return;
+              const d = entry.target;
+              if (d.classList.contains("panzoom-ready")) {
+                obs.unobserve(d);
+                return;
+              }
+              const svg = d.querySelector(".mermaid svg");
+              if (!svg) {
+                obs.unobserve(d);
+                return;
+              }
+              // initOne erst nach einem Layout-Frame, damit das jetzt sichtbare
+              // SVG bereits gepaintet ist und eine finite BBox liefert. Schlaegt
+              // es trotzdem fehl (BBox noch 0), bleibt d beobachtet und wird beim
+              // naechsten Intersection-Tick erneut versucht.
+              requestAnimationFrame(() => {
+                if (initOne(svg, d)) obs.unobserve(d);
+              });
+            });
+          },
+          { rootMargin: "200px 0px" } // knapp vor Sichtbarkeit initialisieren
+        );
+
+        // Nur echte Mermaid-Diagramme (.mermaid svg) — nicht die Screenshot-/
+        // Iframe-Showcases, die ebenfalls .diagram heissen.
+        document.querySelectorAll(".diagram .mermaid").forEach((m) => {
+          const svg = m.querySelector("svg");
+          if (!svg) return;
+          const d = m.closest(".diagram");
+          if (!d) return;
+
+          // Vergroessern-Button (Fullscreen-Affordance) sicherstellen.
+          if (!d.querySelector(".zoom-btn")) {
+            const btn = document.createElement("button");
+            btn.className = "zoom-btn";
+            btn.type = "button";
+            btn.textContent = "Vergroessern";
+            btn.addEventListener("click", (e) => {
+              e.stopPropagation();
+              openZoom(d);
+            });
+            d.appendChild(btn);
+          }
+
+          // SVG in einen dimensionierten Viewport huellen (Gotcha: useMaxWidth).
+          let vp = svg.parentElement;
+          if (!vp || !vp.classList.contains("panzoom-viewport")) {
+            vp = document.createElement("div");
+            vp.className = "panzoom-viewport";
+            svg.parentNode.insertBefore(vp, svg);
+            vp.appendChild(svg);
+          }
+          // Mermaid setzt max-width + width:100% ohne height — explizit 100%/100%,
+          // damit das SVG den dimensionierten Viewport fuellt.
+          svg.style.maxWidth = "none";
+          svg.style.width = "100%";
+          svg.style.height = "100%";
+
+          panZoomObserver.observe(d);
+        });
+      }
+
+      /* ---- Fullscreen-Overlay: gleiche Engine, aber mit Wheel-Zoom ---- */
+      const overlay = document.getElementById("zoom-overlay");
+      const stage = document.getElementById("zoom-stage");
+      let overlaySvg = null;
+      let overlayHome = null;
+      let overlayInst = null;
+
       function openZoom(diagram) {
-        if (activeSvg) return; // bereits ein Diagramm offen
+        if (overlaySvg) return; // bereits offen
         const svg = diagram.querySelector("svg");
         if (!svg) return;
-        // Original-SVG verschieben (kein Klon) — bewahrt Mermaids id-skopierte Styles.
-        activeSvg = svg;
-        activeHome = svg.parentElement;
+
+        // In-Place-Instanz dieses SVGs zuerst loesen, sonst doppelte Bindung.
+        overlaySvg = svg;
+        overlayHome = svg.parentElement; // .panzoom-viewport
         svg.dataset.prevMaxWidth = svg.style.maxWidth || "";
         svg.dataset.prevWidth = svg.style.width || "";
         svg.dataset.prevHeight = svg.style.height || "";
-        const r = svg.getBoundingClientRect();
-        baseW = r.width;
-        baseH = r.height;
-        scale = 1;
-        svg.style.maxWidth = "none";
-        svg.style.height = "auto";
+
+        // SVG (Original, kein Klon) in die Buehne verschieben.
         stage.appendChild(svg);
+        svg.style.maxWidth = "none";
+        svg.style.width = "100%";
+        svg.style.height = "100%";
         overlay.classList.add("open");
-        tx = (overlay.clientWidth - baseW) / 2;
-        ty = (overlay.clientHeight - baseH) / 2;
-        apply();
+
+        overlayInst = svgPanZoom(svg, {
+          zoomEnabled: true,
+          controlIconsEnabled: true,
+          panEnabled: true,
+          dblClickZoomEnabled: true,
+          mouseWheelZoomEnabled: true, // Overlay: Wheel-Zoom erlaubt
+          fit: true,
+          center: true,
+          minZoom: 0.3,
+          maxZoom: 12,
+          zoomScaleSensitivity: 0.25,
+        });
       }
 
       function closeZoom() {
-        if (activeSvg) {
-          activeSvg.style.maxWidth = activeSvg.dataset.prevMaxWidth || "";
-          activeSvg.style.width = activeSvg.dataset.prevWidth || "";
-          activeSvg.style.height = activeSvg.dataset.prevHeight || "";
-          activeHome.appendChild(activeSvg);
-          activeSvg = null;
-          activeHome = null;
+        if (overlayInst) {
+          try {
+            overlayInst.destroy();
+          } catch (e) {
+            /* ignorieren */
+          }
+          overlayInst = null;
+        }
+        if (overlaySvg) {
+          overlaySvg.style.maxWidth = overlaySvg.dataset.prevMaxWidth || "";
+          overlaySvg.style.width = overlaySvg.dataset.prevWidth || "";
+          overlaySvg.style.height = overlaySvg.dataset.prevHeight || "";
+          overlayHome.appendChild(overlaySvg);
+          overlaySvg = null;
+          overlayHome = null;
+          // In-Place-Pan/Zoom fuer alle Diagramme neu aufsetzen
+          // (das zurueckverschobene SVG braucht wieder seine Instanz).
+          setupPanZoom();
         }
         overlay.classList.remove("open");
       }
 
-      function resetZoom() {
-        if (!activeSvg) return;
-        scale = 1;
-        tx = (overlay.clientWidth - baseW) / 2;
-        ty = (overlay.clientHeight - baseH) / 2;
-        apply();
-      }
-
-      function setupZoom() {
-        document.querySelectorAll(".diagram").forEach((d) => {
-          const btn = document.createElement("button");
-          btn.className = "zoom-btn";
-          btn.type = "button";
-          btn.textContent = "Vergroessern";
-          d.appendChild(btn);
-          d.addEventListener("click", () => openZoom(d));
-        });
-
-        overlay.addEventListener(
-          "wheel",
-          (e) => {
-            if (!activeSvg) return;
-            e.preventDefault();
-            const next = Math.min(
-              8,
-              Math.max(0.3, scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15))
-            );
-            const k = next / scale;
-            // Zoom zum Cursor: Punkt unter der Maus bleibt fix.
-            tx = e.clientX * (1 - k) + k * tx;
-            ty = e.clientY * (1 - k) + k * ty;
-            scale = next;
-            apply();
-          },
-          { passive: false }
-        );
-
-        overlay.addEventListener("mousedown", (e) => {
-          if (e.target.closest(".zoom-close")) return;
-          dragging = true;
-          startX = e.clientX - tx;
-          startY = e.clientY - ty;
-          overlay.classList.add("grabbing");
-        });
-        window.addEventListener("mousemove", (e) => {
-          if (!dragging) return;
-          tx = e.clientX - startX;
-          ty = e.clientY - startY;
-          apply();
-        });
-        window.addEventListener("mouseup", () => {
-          dragging = false;
-          overlay.classList.remove("grabbing");
-        });
-        stage.addEventListener("dblclick", resetZoom);
-        overlay
-          .querySelector(".zoom-close")
-          .addEventListener("click", closeZoom);
-        overlay.addEventListener("click", (e) => {
-          if (e.target === overlay) closeZoom();
-        });
-        document.addEventListener("keydown", (e) => {
-          if (e.key === "Escape" && overlay.classList.contains("open"))
-            closeZoom();
-        });
-      }
+      overlay.querySelector(".zoom-close").addEventListener("click", closeZoom);
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) closeZoom();
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && overlay.classList.contains("open")) closeZoom();
+      });
     </script>
   </body>
 </html>
