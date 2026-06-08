@@ -87,6 +87,65 @@ describe("TaskDetail — happy path (pane, open task)", () => {
   });
 });
 
+// ── Add subtask UX ─────────────────────────────────────────────────────
+
+describe("TaskDetail — add subtask (pane)", () => {
+  function renderOpen(): ReturnType<typeof vi.fn> {
+    const onUpdate = vi.fn();
+    render(
+      <TaskDetail
+        task={makeTask({ status: "open", subtasks: [] })}
+        mode="pane"
+        availableProjects={PROJECTS}
+        onUpdate={onUpdate}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+    return onUpdate;
+  }
+
+  it("adds a subtask when the + button is clicked", () => {
+    const onUpdate = renderOpen();
+    fireEvent.change(screen.getByPlaceholderText("Teilschritt"), {
+      target: { value: "Recherche" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Teilschritt hinzufügen" }),
+    );
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subtasks: expect.arrayContaining([
+          expect.objectContaining({ title: "Recherche", done: false }),
+        ]),
+      }),
+    );
+  });
+
+  it("adds a subtask when the input loses focus (blur saves)", () => {
+    const onUpdate = renderOpen();
+    const input = screen.getByPlaceholderText("Teilschritt");
+    fireEvent.change(input, { target: { value: "Notizen" } });
+    fireEvent.blur(input);
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subtasks: expect.arrayContaining([
+          expect.objectContaining({ title: "Notizen" }),
+        ]),
+      }),
+    );
+  });
+
+  it("does not add an empty subtask on blur", () => {
+    const onUpdate = renderOpen();
+    const input = screen.getByPlaceholderText("Teilschritt");
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.blur(input);
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+});
+
 // ── Edge case ──────────────────────────────────────────────────────────
 
 describe("TaskDetail — edge case (pane, done task)", () => {

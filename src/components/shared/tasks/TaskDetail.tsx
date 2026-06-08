@@ -142,31 +142,48 @@ interface AddSubtaskRowProps {
 
 function AddSubtaskRow({ onAdd }: AddSubtaskRowProps): JSX.Element {
   const [value, setValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
   const PlusIcon = ICONS.action.newSession;
 
-  const commit = (): void => {
+  // keepFocus: re-focus the input after an explicit add (+ click / Enter) so
+  // several steps can be typed in a row. On blur we commit but let focus go.
+  const commit = (keepFocus: boolean): void => {
     const trimmed = value.trim();
     if (!trimmed) return;
     onAdd(trimmed);
     setValue("");
+    if (keepFocus) inputRef.current?.focus();
   };
 
   return (
     <div className="flex items-center gap-1.5 py-1 text-[11.5px] text-neutral-500">
-      <PlusIcon className="w-3 h-3 shrink-0" aria-hidden="true" />
+      <button
+        type="button"
+        // preventDefault on mousedown keeps the input focused, so clicking the
+        // + does not fire the input's onBlur (which would double-commit).
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => commit(true)}
+        aria-label="Teilschritt hinzufügen"
+        className="shrink-0 rounded-sm text-neutral-500 hover:text-accent focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+      >
+        <PlusIcon className="w-3 h-3" aria-hidden="true" />
+      </button>
       <input
+        ref={inputRef}
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
-            commit();
+            commit(true);
           }
         }}
-        placeholder="+ Teilschritt"
+        // Commit on blur so a typed-but-not-Entered step is never lost.
+        onBlur={() => commit(false)}
+        placeholder="Teilschritt"
         className="flex-1 bg-transparent text-[11.5px] text-neutral-300 placeholder:text-neutral-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-inset rounded-sm"
-        aria-label="Teilschritt hinzufügen"
+        aria-label="Teilschritt eingeben"
       />
     </div>
   );
