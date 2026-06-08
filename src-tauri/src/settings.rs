@@ -1,5 +1,6 @@
 use crate::error::ADPError;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Settings directory: Documents/Smashq/
 fn settings_dir() -> Result<PathBuf, ADPError> {
@@ -37,12 +38,22 @@ fn sanitize_note_filename(folder_key: &str) -> String {
 
 /// Write data to a file atomically via a temp file + rename.
 /// This prevents corruption if the app crashes mid-write.
+///
+/// The temp filename is unique per call (process id + atomic counter) and lives
+/// in the SAME directory as the target, so the rename stays on one filesystem
+/// and concurrent writers (e.g. main + detached-tasks window) never collide on a
+/// shared temp path. Cleanup-on-failure removes only THIS call's temp.
 fn atomic_write(path: &Path, data: &str) -> Result<(), ADPError> {
-    let temp = path.with_extension("tmp");
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let temp = path.with_extension(format!(
+        "tmp.{}.{}",
+        std::process::id(),
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
     std::fs::write(&temp, data)
         .map_err(|e| ADPError::file_io(format!("Failed to write temp file: {}", e)))?;
     std::fs::rename(&temp, path).map_err(|e| {
-        // Clean up temp file on rename failure
+        // Clean up this call's unique temp file on rename failure
         let _ = std::fs::remove_file(&temp);
         ADPError::file_io(format!("Failed to rename temp to target: {}", e))
     })
@@ -316,7 +327,50 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let path = tmp.path().join("data.json");
         atomic_write(&path, "content").unwrap();
-        assert!(!path.with_extension("tmp").exists());
+        let leftover = std::fs::read_dir(tmp.path())
+            .unwrap()
+            .filter_map(Result::ok)
+            .any(|e| e.file_name().to_string_lossy().contains(".tmp"));
+        assert!(
+            !leftover,
+            "no .tmp file should remain after a successful write"
+        );
+    }
+
+    #[test]
+    fn atomic_write_is_concurrency_safe() {
+        use std::sync::Arc;
+        let tmp = TempDir::new().unwrap();
+        let path = Arc::new(tmp.path().join("tasks.json"));
+        let threads: Vec<_> = (0..16)
+            .map(|t| {
+                let path = Arc::clone(&path);
+                std::thread::spawn(move || {
+                    for i in 0..20 {
+                        let payload = format!("{{\"thread\":{},\"iter\":{}}}", t, i);
+                        atomic_write(&path, &payload).expect("atomic_write must succeed");
+                    }
+                })
+            })
+            .collect();
+        for h in threads {
+            h.join().unwrap();
+        }
+        // Final file must be valid (one full payload, never a partial/corrupt write).
+        let content = std::fs::read_to_string(path.as_path()).unwrap();
+        assert!(
+            content.starts_with("{\"thread\":") && content.ends_with('}'),
+            "final file must equal exactly one payload, got: {}",
+            content
+        );
+        // No leftover temp files from any of the racing writers.
+        let leftover: Vec<_> = std::fs::read_dir(tmp.path())
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|e| e.file_name().to_string_lossy().contains(".tmp"))
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        assert!(leftover.is_empty(), "leftover temp files: {:?}", leftover);
     }
 
     // --- create_backup ---
