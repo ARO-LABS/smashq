@@ -1,6 +1,6 @@
-# AgenticExplorer Design System
+# Smashq Design System
 
-Design system for **AgenticExplorer** — a Tauri v2 + React desktop application for managing and monitoring multiple Claude CLI sessions. Multi-session terminal with project context tabs, favorites, pipeline visualization, and notes. Built for developers who run many Claude CLI sessions in parallel.
+Design system for **Smashq** — a Tauri v2 + React desktop application for managing and monitoring multiple Claude CLI sessions. Multi-session terminal with project context tabs, favorites, pipeline visualization, and notes. Built for developers who run many Claude CLI sessions in parallel.
 
 > **Tone summary:** German UI, English code. Terse, technical, monospace-adjacent. Dense information. Sharp corners. Dark-mode-native with a first-class light theme. One accent color (cyan-teal, hue 190), high-contrast neutrals, semantic colors used structurally never decoratively.
 
@@ -208,7 +208,7 @@ Design system for **AgenticExplorer** — a Tauri v2 + React desktop application
 
 | Product | Path | What it covers |
 |---------|------|----------------|
-| AgenticExplorer Desktop | [`ui-kit/`](ui-kit/) | Full desktop shell with SideNav, interactive Sessions view (click to activate, hover actions), Pipeline live tab with task tree, Kanban board |
+| Smashq Desktop | [`ui-kit/`](ui-kit/) | Full desktop shell with SideNav, interactive Sessions view (click to activate, hover actions), Pipeline live tab with task tree, Kanban board |
 
 ---
 

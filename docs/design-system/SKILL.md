@@ -1,6 +1,6 @@
 ---
-name: agentic-explorer-design
-description: Use this skill to generate well-branded interfaces and assets for AgenticExplorer (a Tauri + React desktop app for managing Claude CLI sessions), either for production or throwaway prototypes/mocks/etc. Contains essential design guidelines, colors, type, fonts, assets, and UI kit components for prototyping.
+name: smashq-design
+description: Use this skill to generate well-branded interfaces and assets for Smashq (a Tauri + React desktop app for managing Claude CLI sessions), either for production or throwaway prototypes/mocks/etc. Contains essential design guidelines, colors, type, fonts, assets, and UI kit components for prototyping.
 user-invocable: true
 ---
 

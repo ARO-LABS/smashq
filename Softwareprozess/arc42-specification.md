@@ -1,15 +1,15 @@
-# AgenticExplorer — arc42 Architektur-Dokumentation
+# Smashq — arc42 Architektur-Dokumentation
 
-**Version**: 2.1 (Product-Owner-Feedback integriert, Testing-Strategie, Workflow)
-**Stand**: 2026-04-04
-**App-Version**: v1.4.0
-**Methode**: Retroaktive Spezifikation + Zukunfts-Vision (3-Runden Spezialisten-Review)
+**Version**: 3.0 (Smashq-Rebrand: Name und Roadmap-Vision auf realen 1.0.0-Stand abgeglichen)
+**Stand**: 2026-06-08
+**App-Version**: 1.0.0 (Smashq — Versionierung beim Rebrand neu gestartet; zuvor AgenticExplorer v1.x)
+**Methode**: Retroaktive Spezifikation + Roadmap-Vision (urspruenglich 3-Runden Spezialisten-Review, 2026-04 als AgenticExplorer; Rebrand-Abgleich 2026-06)
 
 ---
 
 ## 1. Einführung und Ziele
 
-### 1.1 Aufgabenstellung — Vom IDE-Copiloten zum AgenticExplorer
+### 1.1 Aufgabenstellung — Vom IDE-Copiloten zum Session-Kontrollraum
 
 **Der Paradigmenwechsel:**
 
@@ -23,24 +23,22 @@ Die Arbeit mit KI hat sich fundamental verändert. Früher war der IDE-Copilot e
 - Keine Visualisierung, was gerade parallel läuft
 - Skills/Hooks in `.claude/` versteckt — jedes Mal manuell öffnen
 
-**Die Vision:**
+**Was Smashq 1.0.0 ist:**
 
-> AgenticExplorer ist der **Kontrollraum für agentic Development**. Nicht nur Sessions verwalten, sondern echte Pipeline-Transparenz: Alle laufenden Agenten sehen (Hierarchie, Status, Token-Verbrauch), alle Workflows visualisieren, Code-Komplexität rasch erfassbar machen. Die Evolution von der IDE mit AI-Assistent hin zum vollständigen Orchestrierungs- und Monitoring-Tool für CLI-basierte LLM-Agenten.
+> Smashq ist der **Kontrollraum für parallele Claude-CLI-Sessions**: Multi-Session-Terminal mit Projekt-Kontext, Agent-Erkennung aus dem PTY-Output (Hierarchie, Task-Tree), Kanban-/Pipeline-Sicht, GitHub-Integration (via `gh` CLI) und Notizen. Der Session Manager ist mit 1.0.0 **feature-complete und eingefroren** — nur noch Bugfixes.
 
-**Roadmap-Vision:**
+**Vision (offen, nicht committed):** Die weitergehende Idee — vollständige Pipeline-Orchestrierung, Multi-LLM-Abstraktion, persistente Audit-Trails — ist als Roadmap dokumentiert (§4.3), war jedoch die Vision der Vor-Rebrand-Linie (AgenticExplorer) und ist **nicht Teil von 1.0.0**. Das nächste Major-Release ist offen und wird separat geplant.
+
+**Roadmap (real):**
 
 ```mermaid
 graph LR
-    A["v1.0–v1.2<br/>Session Manager MVP<br/>(Terminal, CLAUDE.md, GitHub)"] -->|Transparenz| B["v1.3–v1.4<br/>Agent Detection<br/>(Hierarchie, Task-Tree)"]
-    B -->|Feature-Freeze v1.6| C["v2.0<br/>Pipeline Control<br/>(Workflow-Start, Parallel Tracking)"]
-    C -->|Audit| D["v2.5<br/>Team Features<br/>(Multi-User, Audit-Logs)"]
-    D -->|Orchestrierung| E["v3.0+<br/>AgenticExplorer<br/>(Volle Orchestrierung,<br/>Code-Simplification)"]
+    A["AgenticExplorer v1.x<br/>(2026-04, Vor-Rebrand)<br/>Session Manager + Agent-Detection"] -->|Rebrand + Versions-Reset| B["Smashq 1.0.0<br/>(2026-06, Initial Release)<br/>Session Manager feature-frozen"]
+    B -.->|offen, nicht committed| C["Naechstes Major<br/>Roadmap offen<br/>(Vision-Backlog: Pipeline-Orchestrierung -> Paragraph 4.3)"]
 
-    style A fill:#e1f5ff
-    style B fill:#f3e5f5
-    style C fill:#fff3e0
-    style D fill:#f1f8e9
-    style E fill:#ffe0b2
+    style A fill:#eeeeee
+    style B fill:#e1f5ff
+    style C fill:#fff3e0,stroke-dasharray: 5 5
 ```
 
 ### 1.2 Qualitätsziele
@@ -62,6 +60,8 @@ graph LR
 | **Team-Lead (NEU)** | Agile/DevOps Lead | Wissen wer läuft, was parallel passiert, Bottlenecks erkennen | Cross-Session Agent-Überwachung; Activity-Timeline |
 | **Security-Reviewer (NEU)** | Security/Compliance | Agent-Aktionen auditieren, Compliance-Verstöße erkennen | Audit-Trail; Agent-Action-Log; Approval-Workflow |
 | **Entwicklungs-Team** | Maintainer | Wartbarkeit, klare Architektur, automatisierte QA | Klare Separation: Agent-Detection vs. UI |
+
+> Die Spalte **„Neu in Vision"** spiegelt die ursprüngliche AgenticExplorer-Vision (§4.3). Smashq 1.0.0 ist als Session Manager feature-eingefroren — nicht alle Vision-Erwartungen sind enthalten; Team-/Audit-/Approval-Aspekte zählen zum offenen Backlog.
 
 ---
 
@@ -98,7 +98,7 @@ graph LR
 ```mermaid
 graph LR
     Developer["Developer<br/>(Henrik/Clara)"]
-    App["AgenticExplorer<br/>(Tauri v2 Desktop)"]
+    App["Smashq<br/>(Tauri v2 Desktop)"]
     Claude["Claude CLI<br/>(PTY Process)"]
     GitHub["GitHub<br/>(gh CLI)"]
     FileSystem["Dateisystem<br/>(.claude/ AppData)"]
@@ -169,7 +169,7 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph System["AgenticExplorer (Desktop App)"]
+    subgraph System["Smashq (Desktop App)"]
         App["Tauri v2 Application"]
     end
 
@@ -219,7 +219,9 @@ graph TB
 - **Manager Pattern**: `SessionManager` hält `HashMap<String, SessionHandle>` mit `Arc<Mutex<>>`
 - **Ephemeraler vs. Persistierter State**: `sessionStore` (flüchtig) vs. `settingsStore` (mit Backup)
 
-### 4.3 Evolutionsstrategie — IST zu ZUKUNFT
+### 4.3 Evolutionsstrategie — Vision-Backlog (Stand 2026-04, nicht aktiv verfolgt)
+
+> **Status nach Rebrand (2026-06):** Die unten dokumentierte v2.0–v3.0-Roadmap war die Vision der AgenticExplorer-Linie. Mit dem Rebrand zu Smashq wurde die Versionierung auf **1.0.0 zurückgesetzt** und der Session Manager **feature-eingefroren** (nur Bugfixes). Die Pipeline-/Cloud-/Multi-LLM-Stufen wurden **nicht** weiterverfolgt; das nächste Major-Release ist offen. Die folgenden PO-Entscheidungen und das Stufendiagramm bleiben als **historische Architektur-Vision** erhalten — sie beschreiben das ursprüngliche „Warum", nicht den aktuell committeten Plan.
 
 > **PO-Entscheidung (2026-04-04):** Cloud-Backend und Gamification nach v3.0+ verschoben. Fundament zuerst. Multi-LLM-Abstraktionsschicht in v2.5. App bleibt 100% lokal bis v3.0.
 >
@@ -807,7 +809,7 @@ Backend: Rust `log` + `env_logger` nach `<AppData>/agentic-explorer.log`.
 
 ```mermaid
 graph TD
-    Q["AgenticExplorer Qualitaet"]
+    Q["Smashq Qualitaet"]
 
     Q --> R["Zuverlaessigkeit"]
     Q --> S["Sicherheit"]
@@ -1049,7 +1051,7 @@ graph LR
 
 #### MCP-Server fuer Testing
 
-| MCP-Server | Nutzen fuer AgenticExplorer | Einschraenkung |
+| MCP-Server | Nutzen fuer Smashq | Einschraenkung |
 |------------|---------------------------|----------------|
 | Playwright MCP | Visuelles Regressions-Testing gegen Dev-Server (`:5173`) | Nur WebView, nicht native Shell |
 | GitHub MCP | CI-Status pruefen, Test-Ergebnisse abfragen | Kein direktes Testing |
@@ -1201,6 +1203,8 @@ classDiagram
 ---
 
 ## Anhang A: Funktionale Anforderungen
+
+> Die `vX`-Tags der Unterabschnitte bezeichnen die **Einführungs-Meilensteine der AgenticExplorer-Linie** (2026-04). Mit dem Rebrand sind sie **vollständig in Smashq 1.0.0 konsolidiert** — es handelt sich nicht um separate Smashq-Releases.
 
 ### A.1 Session Management (v1.0.0)
 

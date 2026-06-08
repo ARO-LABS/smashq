@@ -8,7 +8,7 @@
 
 **Language**: UI und Doku auf Deutsch, Code auf Englisch
 
-> **Feature-Freeze (ab v1.6.0):** Session Manager ist feature-complete. Nur Bugfixes. Roadmap fuer das naechste Major-Release ist offen — neue Features werden separat geplant.
+> **Feature-Freeze:** Session Manager ist feature-complete (uebernommen aus der AgenticExplorer-v1.6.x-Linie; Smashq setzt die Versionierung beim Rebrand neu auf 1.0.0). Nur Bugfixes. Roadmap fuer das naechste Major-Release ist offen — neue Features werden separat geplant.
 
 ## Commands
 
