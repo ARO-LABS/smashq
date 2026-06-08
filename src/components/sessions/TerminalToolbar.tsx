@@ -17,7 +17,7 @@ interface TerminalToolbarProps {
 /**
  * Floating overlay-toolbar — reclaimed vertical space by removing the dedicated
  * 36px horizontal bar above the terminal. Sits absolute-positioned top-right
- * inside the terminal container with opacity-60 at rest (unobtrusive) and
+ * inside the terminal container with opacity-80 at rest (unobtrusive) and
  * opacity-100 on hover (full visibility). All controls (branch-chip, config-
  * toggle, layout-toggle) fit in a single rounded-md pill.
  *
@@ -38,7 +38,7 @@ export function TerminalToolbar({
 
   return (
     <div
-      className="absolute top-2 right-2 z-10 flex items-center gap-1 px-1 py-0.5 rounded-md bg-surface-base shadow-hairline opacity-60 hover:opacity-100 transition-opacity"
+      className="absolute top-2 right-2 z-10 flex items-center gap-1 px-1 py-0.5 rounded-md bg-surface-base shadow-hairline opacity-80 hover:opacity-100 transition-opacity"
       data-testid="terminal-toolbar"
     >
       {/* Git cluster: branch chip + diff button */}

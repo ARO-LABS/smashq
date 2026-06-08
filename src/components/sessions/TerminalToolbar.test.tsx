@@ -28,6 +28,8 @@ describe("TerminalToolbar (floating overlay variant)", () => {
     expect(overlay.className).toContain("absolute");
     expect(overlay.className).toContain("top-2");
     expect(overlay.className).toContain("right-2");
+    // Default at-rest opacity is 80 (full on hover).
+    expect(overlay.className).toContain("opacity-80");
   });
 
   it("does not render title or grid-count (signal lives in sidebar/segmented-control)", () => {
