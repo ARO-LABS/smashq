@@ -185,3 +185,18 @@ export function structuredToUnified(e: StructuredEntry): Omit<UnifiedLogEntry, "
   const source: LogSource = e.source === "backend" ? "backend" : "frontend";
   return { timestamp: e.ts, severity, source, module: e.module, message: e.message, stack: e.stack };
 }
+
+/** Format an ISO timestamp as local HH:MM:SS (no milliseconds). */
+export function formatTime(timestamp: string): string {
+  try {
+    const d = new Date(timestamp);
+    if (isNaN(d.getTime())) return timestamp.slice(11, 19);
+    return d.toLocaleTimeString("de-DE", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  } catch {
+    return timestamp.slice(11, 19);
+  }
+}
