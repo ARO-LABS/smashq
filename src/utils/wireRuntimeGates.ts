@@ -4,6 +4,7 @@ import { wireLoggingGate, wirePersistenceGate, flushFrontendLogs, logError } fro
 import { setPerfEnabled } from "./perfLogger";
 import { listenForPreferencesChanges, type BroadcastPartial } from "./preferencesBroadcast";
 import { useTasksStore, sanitizeTasks, type TaskItem } from "../store/tasksStore";
+import { setSuppressTasksPersist } from "../store/tasksStorage";
 import { broadcastTasksChange, listenForTasksChanges } from "./tasksBroadcast";
 
 /**
@@ -47,9 +48,15 @@ function applyRemotePartial(partial: BroadcastPartial): void {
 let applyingRemoteTasks = false;
 function applyRemoteTasks(tasks: TaskItem[]): void {
   applyingRemoteTasks = true;
+  // Suppress the persist write triggered by this setState: zustand persist
+  // calls tasksStorage.setItem synchronously inside setState, so wrapping the
+  // call covers it. The source window already wrote tasks.json — re-persisting
+  // here is a redundant concurrent write + double backup churn (Bug #4).
+  setSuppressTasksPersist(true);
   try {
     useTasksStore.setState({ tasks: sanitizeTasks(tasks) });
   } finally {
+    setSuppressTasksPersist(false);
     applyingRemoteTasks = false;
   }
 }
