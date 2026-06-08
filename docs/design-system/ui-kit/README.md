@@ -1,6 +1,6 @@
-# AgenticExplorer UI Kit
+# Smashq UI Kit
 
-High-fidelity React recreation of the AgenticExplorer desktop shell.
+High-fidelity React recreation of the Smashq desktop shell.
 
 ## Components
 

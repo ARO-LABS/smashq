@@ -1,4 +1,4 @@
-// Button.jsx — AgenticExplorer button
+// Button.jsx — Smashq button
 const AEButton = ({ variant = 'secondary', size = 'md', children, icon, onClick, disabled }) => {
   const styles = {
     primary: { bg: 'var(--color-success)', fg: 'oklch(12% 0.01 250)', border: 'transparent', weight: 700, tracking: '0.06em' },
