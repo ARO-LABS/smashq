@@ -104,6 +104,31 @@ describe("LogViewer", () => {
     expect(mockInvoke).toHaveBeenCalledWith("read_structured_log", { maxLines: 500 });
   });
 
+  it("renders the newest entry first (newest on top)", () => {
+    useLogViewerStore.getState().addEntries([
+      {
+        timestamp: "2025-01-15T10:30:00.000Z",
+        severity: "info",
+        source: "frontend",
+        message: "older entry",
+      },
+      {
+        timestamp: "2025-01-15T10:30:05.000Z",
+        severity: "info",
+        source: "frontend",
+        message: "newer entry",
+      },
+    ]);
+
+    render(<LogViewer />);
+    const older = screen.getByText("older entry");
+    const newer = screen.getByText("newer entry");
+    // newer must appear BEFORE older in the DOM → older follows newer.
+    expect(
+      newer.compareDocumentPosition(older) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("displays entry count correctly", () => {
     useLogViewerStore.getState().addEntries([
       {

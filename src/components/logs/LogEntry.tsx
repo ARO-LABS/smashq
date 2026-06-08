@@ -1,6 +1,10 @@
 import { memo, useState } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
-import type { GroupedLogEntry, LogSeverity } from "../../store/logViewerStore";
+import {
+  formatTime,
+  type GroupedLogEntry,
+  type LogSeverity,
+} from "../../store/logViewerStore";
 
 const severityColors: Record<LogSeverity, string> = {
   error: "text-red-400 bg-red-400/10",
@@ -14,22 +18,6 @@ const sourceColors: Record<string, string> = {
   frontend: "text-purple-400 bg-purple-400/10",
   backend: "text-emerald-400 bg-emerald-400/10",
 };
-
-function formatTime(timestamp: string): string {
-  try {
-    const d = new Date(timestamp);
-    if (isNaN(d.getTime())) return timestamp.slice(11, 23);
-    const hms = d.toLocaleTimeString("de-DE", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-    const ms = String(d.getMilliseconds()).padStart(3, "0");
-    return `${hms}.${ms}`;
-  } catch {
-    return timestamp.slice(11, 23);
-  }
-}
 
 /** Row-height estimate for virtualization (px). Actual height is measured
  *  dynamically (measureElement) so expanded stacks / wrapped messages grow. */

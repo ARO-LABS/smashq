@@ -28,6 +28,22 @@ const pendingSaves = new Map<string, ReturnType<typeof setTimeout>>();
 let initialized = false;
 let initPromise: Promise<void> | null = null;
 
+/**
+ * When true, setItem updates the in-memory cache but does NOT schedule a
+ * debounced save_tasks invoke. Set synchronously around the setState that
+ * applies a cross-window broadcast (see applyRemoteTasks): the originating
+ * window already persisted tasks.json, so the receiver re-writing it is a
+ * redundant concurrent write + double backup churn (Bug #4). zustand persist
+ * calls storage.setItem synchronously within setState, so a synchronous flag
+ * fully covers that write.
+ */
+let suppressPersist = false;
+
+/** Toggle the persist-suppression flag. See `suppressPersist` doc above. */
+export function setSuppressTasksPersist(active: boolean): void {
+  suppressPersist = active;
+}
+
 /** Eagerly load tasks.json into the in-memory cache. Call before hydration. */
 export function initTasksStorage(): Promise<void> {
   if (!isTauri) return Promise.resolve();
@@ -66,6 +82,10 @@ export const tasksStorage: StateStorage = {
       return;
     }
     cache.set(name, value);
+    // Applying a remote broadcast: keep the cache consistent (so getItem
+    // reflects the new value) but skip the disk write — the source window
+    // already persisted it.
+    if (suppressPersist) return;
     const existing = pendingSaves.get(name);
     if (existing) clearTimeout(existing);
     pendingSaves.set(

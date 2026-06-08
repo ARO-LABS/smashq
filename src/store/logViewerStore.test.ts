@@ -4,9 +4,23 @@ import {
   parseBackendLogLine,
   groupConsecutiveEntries,
   structuredToUnified,
+  formatTime,
   type UnifiedLogEntry,
   type LogSeverity,
 } from "./logViewerStore";
+
+describe("formatTime", () => {
+  it("formats to HH:MM:SS without milliseconds", () => {
+    const out = formatTime("2026-05-19T14:05:09.123Z");
+    expect(out).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+    expect(out).not.toContain(".");
+  });
+
+  it("falls back to the HH:MM:SS slice (no ms) for an unparseable timestamp", () => {
+    // Date() rejects the trailing garbage, so the slice fallback runs.
+    expect(formatTime("2026-05-19T14:05:09.123Z-garbage")).toBe("14:05:09");
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Setup

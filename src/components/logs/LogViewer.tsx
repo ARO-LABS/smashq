@@ -105,7 +105,9 @@ export function LogViewer() {
       if (lowerSearch && !e.message.toLowerCase().includes(lowerSearch)) return false;
       return true;
     });
-    return groupConsecutiveEntries(filtered);
+    // Group on chronological order (consecutive-dedup depends on it), then
+    // reverse for display so the newest entry sits on top.
+    return groupConsecutiveEntries(filtered).reverse();
   }, [entries, severityFilter, sourceFilter, searchText]);
 
   // Virtualizer for performant rendering
@@ -119,10 +121,10 @@ export function LogViewer() {
     measureElement: (el) => el.getBoundingClientRect().height,
   });
 
-  // Auto-scroll when liveTail is on
+  // Auto-scroll to the top when liveTail is on — newest entry is at index 0.
   useEffect(() => {
     if (liveTail && grouped.length > 0) {
-      virtualizer.scrollToIndex(grouped.length - 1, { align: "end" });
+      virtualizer.scrollToIndex(0, { align: "start" });
     }
   }, [grouped.length, liveTail, virtualizer]);
 
