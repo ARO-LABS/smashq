@@ -7,6 +7,18 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-06-07 — Cross-Window-Broadcast erzeugte File-Write-Race; und zwei nebenläufige Reviewer widersprachen sich
+
+**Kontext:** Live-Logs der installierten .exe zeigten `tasksStorage.save FILE_IO_ERROR: Failed to rename temp to target ... (os error 2)` exakt beim Löschen von 3 Tasks im Aufgaben-Fenster.
+
+**Erkenntnis 1 — Broadcast hat eine Persist-Nebenwirkung im Empfänger:** Der Cross-Window-State-Sync (`tasksBroadcast` → `applyRemoteTasks` → `useTasksStore.setState`) hält nur In-Memory-State konsistent. Aber zustand-`persist` ruft `storage.setItem` SYNCHRON im `setState` → der Empfänger schrieb `tasks.json` ein ZWEITES Mal, obwohl das Ursprungs-Fenster schon geschrieben hatte. `tasks.json` hat (anders als `settings.json`) bewusst KEINEN Main-Window-Write-Guard → erstes File mit echtem Multi-Writer-Zugriff.
+
+**Erkenntnis 2 — `atomic_write` war nicht nebenläufigkeitssicher:** `path.with_extension("tmp")` = EIN fester Temp-Name. Writer A renamed ihn weg, Writer B's rename → ENOENT (os error 2); der Fehlerpfad `remove_file(&temp)` konnte sogar das Temp eines anderen Writers löschen.
+
+**Regel:** (1) Bei jedem Cross-Window-Store, der persistiert: den Persist-Write im Empfänger unterdrücken (synchrones Flag um das `setState`, in `finally` zurücksetzen) — der Broadcast koordiniert State, nicht Disk. (2) Jeder Multi-Writer-`atomic_write` braucht einen UNIQUE Temp-Namen (pid + process-static Counter), gleiches Verzeichnis (rename bleibt auf einem FS), Cleanup nur des eigenen Temps. Härtet ALLE Caller, nicht nur den Symptom-Caller. (3) Tauri-Capability-Globs sind label-spezifisch: ein Fenster mit Label `diff-{id}` matcht NICHT `detached-*` → null Capabilities → `event:listen` per ACL verweigert. Neue Fenster-Label-Präfixe in `capabilities/default.json` `windows` aufnehmen.
+
+**Prozess-Erkenntnis — nebenläufige Reviewer können sich widersprechen:** Im Fix-Workflow lasen Implementer A (atomic_write) und Reviewer B (remote-persist) dieselbe `settings.rs` GLEICHZEITIG im geteilten Checkout. B meldete „atomic_write nutzt noch den geteilten Temp" — las aber eine halbfertige Datei. A's Reviewer (nach A fertig) verifizierte korrekt. **Regel:** Bei widersprüchlichen Subagent-Reports NIE einem trauen — den finalen Tree SELBST lesen vor dem Commit ([[feedback_subagent_report_skepticism]]). Parallele Datei-Beobachtungen im geteilten Checkout sind grundsätzlich racy.
+
 ### 2026-06-07 — Hydration-TDZ: unverifizierten Hypothesen-Fix gemerged, der in der echten .exe versagte
 
 **Fehler:** Den TDZ (`Cannot access 'p' before initialization`) auf einer Chunk-Hypothese geschlossen (zustand-`vendor-zustand`-Pin), die der Implementer ehrlich als BLOCKED/nicht-reproduzierbar meldete. Trotzdem gemerged, weil alle automatisierten Gates grün waren — jsdom kann den Bug aber prinzipiell nicht ausführen. Die aufgeschobene `.exe`-Smoke zeigte: Fehler unverändert da, gleicher Stack, nur im neuen Chunk.
