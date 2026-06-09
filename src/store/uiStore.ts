@@ -234,10 +234,20 @@ export const useUIStore = create<UIState>()(
           JSON.stringify(scope) !== JSON.stringify(state.libraryScopeOpen) ||
           JSON.stringify(section) !== JSON.stringify(state.librarySectionOpen)
         ) {
-          useUIStore.setState({
-            libraryScopeOpen: scope,
-            librarySectionOpen: section,
-          });
+          // Defer to a microtask. onRehydrateStorage can run SYNCHRONOUSLY
+          // inside create(persist(...)) when storage.getItem returns a sync
+          // value (localStorage fallback: always sync; Tauri: cache hit). At
+          // that point `useUIStore` is still in its Temporal Dead Zone — a sync
+          // setState here throws ReferenceError, which zustand swallows in its
+          // rehydrate .catch, so the corrupt blob is NEVER healed (the exact
+          // recovery path this guard exists for). One microtask later the const
+          // is bound. Mirrors settingsStore.ts. DO NOT inline back to sync.
+          void Promise.resolve().then(() =>
+            useUIStore.setState({
+              libraryScopeOpen: scope,
+              librarySectionOpen: section,
+            }),
+          );
         }
       },
     }

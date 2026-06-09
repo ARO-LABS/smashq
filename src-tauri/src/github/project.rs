@@ -331,6 +331,7 @@ pub mod commands {
         let mut lanes: Vec<ProjectLane> = Vec::new();
         let mut cursor: Option<String> = None;
         let mut first_page = true;
+        let mut completed = false;
 
         for _ in 0..MAX_BOARD_PAGES {
             let val = fetch_board_page(&cwd_str, &query_arg, &number_arg, cursor.as_deref())?;
@@ -351,6 +352,7 @@ pub mod commands {
             all_nodes.extend(nodes.iter().cloned());
 
             if !items["pageInfo"]["hasNextPage"].as_bool().unwrap_or(false) {
+                completed = true;
                 break;
             }
             // hasNextPage is true: a usable endCursor is required to make
@@ -366,6 +368,17 @@ pub mod commands {
                 break;
             }
             cursor = Some(next_cursor);
+        }
+
+        // Only a hasNextPage=false exit means the whole board was read. Every
+        // other exit (page cap, null/duplicate endCursor) is a truncation —
+        // surface it instead of silently returning a partial board on which
+        // cards would appear to have vanished.
+        if !completed {
+            return Err(ADPError::command_failed(
+                "Projekt-Board konnte nicht vollstaendig geladen werden \
+                 (Pagination-Limit oder unerwartete GitHub-Antwort). Bitte erneut versuchen.",
+            ));
         }
 
         let items = parse_items_from_graphql(&all_nodes, &lanes);
