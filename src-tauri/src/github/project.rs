@@ -1,7 +1,7 @@
-use crate::error::ADPError;
+use crate::error::{ADPError, ADPErrorCode};
 use serde::Serialize;
 
-use super::commands::{effective_cwd, ensure_gh, run_command};
+use super::commands::{classify_gh_error, effective_cwd, ensure_gh, run_gh, validate_owner};
 
 /// Fallback hex color for project-board labels with no color from `gh`.
 const BOARD_LABEL_FALLBACK_COLOR: &str = "6b7280";
@@ -19,6 +19,15 @@ pub struct ProjectSummary {
     pub number: u32,
     pub title: String,
     pub items_total: u32,
+}
+
+/// An owner whose Projects v2 boards can be listed — the authenticated user
+/// (`kind == "user"`) or an organization they belong to (`kind == "org"`).
+#[derive(Serialize, Clone)]
+pub struct ProjectOwner {
+    pub login: String,
+    /// `"user"` for the viewer themselves, `"org"` for an organization.
+    pub kind: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -68,10 +77,23 @@ pub struct ProjectBoard {
 /// - Per-item Issue content: number, title, url, state, repository,
 ///   labels (with hex color), assignees
 ///
-/// Variables: `$number: Int!`, `$cursor: String` (optional, for paging).
-/// Uses `viewer` so no login parameter is needed — the `gh` CLI auth
-/// context supplies the authenticated user automatically.
-const PROJECT_BOARD_QUERY: &str = r#"query($number: Int!, $cursor: String) { viewer { projectV2(number: $number) { id field(name: "Status") { ... on ProjectV2SingleSelectField { id options { id name } } } items(first: 100, after: $cursor) { pageInfo { hasNextPage endCursor } nodes { id fieldValues(first: 20) { nodes { __typename ... on ProjectV2ItemFieldSingleSelectValue { optionId field { ... on ProjectV2FieldCommon { name } } } } } content { __typename ... on Issue { number title url state repository { nameWithOwner } labels(first: 10) { nodes { name color } } assignees(first: 5) { nodes { login } } } } } } } } }"#;
+/// Variables: `$id: ID!` (the board's global node id), `$cursor: String`
+/// (optional, for paging).
+///
+/// Addresses the board by its global **node id** via `node(id:)`, NOT via
+/// `viewer { projectV2(number:) }`. This makes the load owner-agnostic: a
+/// user board and an organization board (e.g. an org Kanban) load through
+/// the exact same path, since the node id is globally unique and not relative
+/// to the authenticated viewer. The previous viewer-scoping made every org
+/// board resolve to NOT_FOUND.
+const PROJECT_BOARD_QUERY: &str = r#"query($id: ID!, $cursor: String) { node(id: $id) { ... on ProjectV2 { id field(name: "Status") { ... on ProjectV2SingleSelectField { id options { id name } } } items(first: 100, after: $cursor) { pageInfo { hasNextPage endCursor } nodes { id fieldValues(first: 20) { nodes { __typename ... on ProjectV2ItemFieldSingleSelectValue { optionId field { ... on ProjectV2FieldCommon { name } } } } } content { __typename ... on Issue { number title url state repository { nameWithOwner } labels(first: 10) { nodes { name color } } assignees(first: 5) { nodes { login } } } } } } } } }"#;
+
+/// GraphQL query listing the viewer's own login plus the organizations they
+/// belong to — the set of owners whose Projects v2 boards the user can browse
+/// in the picker. Org logins are what makes `gh project list --owner <org>`
+/// (and therefore org boards) reachable from the UI.
+const PROJECT_OWNERS_QUERY: &str =
+    r#"query { viewer { login organizations(first: 100) { nodes { login } } } }"#;
 
 // ── Validation ───────────────────────────────────────────────────────
 
@@ -207,22 +229,52 @@ fn parse_items_from_graphql(
         .collect()
 }
 
+/// Parses the `list_project_owners` GraphQL response into the viewer (first,
+/// `kind == "user"`) followed by each organization (`kind == "org"`).
+/// Org nodes missing a `login` are skipped. A response without a viewer login
+/// yields an empty list.
+fn parse_project_owners(val: &serde_json::Value) -> Vec<ProjectOwner> {
+    let viewer = &val["data"]["viewer"];
+    let Some(login) = viewer["login"].as_str() else {
+        return Vec::new();
+    };
+
+    let mut owners = vec![ProjectOwner {
+        login: login.to_string(),
+        kind: "user".to_string(),
+    }];
+
+    if let Some(orgs) = viewer["organizations"]["nodes"].as_array() {
+        for org in orgs {
+            if let Some(org_login) = org["login"].as_str() {
+                owners.push(ProjectOwner {
+                    login: org_login.to_string(),
+                    kind: "org".to_string(),
+                });
+            }
+        }
+    }
+
+    owners
+}
+
 /// Fetches and parses a single board page from `gh api graphql`.
 ///
 /// Builds the `gh` argument array in ONE place — the only difference between
 /// the first page and subsequent pages is the optional `cursor=` argument.
 /// Invokes `gh`, parses the JSON response, and surfaces GraphQL-level errors
-/// (auth, scope, not found) as `ADPError` before returning the parsed value.
+/// (auth, scope, not found) as a structured `ADPError` via `classify_gh_error`
+/// before returning the parsed value.
 ///
 /// Returns the full parsed GraphQL response `Value`; the caller indexes into
-/// `data.viewer.projectV2` to extract the Status field and item nodes.
+/// `data.node` to extract the Status field and item nodes.
 fn fetch_board_page(
     cwd_str: &str,
     query_arg: &str,
-    number_arg: &str,
+    id_arg: &str,
     cursor: Option<&str>,
 ) -> Result<serde_json::Value, ADPError> {
-    let mut args: Vec<&str> = vec!["api", "graphql", "-f", query_arg, "-F", number_arg];
+    let mut args: Vec<&str> = vec!["api", "graphql", "-f", query_arg, "-f", id_arg];
     let cursor_arg;
     if let Some(c) = cursor {
         cursor_arg = format!("cursor={}", c);
@@ -230,21 +282,21 @@ fn fetch_board_page(
         args.push(&cursor_arg);
     }
 
-    let response = run_command(cwd_str, "gh", &args)?;
+    let response = run_gh(cwd_str, &args)?;
 
     let val: serde_json::Value = serde_json::from_str(&response)
         .map_err(|e| ADPError::parse(format!("Failed to parse GraphQL response: {}", e)))?;
 
-    // Surface GraphQL-level errors (auth, scope, not found).
+    // Surface GraphQL-level errors (auth, scope, not found) as distinguishable
+    // structured errors instead of one opaque code — the `type` discriminator
+    // (NOT_FOUND / INSUFFICIENT_SCOPES / FORBIDDEN) drives the classification.
     if let Some(errors) = val["errors"].as_array() {
-        let msg = errors
-            .first()
+        let first = errors.first();
+        let msg = first
             .and_then(|e| e["message"].as_str())
             .unwrap_or("Unknown GraphQL error");
-        return Err(ADPError::command_failed(format!(
-            "GitHub API error: {}",
-            msg
-        )));
+        let gql_type = first.and_then(|e| e["type"].as_str());
+        return Err(classify_gh_error(msg, gql_type));
     }
 
     Ok(val)
@@ -256,24 +308,32 @@ fn fetch_board_page(
 pub mod commands {
     use super::*;
 
-    /// Returns all GitHub Projects (v2) owned by the authenticated user.
+    /// Returns the GitHub Projects (v2) owned by `owner`.
+    ///
+    /// `owner` is a GitHub login or the sentinel `@me` (the authenticated user,
+    /// the default when `None`). Passing an organization login lists that org's
+    /// boards — the path that makes org Kanban boards selectable. The owner is
+    /// validated (`validate_owner`) before it reaches the `gh` argument list.
     ///
     /// `folder` is used as the working directory for the `gh` subprocess.
     /// Passing `None` is safe — `gh project list` does not require a git
     /// repository and falls back to `std::env::temp_dir()`.
     #[tauri::command]
     pub async fn list_user_projects(
+        owner: Option<String>,
         folder: Option<String>,
     ) -> Result<Vec<ProjectSummary>, ADPError> {
         ensure_gh("gh CLI not found. Install from https://cli.github.com")?;
 
+        let owner = owner.unwrap_or_else(|| "@me".to_string());
+        validate_owner(&owner)?;
+
         let cwd = effective_cwd(folder.as_deref());
         let cwd_str = cwd.to_string_lossy().to_string();
 
-        let output = run_command(
+        let output = run_gh(
             &cwd_str,
-            "gh",
-            &["project", "list", "--owner", "@me", "--format", "json"],
+            &["project", "list", "--owner", &owner, "--format", "json"],
         )?;
 
         if output.is_empty() {
@@ -324,7 +384,7 @@ pub mod commands {
         let cwd = effective_cwd(folder.as_deref());
         let cwd_str = cwd.to_string_lossy().to_string();
         let query_arg = format!("query={}", PROJECT_BOARD_QUERY);
-        let number_arg = format!("number={}", project_number);
+        let id_arg = format!("id={}", project_id);
 
         let mut all_nodes: Vec<serde_json::Value> = Vec::new();
         let mut status_field_id = String::new();
@@ -334,9 +394,25 @@ pub mod commands {
         let mut completed = false;
 
         for _ in 0..MAX_BOARD_PAGES {
-            let val = fetch_board_page(&cwd_str, &query_arg, &number_arg, cursor.as_deref())?;
+            let val = fetch_board_page(&cwd_str, &query_arg, &id_arg, cursor.as_deref())?;
 
-            let project = &val["data"]["viewer"]["projectV2"];
+            // `node(id:)` resolves to null when the board was deleted, the id is
+            // wrong, or the viewer lost access — surface that as a distinct
+            // "not found" error (with the project number for context) so the
+            // frontend can drop a stale selection instead of showing a generic
+            // or misleading scope message.
+            let project = &val["data"]["node"];
+            if project.is_null() {
+                return Err(ADPError::new(
+                    ADPErrorCode::ServiceRequestFailed,
+                    format!(
+                        "Projekt-Board #{} nicht gefunden — moeglicherweise geloescht, \
+                         umbenannt oder kein Zugriff.",
+                        project_number
+                    ),
+                )
+                .with_details("not_found"));
+            }
 
             // Parse Status field on the first page only — options don't change.
             if first_page {
@@ -413,9 +489,8 @@ pub mod commands {
         let cwd = effective_cwd(folder.as_deref());
         let cwd_str = cwd.to_string_lossy().to_string();
 
-        run_command(
+        run_gh(
             &cwd_str,
-            "gh",
             &[
                 "project",
                 "item-edit",
@@ -431,6 +506,39 @@ pub mod commands {
         )?;
 
         Ok(())
+    }
+
+    /// Lists the owners whose Projects v2 boards the user can browse: the
+    /// authenticated viewer first (`kind == "user"`), then each organization
+    /// they belong to (`kind == "org"`). Powers the picker's owner dropdown so
+    /// org boards become discoverable instead of requiring a known number/id.
+    ///
+    /// Required `gh` auth scope: `read:org` (for the organization list).
+    #[tauri::command]
+    pub async fn list_project_owners(
+        folder: Option<String>,
+    ) -> Result<Vec<ProjectOwner>, ADPError> {
+        ensure_gh("gh CLI not found. Install from https://cli.github.com")?;
+
+        let cwd = effective_cwd(folder.as_deref());
+        let cwd_str = cwd.to_string_lossy().to_string();
+        let query_arg = format!("query={}", PROJECT_OWNERS_QUERY);
+
+        let response = run_gh(&cwd_str, &["api", "graphql", "-f", &query_arg])?;
+
+        let val: serde_json::Value = serde_json::from_str(&response)
+            .map_err(|e| ADPError::parse(format!("Failed to parse GraphQL response: {}", e)))?;
+
+        if let Some(errors) = val["errors"].as_array() {
+            let first = errors.first();
+            let msg = first
+                .and_then(|e| e["message"].as_str())
+                .unwrap_or("Unknown GraphQL error");
+            let gql_type = first.and_then(|e| e["type"].as_str());
+            return Err(classify_gh_error(msg, gql_type));
+        }
+
+        Ok(parse_project_owners(&val))
     }
 }
 
@@ -1257,5 +1365,69 @@ mod tests {
         assert_eq!(json["issue_number"], 8);
         assert_eq!(json["assignee"], "eve");
         assert_eq!(json["current_lane_option_id"], "opt_todo");
+    }
+
+    // --- ProjectOwner parsing (list_project_owners) -------------------
+
+    #[test]
+    fn parse_project_owners_self_first_then_orgs() {
+        let val = serde_json::json!({
+            "data": { "viewer": {
+                "login": "hossoOG",
+                "organizations": { "nodes": [ {"login": "ARO-LABS"}, {"login": "OtherOrg"} ] }
+            }}
+        });
+        let owners = parse_project_owners(&val);
+        assert_eq!(owners.len(), 3);
+        assert_eq!(owners[0].login, "hossoOG");
+        assert_eq!(owners[0].kind, "user");
+        assert_eq!(owners[1].login, "ARO-LABS");
+        assert_eq!(owners[1].kind, "org");
+        assert_eq!(owners[2].login, "OtherOrg");
+    }
+
+    #[test]
+    fn parse_project_owners_no_orgs_yields_just_self() {
+        let val = serde_json::json!({
+            "data": { "viewer": { "login": "solo", "organizations": { "nodes": [] } } }
+        });
+        let owners = parse_project_owners(&val);
+        assert_eq!(owners.len(), 1);
+        assert_eq!(owners[0].login, "solo");
+        assert_eq!(owners[0].kind, "user");
+    }
+
+    #[test]
+    fn parse_project_owners_missing_viewer_yields_empty() {
+        let val = serde_json::json!({ "data": {} });
+        assert!(parse_project_owners(&val).is_empty());
+    }
+
+    #[test]
+    fn parse_project_owners_skips_org_nodes_without_login() {
+        let val = serde_json::json!({
+            "data": { "viewer": {
+                "login": "me",
+                "organizations": { "nodes": [ {"id": 1}, {"login": "GoodOrg"} ] }
+            }}
+        });
+        let owners = parse_project_owners(&val);
+        assert_eq!(owners.len(), 2);
+        assert_eq!(owners[1].login, "GoodOrg");
+    }
+
+    // --- board query is owner-agnostic: node(id), not viewer ----------
+
+    #[test]
+    fn project_board_query_uses_node_id_not_viewer() {
+        assert!(
+            PROJECT_BOARD_QUERY.contains("node(id:"),
+            "board must be addressed by global node id"
+        );
+        assert!(
+            !PROJECT_BOARD_QUERY.contains("viewer"),
+            "viewer-scoping must be gone so org boards load"
+        );
+        assert!(PROJECT_BOARD_QUERY.contains("$id: ID!"));
     }
 }

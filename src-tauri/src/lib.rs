@@ -242,6 +242,7 @@ pub fn run() {
             github::commands::commands::post_issue_comment,
             // Projects v2 Kanban
             github::project::commands::list_user_projects,
+            github::project::commands::list_project_owners,
             github::project::commands::get_project_board,
             github::project::commands::move_project_item,
             // Structured NDJSON log sink (backend + frontend)

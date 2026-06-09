@@ -129,10 +129,12 @@ pub(crate) fn ensure_gh(not_found_msg: &str) -> Result<(), ADPError> {
     if is_command_available("gh") {
         Ok(())
     } else {
-        Err(ADPError::new(
-            ADPErrorCode::ServiceRequestFailed,
-            not_found_msg,
-        ))
+        // `gh_missing` details lets the frontend classify on code+details
+        // instead of matching the message string (which may change/localise).
+        Err(
+            ADPError::new(ADPErrorCode::ServiceRequestFailed, not_found_msg)
+                .with_details("gh_missing"),
+        )
     }
 }
 
@@ -176,6 +178,102 @@ pub(crate) fn validate_repo(repo: &str) -> Result<(), ADPError> {
             repo
         )))
     }
+}
+
+/// Validates a GitHub owner login, or the special `@me` sentinel.
+/// GitHub logins are ASCII alphanumeric with single hyphens, max 39 chars,
+/// no leading/trailing hyphen. Stricter than `validate_repo` (no slash/dot)
+/// so it is safe to pass as a `gh --owner` argument.
+pub(crate) fn validate_owner(owner: &str) -> Result<(), ADPError> {
+    if owner == "@me" {
+        return Ok(());
+    }
+    let ok = !owner.is_empty()
+        && owner.len() <= 39
+        && !owner.starts_with('-')
+        && !owner.ends_with('-')
+        && owner.chars().all(|c| c.is_ascii_alphanumeric() || c == '-');
+    if ok {
+        Ok(())
+    } else {
+        Err(ADPError::validation(format!(
+            "Invalid owner login: '{}'",
+            owner
+        )))
+    }
+}
+
+/// Maps a raw `gh`/GraphQL error message (plus an optional GraphQL
+/// `errors[].type`) to a structured [`ADPError`] whose `code` + `details`
+/// the frontend can branch on. Replaces the fragile
+/// `message.includes("project")` heuristic that mis-reported a deleted board
+/// as a missing OAuth scope. Order matters — most specific class first.
+pub(crate) fn classify_gh_error(msg: &str, gql_type: Option<&str>) -> ADPError {
+    let lower = msg.to_lowercase();
+    let ty = gql_type.unwrap_or("").to_uppercase();
+
+    // Board / node not found (deleted, renamed, or no access via this path).
+    if ty == "NOT_FOUND"
+        || lower.contains("could not resolve to a")
+        || lower.contains("could not resolve to")
+        || lower.contains("not_found")
+    {
+        return ADPError::new(ADPErrorCode::ServiceRequestFailed, msg.to_string())
+            .with_details("not_found");
+    }
+    // Missing OAuth scope (read:project / project).
+    if ty == "INSUFFICIENT_SCOPES"
+        || lower.contains("read:project")
+        || lower.contains("insufficient scope")
+        || lower.contains("required scopes")
+    {
+        return ADPError::new(ADPErrorCode::ServiceAuthFailed, msg.to_string())
+            .with_details("scope");
+    }
+    // Not logged in / authentication required.
+    if lower.contains("gh auth login")
+        || lower.contains("authentication required")
+        || lower.contains("requires authentication")
+        || lower.contains("not logged into")
+        || lower.contains("no oauth token")
+    {
+        return ADPError::new(ADPErrorCode::ServiceAuthFailed, msg.to_string())
+            .with_details("auth");
+    }
+    // Permission denied (member but lacks access). Kept narrow: a generic
+    // "must have ..." (e.g. "must have a Status field") must NOT be tagged as a
+    // permission error, so match only unambiguous forbidden phrasings.
+    if ty == "FORBIDDEN"
+        || lower.contains("forbidden")
+        || lower.contains("does not have permission")
+        || lower.contains("resource not accessible")
+    {
+        return ADPError::new(ADPErrorCode::ServiceAuthFailed, msg.to_string())
+            .with_details("forbidden");
+    }
+    // Transient: rate limit (retryable after a wait).
+    if lower.contains("rate limit") {
+        return ADPError::retryable(ADPErrorCode::ServiceRateLimited, msg.to_string(), 60_000);
+    }
+    // Transient: network / timeout (retryable soon).
+    if lower.contains("timed out")
+        || lower.contains("timeout")
+        || lower.contains("could not resolve host")
+        || lower.contains("dial tcp")
+        || lower.contains("network is unreachable")
+        || lower.contains("connection refused")
+    {
+        return ADPError::retryable(ADPErrorCode::ServiceTimeout, msg.to_string(), 3_000);
+    }
+    ADPError::command_failed(msg.to_string())
+}
+
+/// Runs a `gh` command and re-maps any failure through [`classify_gh_error`],
+/// so callers surface a distinguishable error (auth / scope / not-found /
+/// rate-limit / network) instead of a generic `CommandExecutionFailed`.
+/// Plain `git` calls keep using [`run_command`] directly.
+pub(crate) fn run_gh(cwd: &str, args: &[&str]) -> Result<String, ADPError> {
+    run_command(cwd, "gh", args).map_err(|e| classify_gh_error(&e.message, None))
 }
 
 /// Returns `true` if the given remote URL points to github.com.
@@ -1389,5 +1487,130 @@ mod tests {
         assert_eq!(lp.state, "");
         assert_eq!(lp.url, "");
         assert!(lp.checks.is_empty());
+    }
+
+    // --- classify_gh_error ----------------------------------------------
+    // Maps a raw gh/GraphQL message (+ optional GraphQL errors[].type) to a
+    // structured ADPError whose code + details the frontend can branch on,
+    // replacing the fragile `message.includes("project")` heuristic.
+
+    #[test]
+    fn classify_gh_error_not_found_from_graphql_type() {
+        let err = classify_gh_error(
+            "Could not resolve to a ProjectV2 with the number 4.",
+            Some("NOT_FOUND"),
+        );
+        assert_eq!(err.code, ADPErrorCode::ServiceRequestFailed);
+        assert_eq!(err.details.as_deref(), Some("not_found"));
+        assert!(!err.retryable);
+    }
+
+    #[test]
+    fn classify_gh_error_not_found_from_message_without_type() {
+        // A deleted/renamed board's gh message contains "could not resolve to a".
+        let err = classify_gh_error(
+            "GraphQL: Could not resolve to a node with the global id of 'PVT_x'",
+            None,
+        );
+        assert_eq!(err.code, ADPErrorCode::ServiceRequestFailed);
+        assert_eq!(err.details.as_deref(), Some("not_found"));
+    }
+
+    #[test]
+    fn classify_gh_error_scope_missing() {
+        let err = classify_gh_error(
+            "Your token has not been granted the required scopes: read:project",
+            Some("INSUFFICIENT_SCOPES"),
+        );
+        assert_eq!(err.code, ADPErrorCode::ServiceAuthFailed);
+        assert_eq!(err.details.as_deref(), Some("scope"));
+    }
+
+    #[test]
+    fn classify_gh_error_not_logged_in() {
+        let err = classify_gh_error(
+            "To get started with GitHub CLI, please run: gh auth login",
+            None,
+        );
+        assert_eq!(err.code, ADPErrorCode::ServiceAuthFailed);
+        assert_eq!(err.details.as_deref(), Some("auth"));
+    }
+
+    #[test]
+    fn classify_gh_error_rate_limited_is_retryable() {
+        let err = classify_gh_error("API rate limit exceeded for user", None);
+        assert_eq!(err.code, ADPErrorCode::ServiceRateLimited);
+        assert!(err.retryable);
+    }
+
+    #[test]
+    fn classify_gh_error_network_timeout_is_retryable() {
+        let err = classify_gh_error(
+            "dial tcp: lookup api.github.com: could not resolve host",
+            None,
+        );
+        assert_eq!(err.code, ADPErrorCode::ServiceTimeout);
+        assert!(err.retryable);
+    }
+
+    #[test]
+    fn classify_gh_error_unknown_falls_back_to_command_failed() {
+        let err = classify_gh_error("some entirely unexpected failure", None);
+        assert_eq!(err.code, ADPErrorCode::CommandExecutionFailed);
+        assert!(!err.retryable);
+    }
+
+    #[test]
+    fn classify_gh_error_must_have_phrase_is_not_forbidden() {
+        // A config hint like "must have a Status field" must NOT be tagged as a
+        // permission error (the old heuristic matched "must have" too broadly).
+        let err = classify_gh_error("Project must have a Status field", None);
+        assert_ne!(err.code, ADPErrorCode::ServiceAuthFailed);
+        assert_eq!(err.code, ADPErrorCode::CommandExecutionFailed);
+    }
+
+    #[test]
+    fn classify_gh_error_forbidden_from_permission_phrasing() {
+        let err = classify_gh_error("Resource not accessible by integration", Some("FORBIDDEN"));
+        assert_eq!(err.code, ADPErrorCode::ServiceAuthFailed);
+        assert_eq!(err.details.as_deref(), Some("forbidden"));
+    }
+
+    #[test]
+    fn classify_gh_error_not_found_wins_over_scope_substring() {
+        // A NOT_FOUND message must not be mis-tagged just because it mentions a project.
+        let err = classify_gh_error("Could not resolve to a ProjectV2", Some("NOT_FOUND"));
+        assert_eq!(err.details.as_deref(), Some("not_found"));
+    }
+
+    #[test]
+    fn classify_gh_error_preserves_original_message() {
+        let err = classify_gh_error("verbatim text here", None);
+        assert_eq!(err.message, "verbatim text here");
+    }
+
+    // --- validate_owner -------------------------------------------------
+
+    #[test]
+    fn validate_owner_accepts_at_me() {
+        assert!(validate_owner("@me").is_ok());
+    }
+
+    #[test]
+    fn validate_owner_accepts_login_and_org() {
+        assert!(validate_owner("hossoOG").is_ok());
+        assert!(validate_owner("ARO-LABS").is_ok());
+        assert!(validate_owner("a").is_ok());
+    }
+
+    #[test]
+    fn validate_owner_rejects_shell_and_invalid() {
+        assert!(validate_owner("").is_err());
+        assert!(validate_owner("-leading").is_err());
+        assert!(validate_owner("trailing-").is_err());
+        assert!(validate_owner("has space").is_err());
+        assert!(validate_owner("owner;rm -rf").is_err());
+        assert!(validate_owner("owner/repo").is_err());
+        assert!(validate_owner("owner$(id)").is_err());
     }
 }
