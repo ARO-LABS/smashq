@@ -515,16 +515,15 @@ describe("addFavorite", () => {
 // ============================================================================
 
 describe("addFavorite edge cases", () => {
-  it("handles empty path gracefully", () => {
+  it("accepts empty path with a fallback label", () => {
+    // Current contract: addFavorite("") ACCEPTS the entry. The label derivation
+    // ("".split(...).pop() ?? "folder") yields the literal fallback "folder",
+    // so the favorite is created with an empty path but a non-empty label.
     getState().addFavorite("");
-    // Implementation may either reject or accept — test that it does not crash
-    // If accepted, it should still have valid structure
     const favs = getState().favorites;
-    if (favs.length > 0) {
-      expect(favs[0].path).toBe("");
-      expect(typeof favs[0].label).toBe("string");
-    }
-    // No crash is the key assertion
+    expect(favs).toHaveLength(1);
+    expect(favs[0].path).toBe("");
+    expect(favs[0].label).toBe("folder");
   });
 
   it("handles very long path", () => {
@@ -703,11 +702,17 @@ describe("reorderFavorites", () => {
     expect(getState().favorites[0].id).toBe(id);
   });
 
-  it("handles empty reorder array", () => {
+  it("empty reorder array preserves the existing ungrouped favorite", () => {
+    // Contract: reorderFavorites(groupId, []) is a no-op for membership. The
+    // empty orderedIds produces no reindexed items, but the safety-net `tail`
+    // loop re-appends every group member not named in orderedIds, so the lone
+    // ungrouped favorite survives unchanged.
     getState().addFavorite("C:/Projects/test");
     getState().reorderFavorites(null, []);
-    // Should not crash — behavior depends on implementation
-    // Favorites may be emptied or unchanged
+    const favs = getState().favorites;
+    expect(favs).toHaveLength(1);
+    expect(favs[0].path).toBe("C:/Projects/test");
+    expect(favs[0].groupId).toBe(null);
   });
 });
 
@@ -1238,6 +1243,49 @@ describe("favorites groups migration v4 → v5", () => {
     const out = useSettingsStoreValidateForTest(merged);
     expect(out.favorites[0].groupId).toBe("grp-1"); // preserved — group exists in file-merged view
     expect(out.favoriteGroups).toHaveLength(1);
+  });
+});
+
+describe("settingsStore migrate — apiKeys element validation", () => {
+  it("keeps a well-formed apiKey entry through migrate", () => {
+    const persisted = {
+      apiKeys: [
+        {
+          id: "key-1",
+          provider: "anthropic",
+          label: "My Key",
+          redactedKey: "sk-ant-...xxxx",
+          addedAt: 1700000000000,
+          isValid: true,
+        },
+      ],
+    } as unknown;
+    const migrated = useSettingsStoreMigrateForTest(persisted, 9);
+    expect(migrated.apiKeys).toHaveLength(1);
+    expect(migrated.apiKeys[0].id).toBe("key-1");
+    expect(migrated.apiKeys[0].isValid).toBe(true);
+  });
+
+  it("drops malformed apiKey entries (missing fields / wrong types)", () => {
+    const persisted = {
+      apiKeys: [
+        null,
+        "garbage",
+        { id: "no-redacted", provider: "anthropic", label: "X", addedAt: 1, isValid: true },
+        { id: 42, provider: "anthropic", label: "bad-id-type", redactedKey: "r", addedAt: 1, isValid: true },
+        {
+          id: "key-ok",
+          provider: "anthropic",
+          label: "Valid",
+          redactedKey: "sk-...xxxx",
+          addedAt: 2,
+          isValid: false,
+        },
+      ],
+    } as unknown;
+    const migrated = useSettingsStoreMigrateForTest(persisted, 9);
+    expect(migrated.apiKeys).toHaveLength(1);
+    expect(migrated.apiKeys[0].id).toBe("key-ok");
   });
 });
 
