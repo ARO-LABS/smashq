@@ -2,8 +2,8 @@ import { Suspense, lazy, useEffect } from "react";
 import { useSettingsStore } from "./store/settingsStore";
 import { wireRuntimeGates } from "./utils/wireRuntimeGates";
 
-const KanbanDashboardView = lazy(() =>
-  import("./components/kanban/KanbanDashboardView").then((m) => ({ default: m.KanbanDashboardView }))
+const KanbanBoard = lazy(() =>
+  import("./components/kanban/KanbanBoard").then((m) => ({ default: m.KanbanBoard }))
 );
 const LibraryView = lazy(() =>
   import("./components/library/LibraryView").then((m) => ({ default: m.LibraryView }))
@@ -43,7 +43,7 @@ export default function DetachedViewApp({ view }: { view: string }) {
   const renderView = () => {
     switch (view) {
       case "kanban":
-        return <KanbanDashboardView />;
+        return <KanbanBoard />;
       case "library":
         return <LibraryView />;
       case "editor":
