@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { Button } from "./Button";
 import { Plus } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
@@ -31,6 +32,26 @@ describe("Button", () => {
   it("shows spinner when loading", () => {
     const { container } = render(<Button loading>Laden</Button>);
     expect(container.querySelector(".animate-spin")).toBeTruthy();
+  });
+
+  it("renders the registry loading icon (ICONS.action.loading) when loading", () => {
+    const LoadingIcon = ICONS.action.loading;
+    const { container: refContainer } = render(
+      <LoadingIcon data-testid="ref-loading" />,
+    );
+    const refIcon = refContainer.querySelector("svg");
+    const { container } = render(<Button loading>Laden</Button>);
+    const spinner = container.querySelector(".animate-spin");
+    expect(spinner).toBeTruthy();
+    // Same Lucide glyph class as the registry icon -> identical icon used.
+    expect(spinner?.getAttribute("class")).toContain(
+      refIcon?.getAttribute("class")?.split(" ").find((c) => c.startsWith("lucide-")) ?? "lucide",
+    );
+  });
+
+  it("renders no spinner glyph when not loading (edge: idle state)", () => {
+    const { container } = render(<Button>Bereit</Button>);
+    expect(container.querySelector(".animate-spin")).toBeNull();
   });
 
   it("renders icon when provided", () => {

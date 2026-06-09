@@ -1,7 +1,19 @@
 import { useEffect, useCallback, useId, useRef, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X } from "lucide-react";
+import { ICONS, ICON_SIZE } from "../../utils/icons";
 import { IconButton } from "./IconButton";
+
+const CloseIcon = ICONS.action.close;
+
+// Selector for all tabbable descendants used by the focus trap.
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function getFocusable(container: HTMLElement): HTMLElement[] {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+  ).filter((el) => !el.hasAttribute("disabled") && el.getAttribute("aria-hidden") !== "true");
+}
 
 // ============================================================================
 // Types
@@ -58,12 +70,48 @@ export function Modal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open, handleKeyDown]);
 
-  // Focus trap: focus content on open
+  // Focus trap: on open capture the previously focused element, move focus into
+  // the dialog (first focusable descendant, else the dialog itself), and restore
+  // focus to the captured element on close/cleanup.
   useEffect(() => {
-    if (open) {
-      contentRef.current?.focus();
-    }
+    if (!open) return;
+    const dialog = contentRef.current;
+    if (!dialog) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const focusable = getFocusable(dialog);
+    (focusable[0] ?? dialog).focus();
+    return () => previouslyFocused?.focus?.();
   }, [open]);
+
+  // Trap Tab / Shift+Tab so focus cycles within the dialog (wrap last->first /
+  // first->last) instead of escaping to the underlying page.
+  const handleTabKey = useCallback((e: KeyboardEvent) => {
+    if (e.key !== "Tab") return;
+    const dialog = contentRef.current;
+    if (!dialog) return;
+    const focusable = getFocusable(dialog);
+    if (focusable.length === 0) {
+      e.preventDefault();
+      dialog.focus();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+    if (e.shiftKey && (active === first || active === dialog)) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && active === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    window.addEventListener("keydown", handleTabKey);
+    return () => window.removeEventListener("keydown", handleTabKey);
+  }, [open, handleTabKey]);
 
   return (
     <AnimatePresence>
@@ -76,7 +124,7 @@ export function Modal({
         >
           {/* Backdrop */}
           <motion.div
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/70"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -101,7 +149,7 @@ export function Modal({
               <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-800 shrink-0">
                 <div id={titleId} className="flex-1 min-w-0">{title}</div>
                 <IconButton
-                  icon={<X className="w-5 h-5" />}
+                  icon={<CloseIcon className={ICON_SIZE.close} />}
                   label="Schliessen"
                   onClick={onClose}
                 />
