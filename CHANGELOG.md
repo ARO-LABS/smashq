@@ -20,6 +20,10 @@ globales Board laden, nicht mehr nur die persönlichen Boards des angemeldeten U
 
 ### Geändert
 - Board wird intern über die global eindeutige Projekt-ID adressiert (statt der pro-Konto wiederholten Projekt-Nummer) — verhindert Verwechslung gleichnummerierter Boards verschiedener Konten.
+- Kanban vereinfacht: ein einziges, global gewähltes Board (per Konto-/Board-Picker wechselbar). Der Global/Projekt-Umschalter entfällt.
+
+### Entfernt
+- Der Kanban-Tab in der Session-Config-Sidebar. Kanban öffnet weiterhin als eigenes Fenster (SideNav). Der pro-Ordner-Board-Modus (Folder-Mode) ist damit entfallen.
 
 ## [1.0.1] — 2026-06-09
 

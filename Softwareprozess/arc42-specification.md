@@ -368,7 +368,7 @@ graph TD
 
     Content --> SessionMgr["SessionManagerView"]
     Content --> PipelineView["PipelineView"]
-    Content --> KanbanView["KanbanDashboardView"]
+    Content --> KanbanView["KanbanBoard"]
     Content --> LogView["LogViewer"]
 
     SessionMgr --> SessionList["SessionList / SessionGrid"]
@@ -1232,7 +1232,7 @@ classDiagram
 | FA-G01 | PRs anzeigen | MUSS | `GitHubViewer.tsx` + `get_github_prs()` |
 | FA-G02 | Issues anzeigen | MUSS | `GitHubViewer.tsx` + `get_github_issues()` |
 | FA-G03 | Branch + Commit Info | MUSS | `GitHubViewer.tsx` + `get_git_info()` |
-| FA-G04 | Kanban Board | SOLLTE | `KanbanDashboardView.tsx` + GitHub Projects API |
+| FA-G04 | Kanban Board | SOLLTE | `KanbanBoard.tsx` (eigenes Fenster, ein globales Board) + GitHub Projects API |
 
 ### A.4 Pipeline-Ueberwachung (v1.3.0–v1.4.0)
 
