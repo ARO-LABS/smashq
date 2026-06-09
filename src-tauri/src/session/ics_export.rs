@@ -25,6 +25,34 @@ fn ics_escape(s: &str) -> String {
         .replace('\r', "") // strip CR; the LF above covers CRLF pairs
 }
 
+// ─── RFC5545 line folding ─────────────────────────────────────────────────────
+
+/// Fold a single content line per RFC5545 §3.1: no line may exceed 75 octets.
+/// Longer lines are split with CRLF + a single leading space; the space is
+/// stripped by parsers when unfolding. Splits only on UTF-8 char boundaries so
+/// a multi-byte codepoint is never cut in half.
+///
+/// The caller passes a complete, already-escaped line such as
+/// `SUMMARY:Buy milk` — the property name counts toward the 75-octet budget,
+/// exactly as RFC5545 requires.
+fn fold_line(line: &str) -> String {
+    const MAX_OCTETS: usize = 75;
+    let mut out = String::with_capacity(line.len());
+    let mut octets_in_line = 0usize;
+    for ch in line.chars() {
+        let ch_len = ch.len_utf8();
+        // Continuation lines carry a leading space, leaving 74 octets of
+        // payload budget. Fold before the char that would overflow.
+        if octets_in_line + ch_len > MAX_OCTETS {
+            out.push_str("\r\n ");
+            octets_in_line = 1; // the leading space
+        }
+        out.push(ch);
+        octets_in_line += ch_len;
+    }
+    out
+}
+
 // ─── Pure ICS builder ────────────────────────────────────────────────────────
 
 /// Build a complete VCALENDAR string for a single task event.
@@ -56,14 +84,22 @@ pub fn build_ics(
     let dtstart_line = format!("DTSTART:{}", start_local.format("%Y%m%dT%H%M%S"));
     let dtend_line = format!("DTEND:{}", end_local.format("%Y%m%dT%H%M%S"));
 
-    let summary = ics_escape(title);
+    // SUMMARY/DESCRIPTION/UID can exceed 75 octets, so fold the complete
+    // (property-name-included) line per RFC5545 §3.1 to stay valid for strict
+    // parsers.
+    let summary_line = fold_line(&format!("SUMMARY:{}", ics_escape(title)));
     let description = note
-        .map(|n| format!("DESCRIPTION:{}\r\n", ics_escape(n)))
+        .map(|n| {
+            format!(
+                "{}\r\n",
+                fold_line(&format!("DESCRIPTION:{}", ics_escape(n)))
+            )
+        })
         .unwrap_or_default();
 
     // UID is deterministic from starts_at so repeated exports do not
     // create duplicate calendar entries in most PIM applications.
-    let uid = format!("smashq-{}@local", starts_at);
+    let uid_line = fold_line(&format!("UID:smashq-{}@local", starts_at));
 
     let ics = format!(
         "BEGIN:VCALENDAR\r\n\
@@ -72,11 +108,11 @@ pub fn build_ics(
          CALSCALE:GREGORIAN\r\n\
          METHOD:PUBLISH\r\n\
          BEGIN:VEVENT\r\n\
-         UID:{uid}\r\n\
+         {uid}\r\n\
          DTSTAMP:{dtstamp}\r\n\
          {dtstart}\r\n\
          {dtend}\r\n\
-         SUMMARY:{summary}\r\n\
+         {summary}\r\n\
          {description}\
          TRANSP:OPAQUE\r\n\
          BEGIN:VALARM\r\n\
@@ -86,11 +122,11 @@ pub fn build_ics(
          END:VALARM\r\n\
          END:VEVENT\r\n\
          END:VCALENDAR\r\n",
-        uid = uid,
+        uid = uid_line,
         dtstamp = dtstamp,
         dtstart = dtstart_line,
         dtend = dtend_line,
-        summary = summary,
+        summary = summary_line,
         description = description,
     );
     Ok(ics)
@@ -139,11 +175,20 @@ pub mod commands {
         // ── Build ICS content ────────────────────────────────────────────────
         let ics_content = build_ics(&title, starts_at, ends_at, note.as_deref())?;
 
-        // ── Write to temp dir ────────────────────────────────────────────────
+        // ── Write to a per-process temp subdir ───────────────────────────────
         // Filename is derived exclusively from the numeric starts_at to prevent
         // any path-traversal attack via user-supplied title strings.
+        //
+        // Writing into a per-process subdir (smashq-<pid>) instead of the
+        // world-writable shared temp_dir() removes the predictable-path
+        // symlink/overwrite-follow vector on multi-user hosts: another user
+        // cannot pre-create our exact path to redirect or clobber the write.
+        let dir = std::env::temp_dir().join(format!("smashq-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).map_err(|e| {
+            ADPError::command_failed(format!("Fehler beim Anlegen des Temp-Ordners: {}", e))
+        })?;
         let file_name = format!("smashq-task-{}.ics", starts_at);
-        let temp_path = std::env::temp_dir().join(&file_name);
+        let temp_path = dir.join(&file_name);
 
         std::fs::write(&temp_path, ics_content.as_bytes()).map_err(|e| {
             ADPError::command_failed(format!("Fehler beim Schreiben der .ics-Datei: {}", e))
@@ -220,6 +265,51 @@ mod tests {
     fn build_ics_uid_contains_starts_at() {
         let ics = build_ics("Test", FIXED_START_MS, FIXED_END_MS, None).unwrap();
         assert!(ics.contains(&format!("UID:smashq-{}@local", FIXED_START_MS)));
+    }
+
+    // ── RFC5545 line folding (finding 5) ─────────────────────────────────────
+
+    /// Returns the byte length of the longest physical line in `ics`,
+    /// ignoring the CRLF terminators that `lines()` already strips.
+    fn max_line_octets(ics: &str) -> usize {
+        ics.lines().map(|l| l.len()).max().unwrap_or(0)
+    }
+
+    #[test]
+    fn fold_line_short_line_unchanged() {
+        // A line well under 75 octets must pass through verbatim (happy path).
+        assert_eq!(fold_line("SUMMARY:short"), "SUMMARY:short");
+    }
+
+    #[test]
+    fn build_ics_long_summary_is_folded_to_75_octets() {
+        // A >75-octet title must produce only physical lines of <=75 octets.
+        let long_title = "A".repeat(300);
+        let ics = build_ics(&long_title, FIXED_START_MS, FIXED_END_MS, None).unwrap();
+        assert!(
+            max_line_octets(&ics) <= 75,
+            "every physical line must be <=75 octets, got {}",
+            max_line_octets(&ics)
+        );
+        // Folding must be lossless: unfolding (drop CRLF + leading space)
+        // restores the original SUMMARY payload.
+        let unfolded = ics.replace("\r\n ", "");
+        assert!(unfolded.contains(&format!("SUMMARY:{}", long_title)));
+    }
+
+    #[test]
+    fn fold_line_never_splits_multibyte_char() {
+        // Edge case: a run of 3-octet codepoints (€ = 0xE2 0x82 0xAC). The
+        // folder must break on char boundaries, so every continuation chunk
+        // remains valid UTF-8 and re-parses without replacement chars.
+        let line = format!("SUMMARY:{}", "\u{20AC}".repeat(60));
+        let folded = fold_line(&line);
+        assert!(folded.is_char_boundary(folded.len()));
+        for physical in folded.split("\r\n ") {
+            assert!(physical.len() <= 75, "chunk too long: {}", physical.len());
+        }
+        // No codepoint was destroyed: unfolding restores the original.
+        assert_eq!(folded.replace("\r\n ", ""), line);
     }
 
     // ── DTSTART formatting ───────────────────────────────────────────────────

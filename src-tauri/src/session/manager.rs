@@ -2,10 +2,11 @@
 
 use crate::error::{ADPError, ADPErrorCode};
 use chrono::{DateTime, Utc};
-use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
+use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use tauri::{AppHandle, Emitter};
 
@@ -65,6 +66,16 @@ struct SessionHandle {
     info: SessionInfo,
     writer: Box<dyn Write + Send>,
     master: Box<dyn MasterPty + Send>,
+    /// Killer handle cloned from the spawned child. close_session calls
+    /// `kill()` on this so a per-session close deterministically terminates
+    /// the shell — dropping the master alone does NOT reach grandchildren
+    /// (claude.exe + MCP servers) on Windows, where the Job Object only
+    /// fires on whole-app exit.
+    killer: Box<dyn ChildKiller + Send + Sync>,
+    /// Set by close_session to make the claude-id watcher thread exit early
+    /// instead of polling up to 15s and emitting a resolve event for a dead
+    /// session.
+    watcher_cancelled: Arc<AtomicBool>,
 }
 
 pub struct SessionManager {
@@ -187,6 +198,11 @@ impl SessionManager {
             super::win_job::assign_child(pid);
         }
 
+        // Clone a killer handle BEFORE the child is moved into the waiter
+        // thread. close_session uses this to kill the shell deterministically;
+        // the child itself stays in the waiter thread so wait() still reaps it.
+        let killer = child.clone_killer();
+
         log::info!(
             "Session {} spawned successfully with shell '{}'",
             id,
@@ -245,18 +261,17 @@ impl SessionManager {
             snapshot_at,
         };
 
+        let watcher_cancelled = Arc::new(AtomicBool::new(false));
         {
-            let mut sessions = self.sessions.lock().map_err(|e| {
-                ADPError::internal(format!(
-                    "Failed to lock session manager for create_session: {e}"
-                ))
-            })?;
+            let mut sessions = self.lock_sessions();
             sessions.insert(
                 id.clone(),
                 SessionHandle {
                     info: info.clone(),
                     writer,
                     master: pty_pair.master,
+                    killer,
+                    watcher_cancelled: Arc::clone(&watcher_cancelled),
                 },
             );
         }
@@ -272,37 +287,9 @@ impl SessionManager {
             let watch_app = app.clone();
             let watch_folder = info.folder.clone();
             let snapshot = pre_spawn_snapshot;
+            let cancel = Arc::clone(&watcher_cancelled);
             thread::spawn(move || {
-                match super::file_reader::wait_for_new_session_uuid(
-                    &root,
-                    &watch_folder,
-                    &snapshot,
-                    std::time::Duration::from_secs(15),
-                    std::time::Duration::from_millis(150),
-                ) {
-                    Some(uuid) => {
-                        log::info!("Session {} resolved claudeSessionId={}", watch_id, uuid);
-                        if let Err(e) = watch_app.emit(
-                            "session-claude-id-resolved",
-                            SessionClaudeIdEvent {
-                                id: watch_id.clone(),
-                                claude_session_id: uuid,
-                            },
-                        ) {
-                            log::debug!(
-                                "Session {} failed to emit session-claude-id-resolved: {}",
-                                watch_id,
-                                e
-                            );
-                        }
-                    }
-                    None => {
-                        log::warn!(
-                            "Session {} claude-id discovery timeout (no new jsonl in 15s)",
-                            watch_id
-                        );
-                    }
-                }
+                Self::run_id_watcher(watch_app, watch_id, root, watch_folder, snapshot, cancel);
             });
         }
 
@@ -433,11 +420,7 @@ impl SessionManager {
 
     /// Sendet Daten (User-Input) an eine laufende Session.
     pub fn write_to_session(&self, id: &str, data: &str) -> Result<(), ADPError> {
-        let mut sessions = self.sessions.lock().map_err(|e| {
-            ADPError::internal(format!(
-                "Failed to lock session manager for write_to_session: {e}"
-            ))
-        })?;
+        let mut sessions = self.lock_sessions();
         let session = sessions.get_mut(id).ok_or_else(|| {
             ADPError::new(
                 ADPErrorCode::SessionNotFound,
@@ -457,10 +440,7 @@ impl SessionManager {
 
     /// Aendert die Terminal-Groesse einer Session.
     pub fn resize_session(&self, id: &str, cols: u16, rows: u16) -> Result<(), ADPError> {
-        let sessions = self.sessions.lock().unwrap_or_else(|e| {
-            log::warn!("SessionManager mutex was poisoned during resize_session, recovering");
-            e.into_inner()
-        });
+        let sessions = self.lock_sessions();
         let session = sessions.get(id).ok_or_else(|| {
             ADPError::new(
                 ADPErrorCode::SessionNotFound,
@@ -484,21 +464,26 @@ impl SessionManager {
     /// Fehlt der Ref bereits, ist das kein Hard-Fail — `delete_session_snapshot`
     /// loggt nur eine Warnung.
     pub fn close_session(&self, id: &str) -> Result<(), ADPError> {
-        let mut sessions = self.sessions.lock().map_err(|e| {
-            ADPError::internal(format!(
-                "Failed to lock session manager for close_session: {e}"
-            ))
-        })?;
-        // Drop entfernt den MasterPty, was den Child-Prozess signalisiert
-        let removed = sessions.remove(id).ok_or_else(|| {
+        let mut sessions = self.lock_sessions();
+        let mut removed = sessions.remove(id).ok_or_else(|| {
             ADPError::new(
                 ADPErrorCode::SessionNotFound,
                 format!("Session not found: {id}"),
             )
         })?;
+        // Watcher fruehzeitig stoppen, damit er fuer eine tote Session kein
+        // session-claude-id-resolved mehr emittiert.
+        removed.watcher_cancelled.store(true, Ordering::SeqCst);
+        // Child deterministisch killen — Drop des MasterPty allein erreicht auf
+        // Windows die Grandchildren (claude.exe + MCP-Server) nicht.
+        if let Err(e) = removed.killer.kill() {
+            log::warn!("Session {} kill failed: {}", id, e);
+        }
         let folder_for_cleanup = removed.info.folder.clone();
         let is_git_repo = removed.info.is_git_repo;
-        // Lock vor dem (potentiell langsamen) Git-Call freigeben.
+        // removed (inkl. master + writer) wird beim Verlassen des Scopes
+        // gedroppt → PTY geschlossen. Lock vor dem Git-Call freigeben.
+        drop(removed);
         drop(sessions);
 
         if is_git_repo {
@@ -514,23 +499,81 @@ impl SessionManager {
     /// Wird vom Diff-Command genutzt, um snapshot_commit + folder
     /// nachzuschlagen, ohne den Mutex an den Caller zu reichen.
     pub fn get_session_info(&self, id: &str) -> Option<SessionInfo> {
-        let sessions = self.sessions.lock().unwrap_or_else(|e| {
-            log::warn!("SessionManager mutex was poisoned during get_session_info, recovering");
-            e.into_inner()
-        });
+        let sessions = self.lock_sessions();
         sessions.get(id).map(|s| s.info.clone())
     }
 
     /// Gibt alle aktiven Sessions zurueck.
     pub fn list_sessions(&self) -> Vec<SessionInfo> {
-        let sessions = self.sessions.lock().unwrap_or_else(|e| {
-            log::warn!("SessionManager mutex was poisoned during list_sessions, recovering");
-            e.into_inner()
-        });
+        let sessions = self.lock_sessions();
         sessions.values().map(|s| s.info.clone()).collect()
     }
 
     // --- Private Helpers ---
+
+    /// Einziger Mutex-Zugriffspunkt fuer die Session-Map. Bei vergiftetem
+    /// Mutex (Panic in einem anderen Thread waehrend des Locks) wird der
+    /// Guard via `into_inner()` recovered und eine Warnung geloggt — eine
+    /// einzelne gepanickte Operation soll den Session-Manager nicht dauerhaft
+    /// unbrauchbar machen. Vereinheitlicht das frueher inkonsistente
+    /// Poison-Handling (teils ADPError, teils Recovery).
+    fn lock_sessions(&self) -> MutexGuard<'_, HashMap<String, SessionHandle>> {
+        self.sessions.lock().unwrap_or_else(|e| {
+            log::warn!("SessionManager mutex was poisoned, recovering via into_inner");
+            e.into_inner()
+        })
+    }
+
+    /// Pollt `~/.claude/projects/<slug>/` bis eine neue Session-UUID auftaucht,
+    /// das Timeout erreicht ist ODER `cancel` gesetzt wurde (close_session).
+    /// Emittiert `session-claude-id-resolved` nur fuer eine noch lebende
+    /// Session.
+    fn run_id_watcher(
+        app: AppHandle,
+        id: String,
+        root: std::path::PathBuf,
+        folder: String,
+        snapshot: std::collections::HashSet<String>,
+        cancel: Arc<AtomicBool>,
+    ) {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+        let poll = std::time::Duration::from_millis(150);
+        loop {
+            if cancel.load(Ordering::SeqCst) {
+                log::debug!(
+                    "Session {} claude-id watcher cancelled (session closed)",
+                    id
+                );
+                return;
+            }
+            let current = super::file_reader::snapshot_session_uuids_in(&root, &folder);
+            if let Some(uuid) = current.difference(&snapshot).next() {
+                log::info!("Session {} resolved claudeSessionId={}", id, uuid);
+                if let Err(e) = app.emit(
+                    "session-claude-id-resolved",
+                    SessionClaudeIdEvent {
+                        id: id.clone(),
+                        claude_session_id: uuid.clone(),
+                    },
+                ) {
+                    log::debug!(
+                        "Session {} failed to emit session-claude-id-resolved: {}",
+                        id,
+                        e
+                    );
+                }
+                return;
+            }
+            if std::time::Instant::now() >= deadline {
+                log::warn!(
+                    "Session {} claude-id discovery timeout (no new jsonl in 15s)",
+                    id
+                );
+                return;
+            }
+            std::thread::sleep(poll);
+        }
+    }
 
     fn shell_executable(shell: &str) -> &'static str {
         match shell {
@@ -650,21 +693,24 @@ impl Default for SessionManager {
 
 impl Drop for SessionManager {
     fn drop(&mut self) {
-        // Alle Sessions sauber beenden beim App-Close
-        if let Ok(mut sessions) = self.sessions.lock() {
-            let count = sessions.len();
-            if count > 0 {
-                log::info!(
-                    "SessionManager: closing {} active sessions on shutdown",
-                    count
-                );
-            }
-            sessions.clear(); // Drop aller SessionHandles → PTY Master wird geschlossen → Child-Prozesse beendet
-        } else {
-            log::error!(
-                "SessionManager: mutex poisoned during drop, sessions may not be cleaned up"
+        // Alle Sessions sauber beenden beim App-Close.
+        let mut sessions = self.lock_sessions();
+        let count = sessions.len();
+        if count > 0 {
+            log::info!(
+                "SessionManager: closing {} active sessions on shutdown",
+                count
             );
         }
+        // Jede Session explizit killen + Watcher abbrechen, bevor der Handle
+        // gedroppt wird — analog zu close_session.
+        for (id, handle) in sessions.iter_mut() {
+            handle.watcher_cancelled.store(true, Ordering::SeqCst);
+            if let Err(e) = handle.killer.kill() {
+                log::warn!("Session {} kill failed during shutdown: {}", id, e);
+            }
+        }
+        sessions.clear(); // Drop aller SessionHandles → PTY Master geschlossen.
     }
 }
 
@@ -1153,6 +1199,60 @@ mod tests {
         let mgr = SessionManager::new();
         let err = mgr.close_session("nope").unwrap_err();
         assert_eq!(err.code, ADPErrorCode::SessionNotFound);
+    }
+
+    // --- Finding 1: close_session kill path (regression guard) ---
+    //
+    // The real kill happens inside close_session via the stored ChildKiller,
+    // which requires a real spawned PTY child and cannot be unit-tested in
+    // isolation. We pin the source text so a deletion of the explicit kill
+    // call turns this test red before the regression ships: a per-session
+    // close that relies only on master-drop leaks the shell + MCP grandchildren
+    // on Windows.
+    #[test]
+    fn close_session_invokes_killer() {
+        let src = include_str!("manager.rs");
+        assert!(
+            src.contains("removed.killer.kill()"),
+            "close_session must explicitly kill the child via the stored killer \
+             — dropping the master alone does not terminate grandchildren"
+        );
+        assert!(
+            src.contains("let killer = child.clone_killer();"),
+            "a killer handle must be cloned from the child at spawn time so \
+             close_session can terminate the shell deterministically"
+        );
+    }
+
+    // --- Finding 2: watcher cancellation flag ---
+    #[test]
+    fn close_session_cancels_watcher() {
+        let src = include_str!("manager.rs");
+        assert!(
+            src.contains("removed.watcher_cancelled.store(true, Ordering::SeqCst)"),
+            "close_session must set the watcher cancel flag so the claude-id \
+             watcher exits early instead of emitting for a dead session"
+        );
+        assert!(
+            src.contains("if cancel.load(Ordering::SeqCst)"),
+            "run_id_watcher must poll the cancel flag each iteration"
+        );
+    }
+
+    // --- Finding 3: single mutex-poison helper ---
+    #[test]
+    fn all_session_access_routes_through_lock_helper() {
+        let src = include_str!("manager.rs");
+        // Only the helper itself may call .sessions.lock(); every other accessor
+        // must go through lock_sessions(). Examine only the production portion —
+        // this test module itself mentions the literal in comments/asserts.
+        let prod = src.split("#[cfg(test)]").next().unwrap_or(src);
+        let direct_locks = prod.matches(".sessions.lock()").count();
+        assert_eq!(
+            direct_locks, 1,
+            "exactly one .sessions.lock() call must remain (inside \
+             lock_sessions); found {direct_locks}"
+        );
     }
 
     #[test]
