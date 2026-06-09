@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { KanbanBoard } from "./KanbanBoard";
+import { KanbanBoard, __resetKanbanCachesForTest } from "./KanbanBoard";
 import { invoke } from "@tauri-apps/api/core";
 
 // ── Mocks ─────────────────────────────────────────────────────────────
@@ -56,6 +56,13 @@ vi.mock("./KanbanDetailModal", () => ({
 }));
 
 import { useProjectStore } from "../../store/projectStore";
+
+// Folder/project mode was removed — KanbanBoard is global-only and takes no
+// props. This thin test seam lets the existing render(<Board folder=… />) call
+// sites compile unchanged; the folder value is intentionally ignored.
+function Board(_props: { folder?: string | null }) {
+  return <KanbanBoard />;
+}
 
 // ── Test fixtures ─────────────────────────────────────────────────────
 
@@ -127,62 +134,46 @@ function makeBoard() {
 
 // ── Store setup ───────────────────────────────────────────────────────
 
-const mockSetFolderProject = vi.fn();
 const mockSetGlobalProject = vi.fn();
-const mockGetProjectForFolder = vi.fn();
 const mockGetGlobalProject = vi.fn();
 const mockInvoke = vi.mocked(invoke);
 
+/** Static store with (default) or without a globally-selected board. */
 function setupStore(withProject = true) {
+  const proj = withProject
+    ? { projectNumber: 2, projectId: "PVT_abc123", title: "Smashq" }
+    : undefined;
   vi.mocked(useProjectStore).mockReturnValue({
-    projectByFolder: {},
-    globalProject: null,
-    setFolderProject: mockSetFolderProject,
+    globalProject: proj ?? null,
     setGlobalProject: mockSetGlobalProject,
-    getProjectForFolder: withProject
-      ? mockGetProjectForFolder.mockReturnValue({
-          projectNumber: 2,
-          projectId: "PVT_abc123",
-          title: "Smashq",
-        })
-      : mockGetProjectForFolder.mockReturnValue(undefined),
-    getGlobalProject: mockGetGlobalProject.mockReturnValue(undefined),
+    getGlobalProject: mockGetGlobalProject.mockReturnValue(proj),
   } as ReturnType<typeof useProjectStore>);
 }
 
+/** A distinct global board (used where a specific title is asserted). */
 function setupGlobalStore() {
+  const proj = { projectNumber: 5, projectId: "PVT_g1", title: "Global Board" };
   vi.mocked(useProjectStore).mockReturnValue({
-    projectByFolder: {},
-    globalProject: { projectNumber: 5, projectId: "PVT_g1", title: "Global Board" },
-    setFolderProject: mockSetFolderProject,
+    globalProject: proj,
     setGlobalProject: mockSetGlobalProject,
-    getProjectForFolder: mockGetProjectForFolder.mockReturnValue(undefined),
-    getGlobalProject: mockGetGlobalProject.mockReturnValue({
-      projectNumber: 5,
-      projectId: "PVT_g1",
-      title: "Global Board",
-    }),
+    getGlobalProject: mockGetGlobalProject.mockReturnValue(proj),
   } as ReturnType<typeof useProjectStore>);
 }
 
 /**
- * Stateful store fixture: `setFolderProject` actually mutates a backing
- * variable that `getProjectForFolder` reads. This lets the picker /
- * auto-select flow run end-to-end (loadProjects → setFolderProject →
- * loadBoard), which the static `setupStore` cannot model.
+ * Stateful store fixture: `setGlobalProject` mutates a backing variable that
+ * `getGlobalProject` reads, so the auto-select/picker flow runs end-to-end
+ * (loadProjects → setGlobalProject → loadBoard), which `setupStore` cannot model.
  */
 function setupStatefulStore(): { current: unknown } {
   const ref: { current: unknown } = { current: undefined };
-  const setFolder = vi.fn((_folder: string, proj: unknown) => {
+  const setGlobal = vi.fn((proj: unknown) => {
     ref.current = proj;
   });
   vi.mocked(useProjectStore).mockReturnValue({
-    projectByFolder: {},
     globalProject: null,
-    setFolderProject: setFolder,
-    setGlobalProject: mockSetGlobalProject,
-    getProjectForFolder: () => ref.current,
-    getGlobalProject: () => undefined,
+    setGlobalProject: setGlobal,
+    getGlobalProject: () => ref.current,
   } as unknown as ReturnType<typeof useProjectStore>);
   return ref;
 }
@@ -193,6 +184,9 @@ describe("KanbanBoard — Projects v2", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    // Caches are process-global; clear so tests don't serve each other stale
+    // boards (global cache key is `global:${projectId}`, shared across tests).
+    __resetKanbanCachesForTest();
     // jsdom lacks Document.elementsFromPoint; stub it so the drag tests can
     // spyOn/override it to resolve the lane under the pointer.
     document.elementsFromPoint = vi.fn(() => []);
@@ -202,18 +196,18 @@ describe("KanbanBoard — Projects v2", () => {
     // Project already in store → only get_project_board is called; keep it pending.
     setupStore();
     mockInvoke.mockReturnValue(new Promise(() => {})); // never resolves
-    render(<KanbanBoard folder="/test/loading" />);
+    render(<Board folder="/test/loading" />);
 
     expect(screen.getByText("Lade Kanban-Daten...")).toBeTruthy();
   });
 
   it("renders dynamic lanes from GitHub Projects v2 Status field", async () => {
-    // setupStore(true) → getProjectForFolder returns a project immediately,
+    // setupStore(true) → getGlobalProject returns a project immediately,
     // so loadProjects is skipped and only get_project_board is called.
     setupStore();
     mockInvoke.mockResolvedValueOnce(makeBoard()); // get_project_board
 
-    render(<KanbanBoard folder="/test/lanes" />);
+    render(<Board folder="/test/lanes" />);
 
     await waitFor(() => {
       // Lane names come from GitHub, not hardcoded strings
@@ -229,7 +223,7 @@ describe("KanbanBoard — Projects v2", () => {
     setupStore();
     mockInvoke.mockResolvedValueOnce(makeBoard()); // get_project_board
 
-    render(<KanbanBoard folder="/test/items" />);
+    render(<Board folder="/test/items" />);
 
     await waitFor(() => {
       expect(screen.getByText("Backlog issue")).toBeTruthy();
@@ -243,7 +237,7 @@ describe("KanbanBoard — Projects v2", () => {
     setupStore();
     mockInvoke.mockResolvedValueOnce(makeBoard()); // get_project_board
 
-    render(<KanbanBoard folder="/test/nostatus" />);
+    render(<Board folder="/test/nostatus" />);
 
     await waitFor(() => {
       expect(screen.getByText("Kein Status")).toBeTruthy();
@@ -255,7 +249,7 @@ describe("KanbanBoard — Projects v2", () => {
     setupStore();
     mockInvoke.mockResolvedValueOnce(makeBoard()); // get_project_board
 
-    const { container } = render(<KanbanBoard folder="/test/laneids" />);
+    const { container } = render(<Board folder="/test/laneids" />);
 
     await waitFor(() => {
       expect(screen.getByText("Backlog")).toBeTruthy();
@@ -275,7 +269,7 @@ describe("KanbanBoard — Projects v2", () => {
     setupStore();
     mockInvoke.mockRejectedValueOnce(new Error("Network error")); // get_project_board fails
 
-    render(<KanbanBoard folder="/test/error" />);
+    render(<Board folder="/test/error" />);
 
     await waitFor(() => {
       expect(screen.getByText("Fehler beim Laden des Boards")).toBeTruthy();
@@ -293,7 +287,7 @@ describe("KanbanBoard — Projects v2", () => {
       retryable: false,
     }); // get_project_board fails with a real scope error
 
-    render(<KanbanBoard folder="/test/scope" />);
+    render(<Board folder="/test/scope" />);
 
     await waitFor(() => {
       expect(screen.getByText(/gh auth refresh/)).toBeTruthy();
@@ -311,7 +305,7 @@ describe("KanbanBoard — Projects v2", () => {
       retryable: false,
     });
 
-    render(<KanbanBoard folder={null} />);
+    render(<Board folder={null} />);
 
     await waitFor(() => {
       expect(screen.getByText("Board nicht gefunden")).toBeTruthy();
@@ -331,7 +325,7 @@ describe("KanbanBoard — Projects v2", () => {
       retryable: false,
     });
 
-    render(<KanbanBoard folder={null} />);
+    render(<Board folder={null} />);
 
     await waitFor(() => {
       expect(screen.getByText("Board nicht gefunden")).toBeTruthy();
@@ -344,7 +338,7 @@ describe("KanbanBoard — Projects v2", () => {
     setupStore();
     mockInvoke.mockResolvedValueOnce(makeBoard()); // get_project_board
 
-    render(<KanbanBoard folder="/test/header" />);
+    render(<Board folder="/test/header" />);
 
     await waitFor(() => {
       expect(screen.getByText("Smashq")).toBeTruthy();
@@ -355,7 +349,7 @@ describe("KanbanBoard — Projects v2", () => {
     setupStore();
     mockInvoke.mockResolvedValueOnce(makeBoard()); // get_project_board
 
-    const { container } = render(<KanbanBoard folder="/test/nodnd" />);
+    const { container } = render(<Board folder="/test/nodnd" />);
 
     await waitFor(() => {
       expect(screen.getByText("Backlog")).toBeTruthy();
@@ -367,21 +361,21 @@ describe("KanbanBoard — Projects v2", () => {
     });
   });
 
-  it("global mode (folder=null) loads board and passes folder:null to backend", async () => {
+  it("loads the globally-selected board by its project id", async () => {
     setupGlobalStore();
     mockInvoke.mockResolvedValueOnce(makeBoard()); // get_project_board
 
-    render(<KanbanBoard folder={null} />);
+    render(<Board />);
 
     await waitFor(() => {
       expect(screen.getByText("Backlog")).toBeTruthy();
       expect(screen.getByText("Global Board")).toBeTruthy();
     });
 
-    // Board was fetched with folder: null — backend uses temp_dir fallback.
+    // Board is addressed by its global project id (no folder mode anymore).
     expect(mockInvoke).toHaveBeenCalledWith(
       "get_project_board",
-      expect.objectContaining({ folder: null })
+      expect.objectContaining({ projectId: "PVT_g1" })
     );
   });
 
@@ -391,7 +385,7 @@ describe("KanbanBoard — Projects v2", () => {
     setupStore();
     mockInvoke.mockResolvedValueOnce(makeBoard()); // get_project_board
 
-    render(<KanbanBoard folder="/test/count" />);
+    render(<Board folder="/test/count" />);
 
     // makeBoard has 5 items in total.
     await waitFor(() => {
@@ -403,7 +397,7 @@ describe("KanbanBoard — Projects v2", () => {
     setupStore();
     mockInvoke.mockResolvedValueOnce(makeBoard()); // get_project_board
 
-    const { container } = render(<KanbanBoard folder="/test/lanecount" />);
+    const { container } = render(<Board folder="/test/lanecount" />);
 
     await waitFor(() => {
       expect(screen.getByText("Backlog")).toBeTruthy();
@@ -418,7 +412,7 @@ describe("KanbanBoard — Projects v2", () => {
     setupStore();
     mockInvoke.mockResolvedValueOnce(makeBoard()); // get_project_board
 
-    render(<KanbanBoard folder="/test/emptylane" />);
+    render(<Board folder="/test/emptylane" />);
 
     await waitFor(() => {
       expect(screen.getByText("In progress")).toBeTruthy();
@@ -433,7 +427,7 @@ describe("KanbanBoard — Projects v2", () => {
     // Backend returns null board — component renders nothing after loading.
     mockInvoke.mockResolvedValueOnce(null);
 
-    const { container } = render(<KanbanBoard folder="/test/nullboard" />);
+    const { container } = render(<Board folder="/test/nullboard" />);
 
     await waitFor(() => {
       expect(screen.queryByText("Lade Kanban-Daten...")).toBeNull();
@@ -456,7 +450,7 @@ describe("KanbanBoard — Projects v2", () => {
       return Promise.resolve(makeBoard());
     });
 
-    render(<KanbanBoard folder="/test/picker-open" />);
+    render(<Board folder="/test/picker-open" />);
 
     await waitFor(() => {
       expect(screen.getByText("Backlog")).toBeTruthy();
@@ -474,7 +468,7 @@ describe("KanbanBoard — Projects v2", () => {
     expect(screen.getByText("3 Items")).toBeTruthy();
   });
 
-  it("selecting a project from the picker calls setFolderProject and closes the picker", async () => {
+  it("selecting a project from the picker persists it globally and closes the picker", async () => {
     const ref = setupStatefulStore();
     mockInvoke.mockImplementation((cmd: string) => {
       if (cmd === "list_user_projects") {
@@ -486,7 +480,7 @@ describe("KanbanBoard — Projects v2", () => {
       return Promise.resolve(makeBoard());
     });
 
-    render(<KanbanBoard folder="/test/picker-select" />);
+    render(<Board folder="/test/picker-select" />);
 
     await waitFor(() => {
       expect(screen.getByText("Backlog")).toBeTruthy();
@@ -499,7 +493,7 @@ describe("KanbanBoard — Projects v2", () => {
 
     fireEvent.click(screen.getByText("Side Project"));
 
-    // setFolderProject updated the backing project reference.
+    // setGlobalProject updated the backing project reference.
     expect(ref.current).toMatchObject({ projectNumber: 9, projectId: "PVT_other" });
     // Dropdown closes after selection.
     await waitFor(() => {
@@ -518,7 +512,7 @@ describe("KanbanBoard — Projects v2", () => {
       return Promise.resolve(makeBoard());
     });
 
-    render(<KanbanBoard folder="/test/picker-toggle" />);
+    render(<Board folder="/test/picker-toggle" />);
 
     await waitFor(() => {
       expect(screen.getByText("Backlog")).toBeTruthy();
@@ -556,7 +550,7 @@ describe("KanbanBoard — Projects v2", () => {
       return Promise.resolve(makeBoard());
     });
 
-    render(<KanbanBoard folder="/test/owner-switch" />);
+    render(<Board folder="/test/owner-switch" />);
 
     await waitFor(() => expect(screen.getByText("Backlog")).toBeTruthy());
 
@@ -580,7 +574,7 @@ describe("KanbanBoard — Projects v2", () => {
       return Promise.resolve(makeBoard());
     });
 
-    render(<KanbanBoard folder="/test/empty-owner" />);
+    render(<Board folder="/test/empty-owner" />);
 
     await waitFor(() => {
       expect(screen.getByText(/Kein Board/i)).toBeTruthy();
@@ -597,7 +591,7 @@ describe("KanbanBoard — Projects v2", () => {
       .mockResolvedValueOnce(makeBoard()) // initial get_project_board
       .mockResolvedValue(makeBoard()); // refresh
 
-    render(<KanbanBoard folder="/test/refresh" />);
+    render(<Board folder="/test/refresh" />);
 
     await waitFor(() => {
       expect(screen.getByText("Backlog")).toBeTruthy();
@@ -623,7 +617,7 @@ describe("KanbanBoard — Projects v2", () => {
       .mockRejectedValueOnce(new Error("Network error")) // first load fails
       .mockResolvedValueOnce(makeBoard()); // retry succeeds
 
-    render(<KanbanBoard folder="/test/retry" />);
+    render(<Board folder="/test/retry" />);
 
     await waitFor(() => {
       expect(screen.getByText("Fehler beim Laden des Boards")).toBeTruthy();
@@ -643,7 +637,7 @@ describe("KanbanBoard — Projects v2", () => {
     setupStore();
     mockInvoke.mockResolvedValueOnce(makeBoard()); // get_project_board
 
-    render(<KanbanBoard folder="/test/cardclick" />);
+    render(<Board folder="/test/cardclick" />);
 
     await waitFor(() => {
       expect(screen.getByText("Backlog issue")).toBeTruthy();
@@ -663,7 +657,7 @@ describe("KanbanBoard — Projects v2", () => {
     setupStore();
     mockInvoke.mockResolvedValueOnce(makeBoard()); // get_project_board
 
-    render(<KanbanBoard folder="/test/nomodal" />);
+    render(<Board folder="/test/nomodal" />);
 
     await waitFor(() => {
       expect(screen.getByText("Backlog issue")).toBeTruthy();
@@ -683,7 +677,7 @@ describe("KanbanBoard — Projects v2", () => {
       return Promise.resolve(makeBoard());
     });
 
-    render(<KanbanBoard folder="/test/listfail" />);
+    render(<Board folder="/test/listfail" />);
 
     await waitFor(() => {
       expect(screen.getByText("Fehler beim Laden des Boards")).toBeTruthy();
@@ -691,14 +685,11 @@ describe("KanbanBoard — Projects v2", () => {
   });
 
   it("renders cross-repo repository badge for global-board items", async () => {
-    // Distinct project number so the module-level board cache (keyed by
-    // project number) does not serve a stale board from an earlier test.
+    // Distinct project id so the module-level board cache (keyed by project id)
+    // does not serve a stale board from an earlier test.
     vi.mocked(useProjectStore).mockReturnValue({
-      projectByFolder: {},
       globalProject: { projectNumber: 77, projectId: "PVT_g77", title: "Repo Board" },
-      setFolderProject: mockSetFolderProject,
       setGlobalProject: mockSetGlobalProject,
-      getProjectForFolder: () => undefined,
       getGlobalProject: () => ({
         projectNumber: 77,
         projectId: "PVT_g77",
@@ -716,7 +707,7 @@ describe("KanbanBoard — Projects v2", () => {
     } as unknown as (typeof board.items)[0];
     mockInvoke.mockResolvedValueOnce(board); // get_project_board
 
-    render(<KanbanBoard folder={null} />);
+    render(<Board folder={null} />);
 
     await waitFor(() => {
       expect(screen.getByText("octocat/hello-world")).toBeTruthy();
@@ -750,7 +741,7 @@ describe("KanbanBoard — Projects v2", () => {
     setupStore();
     mockInvoke.mockResolvedValueOnce(makeBoard()); // get_project_board
 
-    const { container } = render(<KanbanBoard folder="/test/drag-highlight" />);
+    const { container } = render(<Board folder="/test/drag-highlight" />);
     await waitFor(() => expect(screen.getByText("Ready issue")).toBeTruthy());
 
     const moveOver = startDragOverLane("Ready issue");
@@ -766,7 +757,7 @@ describe("KanbanBoard — Projects v2", () => {
     setupStore();
     mockInvoke.mockResolvedValueOnce(makeBoard()); // get_project_board
 
-    const { container } = render(<KanbanBoard folder="/test/drag-guard" />);
+    const { container } = render(<Board folder="/test/drag-guard" />);
     await waitFor(() => expect(screen.getByText("Ready issue")).toBeTruthy());
 
     const moveOver = startDragOverLane("Ready issue");

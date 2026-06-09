@@ -73,6 +73,15 @@ interface ProjectListEntry {
 const projectListCache = new Map<string, ProjectListEntry>();
 const PROJECT_LIST_TTL = 30_000;
 
+/** Test-only: clears the module-level board + project-list caches so unit tests
+ *  don't serve each other stale data (cache keys are process-global). No-op
+ *  cost in production; never called outside tests. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function __resetKanbanCachesForTest(): void {
+  cache.clear();
+  projectListCache.clear();
+}
+
 /** Fixed lane width — every Kanban column (incl. the "no status" column) uses this. */
 const LANE_WIDTH_CLASS = "w-[260px] min-w-[260px]";
 
@@ -90,16 +99,14 @@ function toKanbanIssue(item: ProjectItem): KanbanIssue {
   };
 }
 
-// ── Props ─────────────────────────────────────────────────────────────
-
-interface KanbanBoardProps {
-  /** Folder path for folder-mode boards; null for the global user board. */
-  folder: string | null;
-}
-
 // ── Component ─────────────────────────────────────────────────────────
 
-export function KanbanBoard({ folder }: KanbanBoardProps) {
+/**
+ * The Kanban board. Shows ONE globally-selected GitHub Projects v2 board,
+ * switchable via the header picker (account dropdown → board). There is no
+ * folder/project mode — board selection is a single global preference.
+ */
+export function KanbanBoard() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [board, setBoard] = useState<ProjectBoard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -119,27 +126,19 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
   const [moveError, setMoveError] = useState<string | null>(null);
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
 
-  const { setFolderProject, getProjectForFolder, setGlobalProject, getGlobalProject } =
-    useProjectStore();
+  const { setGlobalProject, getGlobalProject } = useProjectStore();
 
-  /** True when operating in folder-free global user-board mode. */
-  const isGlobal = folder === null;
-
-  /** Resolves the active project — global board or the folder's project. */
+  /** Resolves the globally-selected board (undefined until one is chosen). */
   const resolveProject = useCallback(
-    () => (isGlobal ? getGlobalProject() : getProjectForFolder(folder ?? "")),
-    [folder, isGlobal, getGlobalProject, getProjectForFolder]
+    () => getGlobalProject(),
+    [getGlobalProject]
   );
 
   /** Builds the board cache key from the GLOBALLY UNIQUE project id.
    *  Projects v2 numbers are owner-relative (a user board #1 and an org board #1
-   *  collide), so keying on the number would serve the wrong board once org
-   *  boards are selectable. The id (`PVT_…`) is unique across owners. */
-  const cacheKeyFor = useCallback(
-    (projectId: string) =>
-      isGlobal ? `global:${projectId}` : `${folder}:${projectId}`,
-    [folder, isGlobal]
-  );
+   *  collide), so keying on the number would serve the wrong board. The id
+   *  (`PVT_…`) is unique across owners. */
+  const cacheKeyFor = useCallback((projectId: string) => `global:${projectId}`, []);
 
   /** Drops the cached board for the active project so the next load re-fetches. */
   const invalidateBoardCache = useCallback(() => {
@@ -191,8 +190,7 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
       owner: string = SELF_OWNER,
       opts: { silent?: boolean } = {},
     ) => {
-      const base = isGlobal ? "__global__" : (folder ?? "__null__");
-      const listKey = `${base}:${owner}`;
+      const listKey = `global:${owner}`;
       const cached = projectListCache.get(listKey);
       if (cached && Date.now() - cached.timestamp < PROJECT_LIST_TTL) {
         if (!signal.aborted) setProjects(cached.projects);
@@ -203,7 +201,6 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
         const result = await wrapInvoke<ProjectSummary[]>("list_user_projects", {
           // `@me` is the backend default; send a concrete login only for orgs.
           owner: owner === SELF_OWNER ? undefined : owner,
-          folder,
         });
         if (signal.aborted) return result;
         projectListCache.set(listKey, { projects: result, timestamp: Date.now() });
@@ -223,7 +220,7 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
         return [];
       }
     },
-    [folder, isGlobal]
+    []
   );
 
   /** Lazily loads the owner list (viewer + orgs) for the picker dropdown.
@@ -234,18 +231,21 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
     if (ownersAttemptedRef.current) return;
     ownersAttemptedRef.current = true;
     try {
-      const result = await invoke<ProjectOwner[]>("list_project_owners", { folder });
-      setOwners(Array.isArray(result) ? result : []);
+      const result = await invoke<ProjectOwner[]>("list_project_owners", {});
+      const list = Array.isArray(result) ? result : [];
+      setOwners(list);
       setSelectedOwner((prev) => {
         if (prev) return prev;
         const current = resolveProject();
-        return current?.owner ?? result[0]?.login ?? SELF_OWNER;
+        // Guard list[0] via the sanitized `list`, never the raw (maybe
+        // undefined) invoke result.
+        return current?.owner ?? list[0]?.login ?? SELF_OWNER;
       });
     } catch (err) {
       // Non-fatal: the board itself may still load; just log and keep @me.
       logError("KanbanBoard.loadOwners", err);
     }
-  }, [folder, resolveProject]);
+  }, [resolveProject]);
 
   /** Aborts the in-flight owner-switch list call so rapid A→B→A switches can't
    *  let a stale resolve clobber the currently-selected owner's board list. */
@@ -293,7 +293,6 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
         const result = await wrapInvoke<ProjectBoard>("get_project_board", {
           projectNumber: proj.projectNumber,
           projectId: proj.projectId,
-          folder,
         });
         if (signal.aborted) return;
         const cacheEntry: CacheEntry = { board: result, timestamp: Date.now() };
@@ -310,12 +309,11 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
         setLoading(false);
       }
     },
-    [folder, resolveProject, cacheKeyFor]
+    [resolveProject, cacheKeyFor]
   );
 
-  // Single effect keyed on both folder and selected project number.
-  // AbortController prevents stale async callbacks from updating state after
-  // unmount or before the next effect fires.
+  // Load effect keyed on the selected project id. AbortController prevents
+  // stale async callbacks from updating state after unmount or re-fire.
   useEffect(() => {
     const controller = new AbortController();
     const { signal } = controller;
@@ -340,8 +338,7 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
           return;
         }
         const auto = { projectNumber: list[0].number, projectId: list[0].id, title: list[0].title };
-        if (isGlobal) setGlobalProject(auto);
-        else setFolderProject(folder ?? "", auto);
+        setGlobalProject(auto);
         // loadBoard reads store — defer one tick so Zustand state has updated.
         void loadBoard(signal);
       });
@@ -349,16 +346,20 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
 
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folder, isGlobal, selectedProject?.projectId]);
+  }, [selectedProject?.projectId]);
 
   // When there is no board to show (no selection, empty owner, or a not-found
   // board), the chooser screen is rendered — make sure the owner list is loaded
   // so the user can switch to an org. Guarded once via ownersAttemptedRef.
   useEffect(() => {
-    const needChooser =
-      !loading && !board && (!errorInfo || errorInfo.kind === "board_not_found");
-    if (needChooser) void loadOwners();
-  }, [loading, board, errorInfo, loadOwners]);
+    // Mirror the chooser-render gate: only load owners when the chooser is
+    // actually shown (no board, and either no selection or a not-found board).
+    const showsChooser =
+      !loading &&
+      !board &&
+      (!selectedProject || errorInfo?.kind === "board_not_found");
+    if (showsChooser) void loadOwners();
+  }, [loading, board, errorInfo, selectedProject, loadOwners]);
 
   // ── Drag & drop ─────────────────────────────────────────────────────
 
@@ -401,7 +402,6 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
           itemId: movedItemId,
           fieldId: currentBoard.status_field_id,
           optionId: targetOptionId,
-          folder,
         });
         // Invalidate cache so next refresh reflects server state.
         invalidateBoardCache();
@@ -427,7 +427,7 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
         setMoving(null);
       }
     },
-    [folder, invalidateBoardCache]
+    [invalidateBoardCache]
   );
 
   const startGlobalDragListeners = useCallback(() => {
@@ -479,10 +479,9 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
         ? { owner: selectedOwner }
         : {}),
     };
-    if (isGlobal) setGlobalProject(entry);
-    else setFolderProject(folder ?? "", entry);
+    setGlobalProject(entry);
     setProjectPickerOpen(false);
-    // State update above triggers the useEffect via selectedProject?.projectNumber dep.
+    // State update above triggers the load effect via selectedProject?.projectId dep.
   };
 
   /** Renders a draggable KanbanCard for a board item — shared by all columns.
@@ -763,7 +762,7 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
       {selectedIssue !== null && (
         <KanbanDetailModal
           open
-          folder={folder}
+          folder={null}
           repository={selectedIssue.repository}
           issueNumber={selectedIssue.number}
           onClose={() => setSelectedIssue(null)}

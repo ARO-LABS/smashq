@@ -180,8 +180,9 @@ describe("ConfigPanelTabList", () => {
     expect(screen.getByTitle("Hooks")).toBeTruthy();
     expect(screen.getByTitle("GitHub")).toBeTruthy();
     expect(screen.getByTitle("Worktrees")).toBeTruthy();
-    expect(screen.getByTitle("Kanban")).toBeTruthy();
     expect(screen.getByTitle("History")).toBeTruthy();
+    // Kanban is no longer a config-sidebar tab (it lives in its own window).
+    expect(screen.queryByTitle("Kanban")).toBeNull();
   });
 
   it("renders group separators between tab groups", () => {
@@ -231,11 +232,10 @@ describe("ConfigPanelTabList", () => {
     await waitFor(() => {
       expect(screen.getByTitle("GitHub")).toBeTruthy();
       expect(screen.getByTitle("Worktrees")).toBeTruthy();
-      expect(screen.getByTitle("Kanban")).toBeTruthy();
     });
   });
 
-  it("hides GitHub/Worktrees/Kanban when has_github=false and has_git=false", async () => {
+  it("hides GitHub/Worktrees when has_github=false and has_git=false", async () => {
     mockInvoke.mockImplementation(
       makeInvokeImplDetailed({
         projectPresence: {
@@ -257,7 +257,7 @@ describe("ConfigPanelTabList", () => {
     expect(screen.getByTitle("History")).toBeTruthy();
   });
 
-  it("shows Worktrees but hides GitHub/Kanban when has_git=true and has_github=false", async () => {
+  it("shows Worktrees but hides GitHub when has_git=true and has_github=false", async () => {
     mockInvoke.mockImplementation(
       makeInvokeImplDetailed({
         projectPresence: {

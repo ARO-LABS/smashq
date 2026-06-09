@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { CONFIG_TABS } from "./configPanelShared";
 
 describe("CONFIG_TABS", () => {
-  it("defines all nine configuration tabs", () => {
-    expect(CONFIG_TABS).toHaveLength(9);
+  it("defines all eight configuration tabs (kanban moved to its own window)", () => {
+    expect(CONFIG_TABS).toHaveLength(8);
   });
 
   it("gives every tab a unique id", () => {
@@ -39,8 +39,7 @@ describe("CONFIG_TABS", () => {
     expect(history!.requiresPresence).toBeUndefined();
   });
 
-  it("includes the kanban tab gated behind github presence", () => {
-    const kanban = CONFIG_TABS.find((t) => t.id === "kanban");
-    expect(kanban?.requiresPresence).toBe("github");
+  it("does not include a kanban tab (moved to its own window)", () => {
+    expect(CONFIG_TABS.find((t) => t.id === "kanban")).toBeUndefined();
   });
 });

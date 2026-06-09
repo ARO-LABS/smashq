@@ -7,6 +7,12 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-06-09 — Kanban-Vereinfachung: Prop entfernt ohne ALLE Caller zu greppen; + Cache-Key-Wechsel brach Test-Isolation
+
+**Fehler 1 — Caller nicht vollständig gegreppt:** Ich entfernte das `folder`-Prop von `KanbanBoard`, nachdem ich nur `KanbanDashboardView` als Consumer angenommen hatte. Tatsächlich gab es einen zweiten: `configPanelShared.tsx` (Kanban-Tab pro Session, folder-scoped). tsc fing es — aber erst nach dem halben Refactor; ich hätte VORHER `grep "<KanbanBoard"` über das ganze Repo laufen lassen müssen. **Regel:** Bevor eine Komponenten-/Funktions-Signatur geändert wird, IMMER alle Aufrufstellen greppen (`<Component`, `funcName(`) — nicht nur die eine, die man im Kopf hat. (Wiederholung der [[verify-git-head-before-branching]]-Klasse: live prüfen statt annehmen.) Folge: STOP + re-plan + User-Rückfrage, weil die Design-Annahme falsch war.
+
+**Fehler 2 — Cache-Key-Wechsel brach versteckte Test-Isolation:** Die KanbanBoard-Unit-Tests verließen sich darauf, dass der modul-globale Board-Cache pro Test einen eindeutigen Key hatte (früher `${folder}:${number}`, jede Test-`folder` unterschiedlich). Nach dem Wechsel auf `global:${projectId}` kollidierten Tests mit gleicher `projectId` → ein Test servierte dem nächsten ein gecachtes Board, `mockResolvedValueOnce` blieb unkonsumiert → kaskadierende Fehler (isoliert grün, zusammen rot). **Regel:** Modul-globale Caches in Unit-Tests in `beforeEach` resetten (Test-only-Export `__resetXForTest()`), statt sich auf zufällig-eindeutige Keys zu verlassen. „Isoliert grün, zusammen rot" = immer geteilter Modul-State.
+
 ### 2026-06-09 — Kanban-Overhaul: zwei HIGH-Findings teilten eine Wurzel (owner-relative ID) + Recovery-via-State-Clear feuerte Effekt neu
 
 **Kontext:** Phase A+B des Kanban-Overhauls (Org-Boards ladbar, ehrliche Fehler). 5-Agenten-Review fing zwei HIGH-Bugs, beide in `KanbanBoard.tsx`.
