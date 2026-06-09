@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { RefreshCw, Columns3, AlertCircle, ChevronDown } from "lucide-react";
-import { getErrorMessage } from "../../utils/adpError";
+import {
+  getErrorMessage,
+  classifyGithubError,
+  type GithubErrorInfo,
+} from "../../utils/adpError";
 import { wrapInvoke } from "../../utils/perfLogger";
 import { KanbanCard, type KanbanIssue } from "./KanbanCard";
 import { KanbanDetailModal } from "./KanbanDetailModal";
@@ -16,6 +20,15 @@ interface ProjectSummary {
   title: string;
   items_total: number;
 }
+
+/** An owner whose boards can be listed — the viewer (`user`) or an org. */
+interface ProjectOwner {
+  login: string;
+  kind: string;
+}
+
+/** Sentinel owner login for the authenticated user (`gh ... --owner @me`). */
+const SELF_OWNER = "@me";
 
 interface ProjectLane {
   option_id: string;
@@ -90,7 +103,12 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [board, setBoard] = useState<ProjectBoard | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>("");
+  /** Classified load error (null = no error). Drives honest, kind-specific UI. */
+  const [errorInfo, setErrorInfo] = useState<GithubErrorInfo | null>(null);
+  /** Owners (viewer + orgs) for the picker dropdown; lazily loaded on first open. */
+  const [owners, setOwners] = useState<ProjectOwner[]>([]);
+  /** Currently browsed owner login in the picker; null until the picker loads it. */
+  const [selectedOwner, setSelectedOwner] = useState<string | null>(null);
   /** Tracks the clicked card — stores number + repository for cross-repo modal. */
   const [selectedIssue, setSelectedIssue] = useState<{
     number: number;
@@ -113,17 +131,20 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
     [folder, isGlobal, getGlobalProject, getProjectForFolder]
   );
 
-  /** Builds the board cache key for a project number. */
+  /** Builds the board cache key from the GLOBALLY UNIQUE project id.
+   *  Projects v2 numbers are owner-relative (a user board #1 and an org board #1
+   *  collide), so keying on the number would serve the wrong board once org
+   *  boards are selectable. The id (`PVT_…`) is unique across owners. */
   const cacheKeyFor = useCallback(
-    (projectNumber: number) =>
-      isGlobal ? `global:${projectNumber}` : `${folder}:${projectNumber}`,
+    (projectId: string) =>
+      isGlobal ? `global:${projectId}` : `${folder}:${projectId}`,
     [folder, isGlobal]
   );
 
   /** Drops the cached board for the active project so the next load re-fetches. */
   const invalidateBoardCache = useCallback(() => {
     const proj = resolveProject();
-    if (proj) cache.delete(cacheKeyFor(proj.projectNumber));
+    if (proj) cache.delete(cacheKeyFor(proj.projectId));
   }, [resolveProject, cacheKeyFor]);
 
   /** Stable ref pointing to the latest board — used in drag-drop callbacks
@@ -165,8 +186,13 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
   // ── Data loading ────────────────────────────────────────────────────
 
   const loadProjects = useCallback(
-    async (signal: AbortSignal) => {
-      const listKey = isGlobal ? "__global__" : (folder ?? "__null__");
+    async (
+      signal: AbortSignal,
+      owner: string = SELF_OWNER,
+      opts: { silent?: boolean } = {},
+    ) => {
+      const base = isGlobal ? "__global__" : (folder ?? "__null__");
+      const listKey = `${base}:${owner}`;
       const cached = projectListCache.get(listKey);
       if (cached && Date.now() - cached.timestamp < PROJECT_LIST_TTL) {
         if (!signal.aborted) setProjects(cached.projects);
@@ -175,6 +201,8 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
 
       try {
         const result = await wrapInvoke<ProjectSummary[]>("list_user_projects", {
+          // `@me` is the backend default; send a concrete login only for orgs.
+          owner: owner === SELF_OWNER ? undefined : owner,
           folder,
         });
         if (signal.aborted) return result;
@@ -183,8 +211,14 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
         return result;
       } catch (err) {
         if (!signal.aborted) {
-          setError(getErrorMessage(err));
-          setLoading(false);
+          // `silent` (owner switch inside the picker): keep the chooser visible
+          // with an empty list instead of replacing it with a full-screen error.
+          if (opts.silent) {
+            setProjects([]);
+          } else {
+            setErrorInfo(classifyGithubError(err));
+            setLoading(false);
+          }
         }
         return [];
       }
@@ -192,19 +226,58 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
     [folder, isGlobal]
   );
 
+  /** Lazily loads the owner list (viewer + orgs) for the picker dropdown.
+   *  Attempted at most once; a failure is non-fatal (the picker degrades to
+   *  "@me" only). Owner discovery is what makes org boards selectable. */
+  const ownersAttemptedRef = useRef(false);
+  const loadOwners = useCallback(async () => {
+    if (ownersAttemptedRef.current) return;
+    ownersAttemptedRef.current = true;
+    try {
+      const result = await invoke<ProjectOwner[]>("list_project_owners", { folder });
+      setOwners(Array.isArray(result) ? result : []);
+      setSelectedOwner((prev) => {
+        if (prev) return prev;
+        const current = resolveProject();
+        return current?.owner ?? result[0]?.login ?? SELF_OWNER;
+      });
+    } catch (err) {
+      // Non-fatal: the board itself may still load; just log and keep @me.
+      logError("KanbanBoard.loadOwners", err);
+    }
+  }, [folder, resolveProject]);
+
+  /** Aborts the in-flight owner-switch list call so rapid A→B→A switches can't
+   *  let a stale resolve clobber the currently-selected owner's board list. */
+  const ownerSwitchAbortRef = useRef<AbortController | null>(null);
+
+  /** Switches the browsed owner in the picker and re-lists that owner's boards.
+   *  Runs `silent` so a failing org list keeps the chooser open (empty list)
+   *  instead of ejecting the user to the full-screen error card. */
+  const handleOwnerChange = useCallback(
+    (login: string) => {
+      setSelectedOwner(login);
+      ownerSwitchAbortRef.current?.abort();
+      const controller = new AbortController();
+      ownerSwitchAbortRef.current = controller;
+      void loadProjects(controller.signal, login, { silent: true });
+    },
+    [loadProjects]
+  );
+
   const loadBoard = useCallback(
     async (signal: AbortSignal, forceRefresh = false) => {
       const proj = resolveProject();
       if (!proj) return;
 
-      const cacheKey = cacheKeyFor(proj.projectNumber);
+      const cacheKey = cacheKeyFor(proj.projectId);
 
       if (!forceRefresh) {
         const cached = cache.get(cacheKey);
         if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
           if (!signal.aborted) {
             setBoard(cached.board);
-            setError("");
+            setErrorInfo(null);
             setLoading(false);
           }
           return;
@@ -213,7 +286,7 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
 
       if (!signal.aborted) {
         setLoading(true);
-        setError("");
+        setErrorInfo(null);
       }
 
       try {
@@ -228,10 +301,13 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
         setBoard(result);
         setLoading(false);
       } catch (err) {
-        if (!signal.aborted) {
-          setError(getErrorMessage(err));
-          setLoading(false);
-        }
+        if (signal.aborted) return;
+        // Classify into an honest, kind-specific error. A board_not_found is
+        // NOT auto-cleared here: doing so would re-trigger the load effect and
+        // silently auto-select a *different* board. Instead the render shows the
+        // chooser from errorInfo (selection preserved) so the user picks.
+        setErrorInfo(classifyGithubError(err));
+        setLoading(false);
       }
     },
     [folder, resolveProject, cacheKeyFor]
@@ -245,7 +321,7 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
     const { signal } = controller;
 
     setLoading(true);
-    setError("");
+    setErrorInfo(null);
     setBoard(null);
 
     const proj = resolveProject();
@@ -256,7 +332,13 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
     } else {
       // First visit: load project list, auto-select first, then board.
       void loadProjects(signal).then((list) => {
-        if (signal.aborted || list.length === 0) return;
+        if (signal.aborted) return;
+        // No boards for this owner → stop loading and let the chooser render
+        // (previously `loading` stayed true here, hanging the spinner forever).
+        if (list.length === 0) {
+          setLoading(false);
+          return;
+        }
         const auto = { projectNumber: list[0].number, projectId: list[0].id, title: list[0].title };
         if (isGlobal) setGlobalProject(auto);
         else setFolderProject(folder ?? "", auto);
@@ -267,7 +349,16 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
 
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folder, isGlobal, selectedProject?.projectNumber]);
+  }, [folder, isGlobal, selectedProject?.projectId]);
+
+  // When there is no board to show (no selection, empty owner, or a not-found
+  // board), the chooser screen is rendered — make sure the owner list is loaded
+  // so the user can switch to an org. Guarded once via ownersAttemptedRef.
+  useEffect(() => {
+    const needChooser =
+      !loading && !board && (!errorInfo || errorInfo.kind === "board_not_found");
+    if (needChooser) void loadOwners();
+  }, [loading, board, errorInfo, loadOwners]);
 
   // ── Drag & drop ─────────────────────────────────────────────────────
 
@@ -378,7 +469,16 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
   // ── Project picker ───────────────────────────────────────────────────
 
   const handleSelectProject = (proj: ProjectSummary) => {
-    const entry = { projectNumber: proj.number, projectId: proj.id, title: proj.title };
+    const entry = {
+      projectNumber: proj.number,
+      projectId: proj.id,
+      title: proj.title,
+      // Persist the owner only for orgs; `@me`/self boards load fine without it
+      // (the board is fetched by its global id), keeping legacy entries valid.
+      ...(selectedOwner && selectedOwner !== SELF_OWNER
+        ? { owner: selectedOwner }
+        : {}),
+    };
     if (isGlobal) setGlobalProject(entry);
     else setFolderProject(folder ?? "", entry);
     setProjectPickerOpen(false);
@@ -416,7 +516,61 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
     [startGlobalDragListeners]
   );
 
-  // ── Loading / error states ───────────────────────────────────────────
+  // Opens/closes the picker; loads the owner list the first time it opens so
+  // org boards become selectable.
+  const togglePicker = () => {
+    setProjectPickerOpen((open) => {
+      if (!open) void loadOwners();
+      return !open;
+    });
+  };
+
+  // Owner dropdown + project list, shared by the header picker dropdown and the
+  // full-screen chooser (empty / board-not-found). Single source for the
+  // "switch owner → pick a board (incl. org boards)" flow.
+  const renderProjectChooser = () => (
+    <>
+      <label className="flex items-center gap-2 px-3 py-2 border-b border-neutral-800 text-[11px] text-neutral-500">
+        <span>Konto</span>
+        <select
+          aria-label="Konto"
+          value={selectedOwner ?? SELF_OWNER}
+          onChange={(e) => handleOwnerChange(e.target.value)}
+          className="flex-1 text-xs rounded-sm bg-surface-base border border-neutral-700 text-neutral-300 px-1.5 py-1 outline-none focus-visible:ring-1 focus-visible:ring-accent"
+        >
+          {owners.length === 0 && <option value={SELF_OWNER}>Eigene Boards</option>}
+          {owners.map((o) => (
+            <option key={o.login} value={o.login}>
+              {o.login}
+              {o.kind === "org" ? " (Org)" : ""}
+            </option>
+          ))}
+        </select>
+      </label>
+      {projects.length === 0 ? (
+        <div className="px-3 py-3 text-[11px] text-neutral-600 text-center">
+          Keine Boards für dieses Konto.
+        </div>
+      ) : (
+        projects.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => handleSelectProject(p)}
+            className={`w-full text-left px-3 py-2 text-xs hover:bg-hover-overlay transition-colors ${
+              selectedProject?.projectId === p.id
+                ? "text-accent"
+                : "text-neutral-300"
+            }`}
+          >
+            <span className="block truncate">{p.title}</span>
+            <span className="text-[10px] text-neutral-500">{p.items_total} Items</span>
+          </button>
+        ))
+      )}
+    </>
+  );
+
+  // ── Loading / error / chooser states ─────────────────────────────────
 
   if (loading) {
     return (
@@ -426,27 +580,50 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
     );
   }
 
-  if (error) {
-    const isScope = error.toLowerCase().includes("project");
+  // Hard errors (scope, login, gh missing, network, rate-limit, unknown) get an
+  // honest, kind-specific card. board_not_found is intentionally NOT here — it
+  // falls through to the chooser so the user can pick another board.
+  if (errorInfo && errorInfo.kind !== "board_not_found") {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 text-neutral-500">
         <AlertCircle className="w-10 h-10 text-neutral-600" />
-        <span className="text-sm">Fehler beim Laden des Boards</span>
+        <span className="text-sm">{errorInfo.title}</span>
         <span className="text-xs text-neutral-600 max-w-md text-center">
-          {isScope
-            ? 'GitHub Scope fehlt. Führe aus: gh auth refresh -s project,read:project'
-            : error}
+          {errorInfo.hint}
         </span>
         <button
           onClick={() => {
             const controller = new AbortController();
-            setError("");
+            setErrorInfo(null);
             void loadBoard(controller.signal, true);
           }}
           className="mt-2 px-3 py-1.5 text-xs rounded-md bg-surface-raised text-neutral-300 shadow-hairline hover:shadow-lift hover:bg-hover-overlay hover:text-neutral-100 transition-shadow duration-200"
         >
           Erneut versuchen
         </button>
+      </div>
+    );
+  }
+
+  // No board to show: no selection, the owner has no boards, or the previously
+  // selected board was deleted/renamed. Render the chooser so the user can
+  // select a board — including an org board via the owner dropdown.
+  if (!board && (!selectedProject || errorInfo?.kind === "board_not_found")) {
+    const isNotFound = errorInfo?.kind === "board_not_found";
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 text-neutral-500 px-4">
+        <Columns3 className="w-10 h-10 text-neutral-600" />
+        <span className="text-sm">
+          {isNotFound ? "Board nicht gefunden" : "Kein Board ausgewählt"}
+        </span>
+        <span className="text-xs text-neutral-600 max-w-md text-center">
+          {isNotFound
+            ? errorInfo.hint
+            : "Globales Board wählen — eigene Boards oder ein Board einer Organisation."}
+        </span>
+        <div className="w-[240px] bg-surface-raised rounded-md shadow-hairline overflow-hidden">
+          {renderProjectChooser()}
+        </div>
       </div>
     );
   }
@@ -464,7 +641,7 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
           {/* Project selector */}
           <div className="relative">
             <button
-              onClick={() => setProjectPickerOpen((o) => !o)}
+              onClick={togglePicker}
               className="flex items-center gap-1 text-xs text-neutral-300 hover:text-neutral-100 transition-colors"
             >
               <span className="font-medium">
@@ -473,23 +650,8 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
               <ChevronDown className="w-3 h-3 text-neutral-500" />
             </button>
             {projectPickerOpen && (
-              <div className="absolute left-0 top-full mt-1 z-50 bg-surface-raised rounded-md shadow-lift min-w-[200px] overflow-hidden">
-                {projects.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => handleSelectProject(p)}
-                    className={`w-full text-left px-3 py-2 text-xs hover:bg-hover-overlay transition-colors ${
-                      selectedProject?.projectNumber === p.number
-                        ? "text-accent"
-                        : "text-neutral-300"
-                    }`}
-                  >
-                    <span className="block truncate">{p.title}</span>
-                    <span className="text-[10px] text-neutral-500">
-                      {p.items_total} Items
-                    </span>
-                  </button>
-                ))}
+              <div className="absolute left-0 top-full mt-1 z-50 bg-surface-raised rounded-md shadow-lift min-w-[220px] overflow-hidden">
+                {renderProjectChooser()}
               </div>
             )}
           </div>

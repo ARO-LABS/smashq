@@ -3,6 +3,7 @@ import {
   isADPError,
   parseInvokeError,
   getErrorMessage,
+  classifyGithubError,
 } from "./adpError";
 import type { ADPError } from "../protocols/schema";
 
@@ -178,5 +179,124 @@ describe("getErrorMessage", () => {
         retryable: true,
       }),
     ).toBe("timed out");
+  });
+});
+
+describe("classifyGithubError", () => {
+  it("flags a missing gh CLI", () => {
+    const r = classifyGithubError({
+      code: "SERVICE_REQUEST_FAILED",
+      message: "gh CLI not found. Install from https://cli.github.com",
+      retryable: false,
+    });
+    expect(r.kind).toBe("gh_missing");
+  });
+
+  it("flags a deleted/unfindable board via the not_found details discriminator", () => {
+    const r = classifyGithubError({
+      code: "SERVICE_REQUEST_FAILED",
+      message: "Projekt-Board #4 nicht gefunden",
+      details: "not_found",
+      retryable: false,
+    });
+    expect(r.kind).toBe("board_not_found");
+  });
+
+  it("flags a missing OAuth scope", () => {
+    const r = classifyGithubError({
+      code: "SERVICE_AUTH_FAILED",
+      message: "required scopes: read:project",
+      details: "scope",
+      retryable: false,
+    });
+    expect(r.kind).toBe("scope_missing");
+    // The scope hint must name the concrete recovery command.
+    expect(r.hint).toContain("gh auth refresh");
+  });
+
+  it("flags a not-logged-in state", () => {
+    const r = classifyGithubError({
+      code: "SERVICE_AUTH_FAILED",
+      message: "please run: gh auth login",
+      details: "auth",
+      retryable: false,
+    });
+    expect(r.kind).toBe("not_logged_in");
+  });
+
+  it("flags a forbidden (no-access) error distinctly from scope", () => {
+    const r = classifyGithubError({
+      code: "SERVICE_AUTH_FAILED",
+      message: "Resource not accessible",
+      details: "forbidden",
+      retryable: false,
+    });
+    expect(r.kind).toBe("forbidden");
+    expect(r.kind).not.toBe("scope_missing");
+  });
+
+  it("flags a missing gh CLI via the structured gh_missing discriminator", () => {
+    const r = classifyGithubError({
+      code: "SERVICE_REQUEST_FAILED",
+      message: "etwas ganz anderes",
+      details: "gh_missing",
+      retryable: false,
+    });
+    expect(r.kind).toBe("gh_missing");
+  });
+
+  it("flags rate limiting as retryable", () => {
+    const r = classifyGithubError({
+      code: "SERVICE_RATE_LIMITED",
+      message: "API rate limit exceeded",
+      retryable: true,
+    });
+    expect(r.kind).toBe("rate_limited");
+    expect(r.retryable).toBe(true);
+  });
+
+  it("flags network/timeout as retryable", () => {
+    const r = classifyGithubError({
+      code: "SERVICE_TIMEOUT",
+      message: "could not resolve host",
+      retryable: true,
+    });
+    expect(r.kind).toBe("network");
+    expect(r.retryable).toBe(true);
+  });
+
+  it("does NOT misclassify a not_found board as a scope problem (the original bug)", () => {
+    // Regression guard: the deleted-board NOT_FOUND message contains 'project'
+    // but must never surface as 'GitHub Scope fehlt'.
+    const r = classifyGithubError({
+      code: "SERVICE_REQUEST_FAILED",
+      message: "Could not resolve to a ProjectV2 with the number 4.",
+      details: "not_found",
+      retryable: false,
+    });
+    expect(r.kind).toBe("board_not_found");
+    expect(r.kind).not.toBe("scope_missing");
+  });
+
+  it("falls back to unknown with the raw message for unclassified errors", () => {
+    const r = classifyGithubError({
+      code: "COMMAND_EXECUTION_FAILED",
+      message: "some entirely unexpected failure",
+      retryable: false,
+    });
+    expect(r.kind).toBe("unknown");
+    expect(r.hint).toContain("some entirely unexpected failure");
+  });
+
+  it("gives every kind a non-empty German title and hint", () => {
+    for (const sample of [
+      { code: "SERVICE_AUTH_FAILED", message: "x", details: "scope", retryable: false },
+      { code: "SERVICE_REQUEST_FAILED", message: "y", details: "not_found", retryable: false },
+      { code: "SERVICE_TIMEOUT", message: "z", retryable: true },
+    ] as const) {
+      const r = classifyGithubError(sample);
+      expect(r.title.length).toBeGreaterThan(0);
+      expect(r.hint.length).toBeGreaterThan(0);
+    }
   });
 });

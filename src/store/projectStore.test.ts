@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { useProjectStore } from "./projectStore";
+import { useProjectStore, sanitizeFolderProject } from "./projectStore";
 
 const PROJECT_A = { projectNumber: 1, projectId: "PVT_a", title: "Board A" };
 const PROJECT_B = { projectNumber: 2, projectId: "PVT_b", title: "Board B" };
@@ -89,5 +89,84 @@ describe("persistence", () => {
     const raw = localStorage.getItem("agentic-project-store");
     expect(raw).toBeTruthy();
     expect(raw).toContain("/repo/a");
+  });
+});
+
+describe("sanitizeFolderProject", () => {
+  it("accepts a valid project", () => {
+    expect(
+      sanitizeFolderProject({ projectNumber: 3, projectId: "PVT_x", title: "T" }),
+    ).toEqual({ projectNumber: 3, projectId: "PVT_x", title: "T" });
+  });
+
+  it("preserves an owner login when present", () => {
+    const r = sanitizeFolderProject({
+      projectNumber: 1,
+      projectId: "PVT_x",
+      title: "T",
+      owner: "ARO-LABS",
+    });
+    expect(r?.owner).toBe("ARO-LABS");
+  });
+
+  it("defaults a missing title to an empty string", () => {
+    expect(
+      sanitizeFolderProject({ projectNumber: 1, projectId: "PVT_x" })?.title,
+    ).toBe("");
+  });
+
+  it("rejects a non-positive, non-integer, or NaN project number", () => {
+    expect(sanitizeFolderProject({ projectNumber: 0, projectId: "PVT_x" })).toBeNull();
+    expect(sanitizeFolderProject({ projectNumber: -1, projectId: "PVT_x" })).toBeNull();
+    expect(sanitizeFolderProject({ projectNumber: NaN, projectId: "PVT_x" })).toBeNull();
+    expect(sanitizeFolderProject({ projectNumber: 1.5, projectId: "PVT_x" })).toBeNull();
+  });
+
+  it("rejects a missing or empty projectId", () => {
+    expect(sanitizeFolderProject({ projectNumber: 1, projectId: "" })).toBeNull();
+    expect(sanitizeFolderProject({ projectNumber: 1 })).toBeNull();
+  });
+
+  it("rejects non-objects", () => {
+    expect(sanitizeFolderProject(null)).toBeNull();
+    expect(sanitizeFolderProject("x")).toBeNull();
+    expect(sanitizeFolderProject(42)).toBeNull();
+  });
+});
+
+describe("onRehydrateStorage corruption recovery", () => {
+  it("drops a corrupt globalProject on rehydrate", async () => {
+    localStorage.setItem(
+      "agentic-project-store",
+      JSON.stringify({
+        state: {
+          projectByFolder: {},
+          globalProject: { projectNumber: "bad", title: 5 },
+        },
+        version: 1,
+      }),
+    );
+    await useProjectStore.persist.rehydrate();
+    expect(useProjectStore.getState().globalProject).toBeNull();
+  });
+
+  it("drops corrupt projectByFolder entries but keeps valid ones", async () => {
+    localStorage.setItem(
+      "agentic-project-store",
+      JSON.stringify({
+        state: {
+          projectByFolder: {
+            "/good": { projectNumber: 2, projectId: "PVT_g", title: "G" },
+            "/bad": { projectNumber: 0 },
+          },
+          globalProject: null,
+        },
+        version: 1,
+      }),
+    );
+    await useProjectStore.persist.rehydrate();
+    const map = useProjectStore.getState().projectByFolder;
+    expect(map["/good"]).toBeTruthy();
+    expect(map["/bad"]).toBeUndefined();
   });
 });

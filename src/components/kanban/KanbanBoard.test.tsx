@@ -284,17 +284,60 @@ describe("KanbanBoard — Projects v2", () => {
     expect(screen.getByText("Erneut versuchen")).toBeTruthy();
   });
 
-  it("shows scope hint when error mentions 'project'", async () => {
+  it("shows the scope hint for a STRUCTURED scope error", async () => {
     setupStore();
-    mockInvoke.mockRejectedValueOnce(new Error("Missing project scope")); // get_project_board fails
+    mockInvoke.mockRejectedValueOnce({
+      code: "SERVICE_AUTH_FAILED",
+      message: "required scopes: read:project",
+      details: "scope",
+      retryable: false,
+    }); // get_project_board fails with a real scope error
 
     render(<KanbanBoard folder="/test/scope" />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/gh auth refresh -s project/)
-      ).toBeTruthy();
+      expect(screen.getByText(/gh auth refresh/)).toBeTruthy();
     });
+  });
+
+  it("does NOT show a scope hint for a not_found board (the original misclassification bug)", async () => {
+    // Regression guard: a deleted board's NOT_FOUND message contains 'project'
+    // but must never surface as the scope hint.
+    setupGlobalStore();
+    mockInvoke.mockRejectedValue({
+      code: "SERVICE_REQUEST_FAILED",
+      message: "Could not resolve to a ProjectV2 with the number 5.",
+      details: "not_found",
+      retryable: false,
+    });
+
+    render(<KanbanBoard folder={null} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Board nicht gefunden")).toBeTruthy();
+    });
+    expect(screen.queryByText(/gh auth refresh/)).toBeNull();
+  });
+
+  it("surfaces the chooser on a not_found board WITHOUT silently jumping to another board", async () => {
+    // Regression guard for the review's HIGH finding: board_not_found must NOT
+    // clear the selection (which would re-trigger the effect and auto-select a
+    // different board). The selection is preserved; the chooser is shown.
+    setupGlobalStore();
+    mockInvoke.mockRejectedValue({
+      code: "SERVICE_REQUEST_FAILED",
+      message: "Could not resolve to a ProjectV2",
+      details: "not_found",
+      retryable: false,
+    });
+
+    render(<KanbanBoard folder={null} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Board nicht gefunden")).toBeTruthy();
+    });
+    // No silent clear of the global selection.
+    expect(mockSetGlobalProject).not.toHaveBeenCalledWith(null);
   });
 
   it("shows project title in board header", async () => {
@@ -491,6 +534,59 @@ describe("KanbanBoard — Projects v2", () => {
     await waitFor(() => {
       expect(screen.queryByText("5 Items")).toBeNull();
     });
+  });
+
+  it("lists owners in the picker and switches the board list per owner", async () => {
+    setupStatefulStore();
+    mockInvoke.mockImplementation((cmd: string, args?: unknown) => {
+      if (cmd === "list_project_owners") {
+        return Promise.resolve([
+          { login: "me", kind: "user" },
+          { login: "ARO-LABS", kind: "org" },
+        ]);
+      }
+      if (cmd === "list_user_projects") {
+        const owner = (args as { owner?: string } | undefined)?.owner;
+        return Promise.resolve(
+          owner === "ARO-LABS"
+            ? [{ id: "PVT_org", number: 1, title: "Org Board", items_total: 0 }]
+            : [{ id: "PVT_abc123", number: 2, title: "Smashq", items_total: 5 }],
+        );
+      }
+      return Promise.resolve(makeBoard());
+    });
+
+    render(<KanbanBoard folder="/test/owner-switch" />);
+
+    await waitFor(() => expect(screen.getByText("Backlog")).toBeTruthy());
+
+    fireEvent.click(screen.getByText("Smashq")); // open picker → loads owners
+
+    const ownerSelect = await screen.findByLabelText("Konto");
+    expect(ownerSelect).toBeTruthy();
+
+    // Switching to the org re-lists that owner's boards.
+    fireEvent.change(ownerSelect, { target: { value: "ARO-LABS" } });
+    await waitFor(() => expect(screen.getByText("Org Board")).toBeTruthy());
+  });
+
+  it("shows onboarding guidance + owner chooser when an owner has no boards", async () => {
+    setupStatefulStore();
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "list_user_projects") return Promise.resolve([]);
+      if (cmd === "list_project_owners") {
+        return Promise.resolve([{ login: "me", kind: "user" }]);
+      }
+      return Promise.resolve(makeBoard());
+    });
+
+    render(<KanbanBoard folder="/test/empty-owner" />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Kein Board/i)).toBeTruthy();
+    });
+    // The owner chooser is offered so the user can switch to an org.
+    expect(screen.getByLabelText("Konto")).toBeTruthy();
   });
 
   // ── Refresh ────────────────────────────────────────────────────────────

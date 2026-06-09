@@ -53,3 +53,118 @@ export function getErrorMessage(err: unknown): string {
   const parsed = parseInvokeError(err);
   return parsed.message;
 }
+
+/** Distinct, actionable classes of GitHub-integration failure. */
+export type GithubErrorKind =
+  | "gh_missing"
+  | "not_logged_in"
+  | "scope_missing"
+  | "forbidden"
+  | "board_not_found"
+  | "rate_limited"
+  | "network"
+  | "unknown";
+
+export interface GithubErrorInfo {
+  kind: GithubErrorKind;
+  /** Short German headline for the error UI. */
+  title: string;
+  /** German, actionable next step. */
+  hint: string;
+  /** Whether retrying the same call could succeed. */
+  retryable: boolean;
+}
+
+/**
+ * Classifies a GitHub-integration error into a distinct, actionable kind.
+ *
+ * Branches on the structured `code` + `details` discriminator the Rust backend
+ * now sets (`classify_gh_error`), NOT on substring matching of the message.
+ * This replaces the former `message.includes("project")` heuristic that
+ * mis-reported a deleted board (NOT_FOUND, whose message contains "project")
+ * as a missing OAuth scope — sending users down a useless `gh auth refresh`
+ * path. Each kind carries a German title + concrete next step.
+ */
+export function classifyGithubError(err: unknown): GithubErrorInfo {
+  const parsed = parseInvokeError(err);
+  const code = parsed.code;
+  const details = parsed.details;
+  const lowerMsg = parsed.message.toLowerCase();
+
+  // gh binary missing — checked first because it shares SERVICE_REQUEST_FAILED
+  // with board-not-found. Prefer the structured `gh_missing` details set by
+  // ensure_gh; keep the message fallback for robustness during migration.
+  if (
+    details === "gh_missing" ||
+    lowerMsg.includes("gh cli not found") ||
+    lowerMsg.includes("gh not found")
+  ) {
+    return {
+      kind: "gh_missing",
+      title: "GitHub CLI nicht gefunden",
+      hint: "GitHub CLI von https://cli.github.com installieren und die App neu starten.",
+      retryable: false,
+    };
+  }
+
+  if (code === "SERVICE_REQUEST_FAILED" && details === "not_found") {
+    return {
+      kind: "board_not_found",
+      title: "Board nicht gefunden",
+      hint: "Das gespeicherte Board wurde vermutlich gelöscht, umbenannt oder ist nicht mehr zugänglich. Ein anderes Board wählen.",
+      retryable: false,
+    };
+  }
+
+  if (code === "SERVICE_AUTH_FAILED" && details === "scope") {
+    return {
+      kind: "scope_missing",
+      title: "GitHub-Scope fehlt",
+      hint: "Dem Token fehlt der nötige Scope. Ausführen: gh auth refresh -s read:project,project",
+      retryable: false,
+    };
+  }
+
+  if (code === "SERVICE_AUTH_FAILED" && details === "auth") {
+    return {
+      kind: "not_logged_in",
+      title: "Nicht bei GitHub angemeldet",
+      hint: "Anmelden mit: gh auth login",
+      retryable: false,
+    };
+  }
+
+  if (code === "SERVICE_AUTH_FAILED" && details === "forbidden") {
+    return {
+      kind: "forbidden",
+      title: "Kein Zugriff",
+      hint: "Kein Zugriff auf dieses Board. Zugriff anfragen oder ein anderes Konto wählen.",
+      retryable: false,
+    };
+  }
+
+  if (code === "SERVICE_RATE_LIMITED") {
+    return {
+      kind: "rate_limited",
+      title: "GitHub-Rate-Limit erreicht",
+      hint: "Zu viele Anfragen. In einer Minute erneut versuchen.",
+      retryable: true,
+    };
+  }
+
+  if (code === "SERVICE_TIMEOUT") {
+    return {
+      kind: "network",
+      title: "Netzwerkfehler",
+      hint: "GitHub war nicht erreichbar. Verbindung prüfen und erneut versuchen.",
+      retryable: true,
+    };
+  }
+
+  return {
+    kind: "unknown",
+    title: "Fehler beim Laden des Boards",
+    hint: parsed.message,
+    retryable: parsed.retryable,
+  };
+}
