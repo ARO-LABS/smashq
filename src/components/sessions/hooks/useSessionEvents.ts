@@ -110,8 +110,12 @@ export function useSessionEvents(): void {
       try {
         const id = event?.payload?.id;
         const exitCode = event?.payload?.exit_code;
-        if (typeof id !== "string" || exitCode == null) return;
-        useSessionStore.getState().setExitCode(id, exitCode as number);
+        // exit_code is an `unknown` payload field. A bare null-check + `as number`
+        // cast let a string / NaN / Infinity through and corrupt the store.
+        // Guard the real type before writing; non-finite numbers are dropped.
+        if (typeof id !== "string") return;
+        if (typeof exitCode !== "number" || !Number.isFinite(exitCode)) return;
+        useSessionStore.getState().setExitCode(id, exitCode);
       } catch (err) {
         logError("useSessionEvents.sessionExit", err);
       }

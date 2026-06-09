@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
-import { dedupRestorableSessions } from "./sessionRestoreSync";
-import type { ClaudeSession } from "./sessionStore";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { dedupRestorableSessions, initSessionRestoreSync } from "./sessionRestoreSync";
+import { useSessionStore, type ClaudeSession } from "./sessionStore";
+import { useSettingsStore } from "./settingsStore";
 
 function makeSession(overrides: Partial<ClaudeSession>): ClaudeSession {
   return {
@@ -102,5 +103,51 @@ describe("dedupRestorableSessions", () => {
     expect(Object.keys(result[0]).sort()).toEqual(
       ["claudeSessionId", "folder", "shell", "title"].sort(),
     );
+  });
+});
+
+describe("initSessionRestoreSync activeFolder change detection", () => {
+  beforeEach(() => {
+    vi.stubEnv("MODE", "test");
+    useSettingsStore.setState({
+      sessionRestore: {
+        enabled: true,
+        sessions: [],
+        activeFolder: null,
+        layoutMode: "single",
+        gridFolders: [],
+      },
+    });
+    useSessionStore.setState({
+      sessions: [
+        makeSession({ id: "s1", folder: "C:/proj/a", claudeSessionId: "uuid-1" }),
+        makeSession({ id: "s2", folder: "C:/proj/b", claudeSessionId: "uuid-2" }),
+      ],
+      activeSessionId: "s1",
+      gridSessionIds: [],
+      layoutMode: "single",
+    });
+  });
+
+  it("persists the new activeFolder when only the active session switches", () => {
+    const unsub = initSessionRestoreSync();
+    // Switching active session changes nothing in sessions/layoutMode/gridFolders
+    // — the activeFolder MUST still be written (was the bug: identical json guard).
+    useSessionStore.setState({ activeSessionId: "s2" });
+    expect(useSettingsStore.getState().sessionRestore.activeFolder).toBe("C:/proj/b");
+    unsub();
+  });
+
+  it("does not re-persist when nothing relevant changes (no-op guard holds)", () => {
+    const unsub = initSessionRestoreSync();
+    // The first subscriber fire after init always writes (lastJson starts "").
+    // Establish that baseline, THEN spy, so we measure only the no-op re-set.
+    useSessionStore.setState({ activeSessionId: "s1" });
+    const setSpy = vi.spyOn(useSettingsStore.getState(), "setSessionRestore");
+    // Re-set the SAME active session id — no relevant field changes.
+    useSessionStore.setState({ activeSessionId: "s1" });
+    expect(setSpy).not.toHaveBeenCalled();
+    setSpy.mockRestore();
+    unsub();
   });
 });

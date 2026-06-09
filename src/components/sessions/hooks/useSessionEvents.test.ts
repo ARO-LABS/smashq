@@ -154,6 +154,23 @@ describe("useSessionEvents", () => {
     expect(mockSetExitCode).toHaveBeenCalledWith("s1", 0);
   });
 
+  it("session-exit: accepts a valid non-zero number", () => {
+    renderHook(() => useSessionEvents());
+    const cb = getListenCallback("session-exit");
+
+    cb({ payload: { id: "s1", exit_code: 137 } });
+    expect(mockSetExitCode).toHaveBeenCalledWith("s1", 137);
+  });
+
+  it("session-exit: ignores a non-number exit_code (string)", () => {
+    renderHook(() => useSessionEvents());
+    const cb = getListenCallback("session-exit");
+
+    // unknown payload — a string must not be force-cast into the store.
+    cb({ payload: { id: "s1", exit_code: "0" } as unknown as Record<string, unknown> });
+    expect(mockSetExitCode).not.toHaveBeenCalled();
+  });
+
   it("session-status: updates valid status", () => {
     renderHook(() => useSessionEvents());
     const cb = getListenCallback("session-status");
