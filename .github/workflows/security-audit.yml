@@ -26,9 +26,18 @@ jobs:
 
       - run: npm ci
 
-      - name: Run npm audit (high severity)
+      # Blocking gate: fail on high/critical vulnerabilities in PRODUCTION deps
+      # (what actually ships in the desktop bundle). Dev-only tooling advisories
+      # (vitest/vite/esbuild) do not reach users and would otherwise pin the
+      # gate permanently red, recreating the "audit never fails" problem.
+      - name: Run npm audit (prod, high severity) — blocking
+        run: npm audit --audit-level=high --omit=dev
+
+      # Informational only: surface ALL advisories (incl. dev tooling) in the
+      # logs without failing the job, so dev-side debt stays visible.
+      - name: Run npm audit (full, informational)
         continue-on-error: true
-        run: npm audit --audit-level=high
+        run: npm audit
 
   cargo-audit:
     name: cargo audit (rust)
@@ -47,7 +56,11 @@ jobs:
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
 
+      # Blocking gate: fail on Rust vulnerabilities. Unmaintained/unsound
+      # advisories are reported as warnings (cargo audit does not fail on them
+      # by default), so accepted transitive debt (gtk-rs GTK3 chain etc.) stays
+      # visible without blocking. rustls-webpki was bumped to >=0.103.13 to clear
+      # RUSTSEC-2026-0098/0099/0104.
       - name: Run cargo audit
-        continue-on-error: true
         working-directory: src-tauri
         run: cargo audit
