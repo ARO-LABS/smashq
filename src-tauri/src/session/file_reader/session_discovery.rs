@@ -198,7 +198,7 @@ mod tests {
     fn snapshot_uuids_picks_up_flat_layout() {
         let tmp = setup_temp_dir();
         let root = tmp.path();
-        let folder = "C:\\Projects\\agentic-dashboard";
+        let folder = "C:\\Projects\\smashq";
         let project_dir = root.join(folder_to_project_dir_name(folder));
         std::fs::create_dir_all(&project_dir).unwrap();
 
@@ -213,7 +213,7 @@ mod tests {
     fn snapshot_uuids_picks_up_nested_layout() {
         let tmp = setup_temp_dir();
         let root = tmp.path();
-        let folder = "C:\\Projects\\agentic-dashboard";
+        let folder = "C:\\Projects\\smashq";
         let project_dir = root.join(folder_to_project_dir_name(folder));
         std::fs::create_dir_all(&project_dir).unwrap();
 
@@ -228,7 +228,7 @@ mod tests {
     fn snapshot_uuids_ignores_non_uuid_directories_and_files() {
         let tmp = setup_temp_dir();
         let root = tmp.path();
-        let folder = "C:\\Projects\\agentic-dashboard";
+        let folder = "C:\\Projects\\smashq";
         let project_dir = root.join(folder_to_project_dir_name(folder));
         std::fs::create_dir_all(&project_dir).unwrap();
 
@@ -252,7 +252,7 @@ mod tests {
         // pickBestHistoryMatch's started_at heuristic.
         let tmp = setup_temp_dir();
         let root = tmp.path();
-        let folder = "C:\\Projects\\agentic-dashboard";
+        let folder = "C:\\Projects\\smashq";
         let project_dir = root.join(folder_to_project_dir_name(folder));
         std::fs::create_dir_all(&project_dir).unwrap();
 

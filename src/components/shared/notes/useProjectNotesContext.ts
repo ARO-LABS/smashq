@@ -106,7 +106,7 @@ export function useProjectNotesContext(open: boolean): ProjectNotesContext {
   const hasAnyProjectNotes = Object.values(projectNotes).some((v) => !!v);
   const hasAnyNotes = !!globalNotes || hasAnyProjectNotes;
 
-  // Tab-Label: shows the active project's short name (e.g. "agentic-dashboard")
+  // Tab-Label: shows the active project's short name (e.g. "smashq")
   // when a folder is bound, fallback to the generic "Projekt-Notizen" so the
   // tab still reads sensibly when no project context exists yet.
   const projectTabLabel = effectiveFolderKey

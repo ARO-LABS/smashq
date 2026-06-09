@@ -7,6 +7,16 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-06-09 — Armada-Review→v1.0.1: TDZ-Klasse wiederholte sich; Rebrand ≠ Key-Rename; Agent-Patches strikt verifizieren
+
+**Kontext:** 20-Agenten-Review (97 Findings) → Fix-Sweep + adversariale End-Verifikation → v1.0.1-Release inkl. Old-Name-Cleanup.
+
+**Erkenntnis 1 — Hydration-TDZ trat erneut auf:** Die settingsStore-`onRehydrateStorage`-TDZ (siehe 2026-06-07) wiederholte sich in `uiStore` — der Autor kopierte den `migrate`+`onRehydrate`-Split, aber NICHT das Microtask-Deferral. Isolierte Unit-Tests (`sanitizeBoolRecord`) fingen es nicht; nur adversariales Lesen gegen die zustand-Middleware-Quelle. **Regel:** Jeder persistierte zustand-Store mit Heal-`setState` in `onRehydrateStorage` MUSS `void Promise.resolve().then(() => store.setState(...))` nutzen. Bei neuem Persist-Store das Pattern aus settingsStore/uiStore + einen dedizierten `*.hydration.test.ts`-Guard mitziehen.
+
+**Erkenntnis 2 — „alten Namen weg" ≠ alles umbenennen:** „agenticexplorer"/"agentic-dashboard" waren teils funktional: Persist-Keys (`agenticexplorer-settings/-ui`), Migration-Fallback (`agentic-dashboard-settings`), Git-Ref-Namespace (`refs/agentic-explorer/`), ADP-Akronym (ADPError, hunderte Sites). Blind-Rename = Datenverlust/Massen-Churn. **Regel:** Vor Rebrand-Cleanup Branding (Logs/Kommentare/Fixtures → umbenennen) von funktionalen Identifiern (Storage-Keys, Wire-Refs, Akronyme → behalten + Kommentar „legacy, stabil für Kompat") trennen. Persist-Key umbenennen nur MIT Fallback-Schicht.
+
+**Erkenntnis 3 — Agent-Patches nie blind anwenden:** Cluster-Agenten lieferten Patches mit CRLF-Mismatch (`\n` vs `\r\n`), selbstreferenziellen Meta-Tests (Test zählte sich selbst), jsdom-Inkompatibilität (`offsetParent`/`elementsFromPoint`), unvollständigem Mutex-Routing, und einer grob unvollständigen `cargo audit --ignore`-Liste (1 ID statt vieler → verdeckte 3 echte rustls-webpki-Vulns). **Regel:** Agent-Patches strikt matchen (abort-on-miss), pro Cluster echte Gates fahren (tsc/build/cargo/vitest), Security-Ignore-Listen via echtem `cargo audit`/`npm audit` verifizieren statt dem Agent-Vorschlag zu trauen. [[feedback_subagent_report_skepticism]]
+
 ### 2026-06-07 — Cross-Window-Broadcast erzeugte File-Write-Race; und zwei nebenläufige Reviewer widersprachen sich
 
 **Kontext:** Live-Logs der installierten .exe zeigten `tasksStorage.save FILE_IO_ERROR: Failed to rename temp to target ... (os error 2)` exakt beim Löschen von 3 Tasks im Aufgaben-Fenster.

@@ -598,7 +598,7 @@ describe("NotesPanel", () => {
         {
           id: "s1",
           title: "Test",
-          folder: "C:\\Projects\\agentic-dashboard",
+          folder: "C:\\Projects\\smashq",
           shell: "powershell",
           status: "running",
           createdAt: Date.now(),
@@ -615,7 +615,7 @@ describe("NotesPanel", () => {
     // Tab is identified by its stable aria-label, but its visible text is the
     // active folder's short name — no longer the generic "Projekt-Notizen".
     const projectTab = screen.getByLabelText("Projekt-Notizen");
-    expect(projectTab.textContent).toContain("agentic-dashboard");
+    expect(projectTab.textContent).toContain("smashq");
     expect(projectTab.textContent).not.toContain("Projekt-Notizen");
   });
 

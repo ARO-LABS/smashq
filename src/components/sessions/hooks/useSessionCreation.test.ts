@@ -332,7 +332,7 @@ describe("useSessionCreation", () => {
     });
 
     it("derives the title from the last path segment, handling backslashes", async () => {
-      settingsSnapshot.defaultProjectPath = "C:\\Users\\me\\agentic-dashboard";
+      settingsSnapshot.defaultProjectPath = "C:\\Users\\me\\smashq";
       mockInvoke.mockResolvedValue({});
 
       const { result } = renderHook(() => useSessionCreation());
@@ -342,7 +342,7 @@ describe("useSessionCreation", () => {
 
       expect(mockInvoke).toHaveBeenCalledWith(
         "create_session",
-        expect.objectContaining({ title: "agentic-dashboard" }),
+        expect.objectContaining({ title: "smashq" }),
       );
     });
 

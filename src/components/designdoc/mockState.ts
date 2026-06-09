@@ -30,7 +30,7 @@ export function seedDesignDocState(): void {
       fakeSession({ id: "ds-1", title: "smashq", status: "running" }),
       fakeSession({
         id: "ds-2",
-        title: "agentic-dashboard",
+        title: "smashq",
         status: "waiting",
         claudeSessionId: "ds-claude-2",
       }),

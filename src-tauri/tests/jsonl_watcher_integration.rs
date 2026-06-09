@@ -20,7 +20,7 @@ use std::thread;
 use std::time::Duration;
 use tempfile::TempDir;
 
-const FOLDER: &str = "C:\\Projects\\agentic-dashboard";
+const FOLDER: &str = "C:\\Projects\\smashq";
 const UUID_A: &str = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const UUID_B: &str = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const UUID_C: &str = "cccccccc-cccc-cccc-cccc-cccccccccccc";

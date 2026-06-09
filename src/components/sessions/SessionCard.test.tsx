@@ -252,7 +252,7 @@ describe("SessionCard", () => {
     it("inline-edit pre-fills just the plain title (no #displayId suffix)", () => {
       const session = makeSession({
         id: "sess-edit-id",
-        title: "agentic-dashboard",
+        title: "smashq",
         displayId: "3K2X",
       });
       useSessionStore.setState({ sessions: [], activeSessionId: null });
@@ -265,9 +265,9 @@ describe("SessionCard", () => {
       });
       renderCard(session);
 
-      fireEvent.doubleClick(screen.getByText("agentic-dashboard"));
+      fireEvent.doubleClick(screen.getByText("smashq"));
       const input = screen.getByLabelText("Session umbenennen") as HTMLInputElement;
-      expect(input.value).toBe("agentic-dashboard");
+      expect(input.value).toBe("smashq");
     });
   });
 

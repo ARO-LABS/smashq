@@ -143,7 +143,7 @@ function setupStore(withProject = true) {
       ? mockGetProjectForFolder.mockReturnValue({
           projectNumber: 2,
           projectId: "PVT_abc123",
-          title: "Agentic Dashboard",
+          title: "Smashq",
         })
       : mockGetProjectForFolder.mockReturnValue(undefined),
     getGlobalProject: mockGetGlobalProject.mockReturnValue(undefined),
@@ -304,7 +304,7 @@ describe("KanbanBoard — Projects v2", () => {
     render(<KanbanBoard folder="/test/header" />);
 
     await waitFor(() => {
-      expect(screen.getByText("Agentic Dashboard")).toBeTruthy();
+      expect(screen.getByText("Smashq")).toBeTruthy();
     });
   });
 
@@ -406,7 +406,7 @@ describe("KanbanBoard — Projects v2", () => {
     mockInvoke.mockImplementation((cmd: string) => {
       if (cmd === "list_user_projects") {
         return Promise.resolve([
-          { id: "PVT_abc123", number: 2, title: "Agentic Dashboard", items_total: 5 },
+          { id: "PVT_abc123", number: 2, title: "Smashq", items_total: 5 },
           { id: "PVT_other", number: 9, title: "Side Project", items_total: 3 },
         ]);
       }
@@ -422,7 +422,7 @@ describe("KanbanBoard — Projects v2", () => {
     // Picker closed initially — "Side Project" not visible.
     expect(screen.queryByText("Side Project")).toBeNull();
 
-    fireEvent.click(screen.getByText("Agentic Dashboard"));
+    fireEvent.click(screen.getByText("Smashq"));
 
     await waitFor(() => {
       expect(screen.getByText("Side Project")).toBeTruthy();
@@ -436,7 +436,7 @@ describe("KanbanBoard — Projects v2", () => {
     mockInvoke.mockImplementation((cmd: string) => {
       if (cmd === "list_user_projects") {
         return Promise.resolve([
-          { id: "PVT_abc123", number: 2, title: "Agentic Dashboard", items_total: 5 },
+          { id: "PVT_abc123", number: 2, title: "Smashq", items_total: 5 },
           { id: "PVT_other", number: 9, title: "Side Project", items_total: 3 },
         ]);
       }
@@ -449,7 +449,7 @@ describe("KanbanBoard — Projects v2", () => {
       expect(screen.getByText("Backlog")).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByText("Agentic Dashboard"));
+    fireEvent.click(screen.getByText("Smashq"));
     await waitFor(() => {
       expect(screen.getByText("Side Project")).toBeTruthy();
     });
@@ -469,7 +469,7 @@ describe("KanbanBoard — Projects v2", () => {
     mockInvoke.mockImplementation((cmd: string) => {
       if (cmd === "list_user_projects") {
         return Promise.resolve([
-          { id: "PVT_abc123", number: 2, title: "Agentic Dashboard", items_total: 5 },
+          { id: "PVT_abc123", number: 2, title: "Smashq", items_total: 5 },
         ]);
       }
       return Promise.resolve(makeBoard());
@@ -481,7 +481,7 @@ describe("KanbanBoard — Projects v2", () => {
       expect(screen.getByText("Backlog")).toBeTruthy();
     });
 
-    const title = screen.getByText("Agentic Dashboard");
+    const title = screen.getByText("Smashq");
     fireEvent.click(title);
     await waitFor(() => {
       expect(screen.getByText("5 Items")).toBeTruthy();

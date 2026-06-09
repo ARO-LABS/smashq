@@ -908,7 +908,7 @@ describe("displayId — visual disambiguation", () => {
   it("addSession persists displayId when provided", () => {
     getState().addSession({
       id: "s1",
-      title: "agentic-dashboard",
+      title: "smashq",
       displayId: "3K2X",
       folder: "C:/projects/test",
       shell: "powershell",
@@ -924,7 +924,7 @@ describe("displayId — visual disambiguation", () => {
   it("renameSession clears displayId — user has taken control of disambiguation", () => {
     getState().addSession({
       id: "s1",
-      title: "agentic-dashboard",
+      title: "smashq",
       displayId: "3K2X",
       folder: "C:/projects/test",
       shell: "powershell",

@@ -28,7 +28,7 @@ pub struct ClaudeSessionSummary {
 }
 
 /// Convert a folder path to the Claude projects directory name.
-/// E.g. `C:\Projects\agentic-dashboard` → `C--Projects-agentic-dashboard`
+/// E.g. `C:\Projects\smashq` → `C--Projects-smashq`
 ///
 /// `pub` so integration tests in `src-tauri/tests/` can use the SAME slug
 /// logic when constructing fixture directories — closes the silent-drift
@@ -410,8 +410,8 @@ mod tests {
     #[test]
     fn folder_to_slug_replaces_windows_drive_and_separators() {
         assert_eq!(
-            folder_to_project_dir_name("C:\\Projects\\agentic-dashboard"),
-            "C--Projects-agentic-dashboard"
+            folder_to_project_dir_name("C:\\Projects\\smashq"),
+            "C--Projects-smashq"
         );
     }
 

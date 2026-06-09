@@ -48,7 +48,7 @@ impl fmt::Display for ADPErrorCode {
     }
 }
 
-/// Structured error type for the Agentic Dashboard Protocol.
+/// Structured error type for the app's IPC error protocol (ADP).
 /// Mirrors the `ADPError` interface from `schema.ts`.
 ///
 /// Tauri v2 serializes the error type as JSON when a command returns `Err`.

@@ -1,5 +1,5 @@
 /**
- * Agentic Dashboard Protocol (ADP) — Fehler-Modell.
+ * ADP (IPC-Error-Protocol) — Fehler-Modell.
  *
  * Envelope, Retry-Policy und Idempotency-Helpers wurden entfernt, nachdem
  * die v2.0-Pipeline-Engine-Roadmap verworfen wurde (commit bd19266) und das

@@ -172,7 +172,7 @@ pub fn run() {
     LOGGING_ENABLED.store(initial_logging, Ordering::Relaxed);
 
     init_logging();
-    log::info!("Agentic Dashboard starting up");
+    log::info!("Smashq starting up");
 
     let session_manager = std::sync::Arc::new(session::manager::SessionManager::new());
     let session_manager_cleanup = session_manager.clone();
@@ -278,7 +278,7 @@ pub fn run() {
         .run(tauri::generate_context!());
 
     match result {
-        Ok(()) => log::info!("Agentic Dashboard exited cleanly"),
+        Ok(()) => log::info!("Smashq exited cleanly"),
         Err(e) => {
             log::error!("Tauri application failed to run: {}", e);
             eprintln!("Fatal: Tauri application failed to run: {}", e);

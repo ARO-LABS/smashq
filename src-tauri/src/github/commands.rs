@@ -615,16 +615,12 @@ mod tests {
 
     #[test]
     fn is_github_remote_detects_https_url() {
-        assert!(is_github_remote(
-            "https://github.com/hossoOG/agentic-dashboard.git"
-        ));
+        assert!(is_github_remote("https://github.com/hossoOG/smashq.git"));
     }
 
     #[test]
     fn is_github_remote_detects_ssh_url() {
-        assert!(is_github_remote(
-            "git@github.com:hossoOG/agentic-dashboard.git"
-        ));
+        assert!(is_github_remote("git@github.com:hossoOG/smashq.git"));
     }
 
     #[test]
@@ -689,9 +685,7 @@ mod tests {
         // nicht portabel aufsetzen (kein git init), daher wird der Helper
         // hier direkt getestet — er ist die single source of truth innerhalb
         // von check_project_presence.
-        assert!(is_github_remote(
-            "https://github.com/hossoOG/agentic-dashboard.git"
-        ));
+        assert!(is_github_remote("https://github.com/hossoOG/smashq.git"));
         assert!(is_github_remote("git@github.com:owner/repo.git"));
         assert!(!is_github_remote("https://gitlab.com/owner/repo.git"));
     }

@@ -830,7 +830,7 @@ describe("normalizeProjectKey", () => {
 // ============================================================================
 
 describe("addPinnedDoc", () => {
-  const folder = "C:/Projects/agentic-dashboard";
+  const folder = "C:/Projects/smashq";
 
   it("adds a pin with generated id and defaults label to filename", () => {
     const err = getState().addPinnedDoc(folder, "tasks/todo.md");
