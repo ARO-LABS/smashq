@@ -274,6 +274,22 @@ describe("Toast", () => {
     expect(screen.getByRole("alert")).toBeTruthy();
   });
 
+  it("renders achievement with a sanctioned token class, not hue 300", () => {
+    render(
+      <Toast
+        toast={{ id: "a1", type: "achievement", title: "Erfolg", duration: 0 }}
+        onDismiss={vi.fn()}
+      />,
+    );
+    const alert = screen.getByRole("alert");
+    // Border uses the sanctioned warning token, never the out-of-palette info hue.
+    expect(alert.className).toContain("border-warning");
+    // Glow must not leak the purple hue 300 that was outside the palette.
+    expect(alert.getAttribute("style") ?? "").not.toContain("300");
+    // Title text uses the sanctioned warning token.
+    expect(screen.getByText("Erfolg").className).toContain("text-warning");
+  });
+
   it("renders distinct types (achievement) with its title", () => {
     render(
       <Toast

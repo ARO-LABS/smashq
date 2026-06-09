@@ -177,6 +177,31 @@ describe("useAutoUpdate", () => {
     expect(mockRelaunch).not.toHaveBeenCalled();
   });
 
+  it("confirmRelaunch transitions to error when relaunch fails (in Tauri)", async () => {
+    // isTauri is a module-level const ("__TAURI_INTERNALS__" in window), so we
+    // must set the global and re-import the module so it re-evaluates to true.
+    // The vi.mock factories route through the persistent mockRelaunch/mockCheck
+    // refs, so they still intercept after resetModules.
+    (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
+    vi.resetModules();
+    mockCheck.mockResolvedValue(null);
+    mockRelaunch.mockRejectedValueOnce(new Error("relaunch blew up"));
+    try {
+      const { useAutoUpdate: freshUseAutoUpdate } = await import("./useAutoUpdate");
+      const { result } = renderHook(() => freshUseAutoUpdate());
+
+      await act(async () => {
+        await result.current.confirmRelaunch();
+      });
+
+      expect(result.current.status).toBe("error");
+      expect(result.current.error).toBe("relaunch blew up");
+    } finally {
+      delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
+      vi.resetModules();
+    }
+  });
+
   it("keeps stable callback identities across re-renders", () => {
     const { result, rerender } = renderHook(() => useAutoUpdate());
 

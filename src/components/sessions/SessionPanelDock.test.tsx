@@ -192,6 +192,21 @@ describe("SessionPanelDock", () => {
     expect(autoUpdate.checkForUpdate).not.toHaveBeenCalled();
   });
 
+  it("does NOT re-check on version click while a download is in flight", () => {
+    autoUpdate.status = "downloading";
+    autoUpdate.progress = 30;
+    autoUpdate.newVersion = "3.0.0";
+    renderDock();
+    // Clear the auto-fired progress toast, then click the version pill.
+    act(() => useUIStore.setState({ toasts: [] }));
+    fireEvent.click(screen.getByTitle(/Version/));
+    // No stray concurrent re-check while the download runs.
+    expect(autoUpdate.checkForUpdate).not.toHaveBeenCalled();
+    const titles = useUIStore.getState().toasts.map((t) => t.title);
+    expect(titles).toContain("Update wird geladen");
+    expect(titles).not.toContain("Suche nach Updates...");
+  });
+
   it("shows an error toast when the update-check fails", async () => {
     autoUpdate.status = "error";
     renderDock();
