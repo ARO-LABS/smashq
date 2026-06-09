@@ -14,8 +14,8 @@ We will acknowledge receipt within 48 hours and aim to release a fix promptly.
 
 | Version | Supported |
 |---------|-----------|
-| 1.2.x   | Yes       |
-| < 1.2   | No        |
+| 1.0.x   | Yes       |
+| < 1.0   | No        |
 
 ## Scope
 
