@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, memo } from "react";
 import { ExternalLink } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
 import { logWarn } from "../../utils/errorLogger";
@@ -39,7 +39,7 @@ async function openUrl(url: string) {
   }
 }
 
-export function KanbanCard({ issue, onClick, onDragStart, onDragEnd }: KanbanCardProps) {
+function KanbanCardComponent({ issue, onClick, onDragStart, onDragEnd }: KanbanCardProps) {
   const [isDragging, setIsDragging] = useState(false);
   const isDraggingRef = useRef(false);
   const startPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -134,3 +134,34 @@ export function KanbanCard({ issue, onClick, onDragStart, onDragEnd }: KanbanCar
     </div>
   );
 }
+
+/**
+ * Compares the issue payload by value. The parent (KanbanBoard.renderCard)
+ * rebuilds the `issue` object and the on* callbacks on every render, so a
+ * shallow prop compare would never skip — this comparator looks at the fields
+ * that actually affect the rendered card. Returning true skips the re-render,
+ * which is what keeps a per-pixel drag from re-rendering unaffected cards.
+ */
+function areCardPropsEqual(
+  prev: KanbanCardProps,
+  next: KanbanCardProps,
+): boolean {
+  const a = prev.issue;
+  const b = next.issue;
+  return (
+    a.itemId === b.itemId &&
+    a.number === b.number &&
+    a.title === b.title &&
+    a.state === b.state &&
+    a.assignee === b.assignee &&
+    a.url === b.url &&
+    (a.repository ?? null) === (b.repository ?? null) &&
+    a.labels.length === b.labels.length &&
+    a.labels.every(
+      (label, i) =>
+        label.name === b.labels[i]?.name && label.color === b.labels[i]?.color,
+    )
+  );
+}
+
+export const KanbanCard = memo(KanbanCardComponent, areCardPropsEqual);

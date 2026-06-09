@@ -23,6 +23,7 @@ export function useGitBranch(folder: string | undefined): string | null {
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let onVisible: (() => void) | null = null;
 
     async function fetchBranch(): Promise<void> {
       try {
@@ -38,9 +39,23 @@ export function useGitBranch(folder: string | undefined): string | null {
 
     function scheduleNext(): void {
       if (cancelled) return;
-      timer = setTimeout(async () => {
-        if (!cancelled && isDocumentVisible()) await fetchBranch();
-        scheduleNext();
+      // While the document is hidden, do not re-arm the 30s poll. Instead wait
+      // for the tab to become visible, then fetch immediately and resume the
+      // loop — this avoids background timer churn and up-to-30s-stale data on
+      // return.
+      if (!isDocumentVisible()) {
+        if (typeof document === "undefined" || onVisible) return;
+        onVisible = () => {
+          if (cancelled || document.visibilityState === "hidden") return;
+          document.removeEventListener("visibilitychange", onVisible!);
+          onVisible = null;
+          void fetchBranch().then(scheduleNext);
+        };
+        document.addEventListener("visibilitychange", onVisible);
+        return;
+      }
+      timer = setTimeout(() => {
+        void fetchBranch().then(scheduleNext);
       }, POLL_INTERVAL_MS);
     }
 
@@ -49,6 +64,10 @@ export function useGitBranch(folder: string | undefined): string | null {
     return () => {
       cancelled = true;
       if (timer !== null) clearTimeout(timer);
+      if (onVisible && typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisible);
+        onVisible = null;
+      }
     };
   }, [folder]);
 

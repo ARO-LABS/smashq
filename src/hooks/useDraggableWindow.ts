@@ -60,6 +60,23 @@ export function useDraggableWindow(
   const { initialSize, minSize = DEFAULT_MIN_SIZE, onResizeEnd } = opts;
 
   const [pos, setPos] = useState<WindowPos | null>(null);
+  // Mirror of `pos` for use inside long-lived listener closures. Reading the
+  // ref lets the resize effect subscribe once instead of re-subscribing on
+  // every pointer move (which would otherwise need `pos` in its deps).
+  const posRef = useRef<WindowPos | null>(null);
+  const setPosTracked = useCallback<Dispatch<SetStateAction<WindowPos | null>>>(
+    (update) => {
+      setPos((prev) => {
+        const nextPos =
+          typeof update === "function"
+            ? (update as (p: WindowPos | null) => WindowPos | null)(prev)
+            : update;
+        posRef.current = nextPos;
+        return nextPos;
+      });
+    },
+    [],
+  );
   const [size, setSize] = useState<WindowSize>(initialSize);
   const dragRef = useRef<{
     px: number;
@@ -105,22 +122,22 @@ export function useDraggableWindow(
   const onDragPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if ((e.target as HTMLElement).closest("button")) return;
-      const cur = pos ?? { x: 0, y: 0 };
+      const cur = posRef.current ?? { x: 0, y: 0 };
       dragRef.current = { px: e.clientX, py: e.clientY, ox: cur.x, oy: cur.y };
       e.currentTarget.setPointerCapture(e.pointerId);
     },
-    [pos],
+    [],
   );
 
   const onDragPointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       const d = dragRef.current;
       if (!d) return;
-      setPos(
+      setPosTracked(
         clamp({ x: d.ox + (e.clientX - d.px), y: d.oy + (e.clientY - d.py) }),
       );
     },
-    [clamp],
+    [clamp, setPosTracked],
   );
 
   const onDragPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -147,11 +164,11 @@ export function useDraggableWindow(
       setSize(
         clampSize(
           { w: r.sw + (e.clientX - r.px), h: r.sh + (e.clientY - r.py) },
-          pos,
+          posRef.current,
         ),
       );
     },
-    [clampSize, pos],
+    [clampSize],
   );
 
   const onResizePointerUp = useCallback(
@@ -173,16 +190,20 @@ export function useDraggableWindow(
   // available room from pos.
   useEffect(() => {
     const onResize = () => {
-      setPos((p) => (p ? clamp(p) : p));
-      setSize((s) => clampSize(s, pos));
+      // Capture the pre-clamp position BEFORE setPosTracked mutates posRef:
+      // the size clamp must measure against where the window currently is,
+      // not where pos gets pushed after the viewport shrank.
+      const at = posRef.current;
+      setPosTracked((p) => (p ? clamp(p) : p));
+      setSize((s) => clampSize(s, at));
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [clamp, clampSize, pos]);
+  }, [clamp, clampSize, setPosTracked]);
 
   return {
     pos,
-    setPos,
+    setPos: setPosTracked,
     size,
     clamp,
     dragHandlers: {

@@ -349,7 +349,11 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
       if (!draggedItemRef.current) return;
       const els = document.elementsFromPoint(e.clientX, e.clientY);
       const laneEl = els.find((el) => el.hasAttribute("data-lane-id"));
-      setDragOverOptionId(laneEl?.getAttribute("data-lane-id") ?? null);
+      const next = laneEl?.getAttribute("data-lane-id") ?? null;
+      // Change-guard: pointermove fires per pixel; only commit when the
+      // resolved lane actually changes. Re-setting state every move would
+      // re-render the whole board (all lanes + cards) on every frame.
+      setDragOverOptionId((prev) => (prev === next ? prev : next));
     };
 
     const onUp = (e: PointerEvent) => {
@@ -381,29 +385,35 @@ export function KanbanBoard({ folder }: KanbanBoardProps) {
     // State update above triggers the useEffect via selectedProject?.projectNumber dep.
   };
 
-  /** Renders a draggable KanbanCard for a board item — shared by all columns. */
-  const renderCard = (item: ProjectItem) => (
-    <KanbanCard
-      key={item.item_id}
-      issue={toKanbanIssue(item)}
-      onClick={() =>
-        setSelectedIssue({
-          number: item.issue_number,
-          repository: item.repository ?? null,
-        })
-      }
-      onDragStart={() => {
-        draggedItemRef.current = {
-          itemId: item.item_id,
-          issueNumber: item.issue_number,
-        };
-        startGlobalDragListeners();
-      }}
-      onDragEnd={() => {
-        draggedItemRef.current = null;
-        setDragOverOptionId(null);
-      }}
-    />
+  /** Renders a draggable KanbanCard for a board item — shared by all columns.
+   * useCallback keeps its identity stable across re-renders; combined with the
+   * memoized KanbanCard this means a lane re-render does not force every card
+   * in it to re-render. */
+  const renderCard = useCallback(
+    (item: ProjectItem) => (
+      <KanbanCard
+        key={item.item_id}
+        issue={toKanbanIssue(item)}
+        onClick={() =>
+          setSelectedIssue({
+            number: item.issue_number,
+            repository: item.repository ?? null,
+          })
+        }
+        onDragStart={() => {
+          draggedItemRef.current = {
+            itemId: item.item_id,
+            issueNumber: item.issue_number,
+          };
+          startGlobalDragListeners();
+        }}
+        onDragEnd={() => {
+          draggedItemRef.current = null;
+          setDragOverOptionId(null);
+        }}
+      />
+    ),
+    [startGlobalDragListeners]
   );
 
   // ── Loading / error states ───────────────────────────────────────────

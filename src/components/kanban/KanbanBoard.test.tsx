@@ -193,6 +193,9 @@ describe("KanbanBoard — Projects v2", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    // jsdom lacks Document.elementsFromPoint; stub it so the drag tests can
+    // spyOn/override it to resolve the lane under the pointer.
+    document.elementsFromPoint = vi.fn(() => []);
   });
 
   it("shows loading state initially", () => {
@@ -622,5 +625,86 @@ describe("KanbanBoard — Projects v2", () => {
     await waitFor(() => {
       expect(screen.getByText("octocat/hello-world")).toBeTruthy();
     });
+  });
+
+  // ── Drag re-render perf (change-guard) ─────────────────────────────────
+
+  /** Starts a drag on a card and registers the board's global pointer
+   * listeners, then returns a helper to dispatch a window pointermove that
+   * resolves to `laneId` via a stubbed elementsFromPoint. */
+  function startDragOverLane(cardTitle: string) {
+    const card = screen.getByText(cardTitle).closest("[class*='cursor-grab']");
+    if (!card) throw new Error("card root not found");
+    fireEvent.pointerDown(card, { button: 0, clientX: 0, clientY: 0 });
+    // Move past the 5px drag threshold → triggers onDragStart on the card,
+    // which registers the board's window pointermove/up listeners.
+    fireEvent.pointerMove(card, { clientX: 50, clientY: 50 });
+    return (laneId: string) => {
+      const laneEl = document.querySelector(`[data-lane-id="${laneId}"]`);
+      vi.spyOn(document, "elementsFromPoint").mockReturnValue(
+        laneEl ? [laneEl as Element] : [],
+      );
+      const ev = new Event("pointermove");
+      Object.assign(ev, { clientX: 10, clientY: 10 });
+      window.dispatchEvent(ev);
+    };
+  }
+
+  it("highlights the lane under the pointer during a drag (happy path)", async () => {
+    setupStore();
+    mockInvoke.mockResolvedValueOnce(makeBoard()); // get_project_board
+
+    const { container } = render(<KanbanBoard folder="/test/drag-highlight" />);
+    await waitFor(() => expect(screen.getByText("Ready issue")).toBeTruthy());
+
+    const moveOver = startDragOverLane("Ready issue");
+    moveOver("opt_inprog");
+
+    await waitFor(() => {
+      const lane = container.querySelector('[data-lane-id="opt_inprog"]');
+      expect(lane?.className).toContain("ring-accent");
+    });
+  });
+
+  it("keeps the board stable when the pointer stays over the same lane (edge: change-guard)", async () => {
+    setupStore();
+    mockInvoke.mockResolvedValueOnce(makeBoard()); // get_project_board
+
+    const { container } = render(<KanbanBoard folder="/test/drag-guard" />);
+    await waitFor(() => expect(screen.getByText("Ready issue")).toBeTruthy());
+
+    const moveOver = startDragOverLane("Ready issue");
+    moveOver("opt_inprog"); // first move → state changes (one commit)
+
+    await waitFor(() => {
+      expect(
+        container
+          .querySelector('[data-lane-id="opt_inprog"]')
+          ?.className.includes("ring-accent"),
+      ).toBe(true);
+    });
+
+    // Keep resolving the SAME lane; the change-guard must make
+    // setDragOverOptionId bail out so the board is not torn down / rebuilt.
+    const lane = container.querySelector('[data-lane-id="opt_inprog"]');
+    vi.spyOn(document, "elementsFromPoint").mockReturnValue(
+      lane ? [lane as Element] : [],
+    );
+    const before = container.querySelectorAll('[data-lane-id]').length;
+    for (let i = 0; i < 5; i++) {
+      const ev = new Event("pointermove");
+      Object.assign(ev, { clientX: 10 + i, clientY: 10 + i });
+      window.dispatchEvent(ev);
+    }
+    const after = container.querySelectorAll('[data-lane-id]').length;
+
+    // Lane set unchanged and the hovered lane still highlighted — proving
+    // repeated same-lane moves did not remount the board.
+    expect(after).toBe(before);
+    expect(
+      container
+        .querySelector('[data-lane-id="opt_inprog"]')
+        ?.className.includes("ring-accent"),
+    ).toBe(true);
   });
 });

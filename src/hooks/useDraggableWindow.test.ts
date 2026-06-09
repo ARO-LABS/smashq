@@ -116,6 +116,68 @@ describe("useDraggableWindow — size + resize", () => {
     expect(result.current.size.h).toBe(392);
   });
 
+  it("subscribes the window 'resize' listener exactly once across pointer moves (edge: no per-move re-subscribe)", () => {
+    const addSpy = vi.spyOn(window, "addEventListener");
+    const removeSpy = vi.spyOn(window, "removeEventListener");
+    const { result } = renderHook(() =>
+      useDraggableWindow({ initialSize: { w: 400, h: 300 } }),
+    );
+    act(() => result.current.setPos({ x: 100, y: 100 }));
+
+    const resizeAddsBefore = addSpy.mock.calls.filter(
+      (c) => c[0] === "resize",
+    ).length;
+    const resizeRemovesBefore = removeSpy.mock.calls.filter(
+      (c) => c[0] === "resize",
+    ).length;
+
+    // Many drag-moves — each changes pos. The 'resize' listener must NOT be
+    // re-subscribed per move (the old deps:[pos] bug did exactly that).
+    act(() => result.current.dragHandlers.onPointerDown(pointer(300, 300)));
+    for (let i = 0; i < 6; i++) {
+      act(() =>
+        result.current.dragHandlers.onPointerMove(pointer(300 + i * 5, 300 + i * 5)),
+      );
+    }
+    act(() => result.current.dragHandlers.onPointerUp(pointer(330, 330)));
+
+    const resizeAddsAfter = addSpy.mock.calls.filter(
+      (c) => c[0] === "resize",
+    ).length;
+    const resizeRemovesAfter = removeSpy.mock.calls.filter(
+      (c) => c[0] === "resize",
+    ).length;
+
+    expect(resizeAddsAfter - resizeAddsBefore).toBe(0);
+    expect(resizeRemovesAfter - resizeRemovesBefore).toBe(0);
+
+    addSpy.mockRestore();
+    removeSpy.mockRestore();
+  });
+
+  it("re-clamps against the live position after a drag (posRef stays in sync)", () => {
+    const { result } = renderHook(() =>
+      useDraggableWindow({ initialSize: { w: 1500, h: 900 } }),
+    );
+    act(() => result.current.setPos({ x: 0, y: 0 }));
+    // Drag the window to a new position via the drag handler (updates posRef).
+    act(() => result.current.dragHandlers.onPointerDown(pointer(0, 0)));
+    act(() => result.current.dragHandlers.onPointerMove(pointer(200, 200)));
+    act(() => result.current.dragHandlers.onPointerUp(pointer(200, 200)));
+    expect(result.current.pos).toEqual({ x: 200, y: 200 });
+
+    act(() => {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 800 });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: 600 });
+      window.dispatchEvent(new Event("resize"));
+    });
+
+    // clampSize must use the dragged position (200,200), not the stale (0,0):
+    // maxW = 800 - 200 - 8 = 592, maxH = 600 - 200 - 8 = 392.
+    expect(result.current.size.w).toBe(592);
+    expect(result.current.size.h).toBe(392);
+  });
+
   it("does not move position when only the resize handle was pressed", () => {
     const { result } = renderHook(() =>
       useDraggableWindow({ initialSize: { w: 400, h: 300 } }),
