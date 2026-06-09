@@ -7,6 +7,22 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-06-09 — Kanban-Overhaul: zwei HIGH-Findings teilten eine Wurzel (owner-relative ID) + Recovery-via-State-Clear feuerte Effekt neu
+
+**Kontext:** Phase A+B des Kanban-Overhauls (Org-Boards ladbar, ehrliche Fehler). 5-Agenten-Review fing zwei HIGH-Bugs, beide in `KanbanBoard.tsx`.
+
+**Erkenntnis 1 — Identität an der falschen ID:** Board-Cache-Key UND Lade-Effekt-Trigger hingen an `projectNumber`. GitHub nummeriert ProjectsV2 **pro Owner ab #1** — sobald der Owner-Dropdown Org-Boards wählbar macht, kollidieren User-Board #1 und Org-Board #1 (gleiche `number`, verschiedene `projectId`): Cache liefert das falsche Board, der Effekt feuert beim Wechsel nicht. Vor dem Feature waren nur @me-Boards erreichbar → numbers faktisch eindeutig → latenter Bug unsichtbar. **Regel:** Wenn ein neues Feature einen vorher eindeutigen Schlüssel mehrdeutig macht, ALLE Stellen finden, die den alten Schlüssel als Identität nutzen (Cache-Keys, Effect-Deps, Vergleiche), und auf den global eindeutigen Wert (`projectId`/`PVT_…`) umstellen. Grep nach dem alten Feld.
+
+**Erkenntnis 2 — Recovery durch State-Clear hat Nebenwirkungen:** Mein „Self-Heal" bei `board_not_found` rief `setGlobalProject(null)` → das änderte die Effect-Dependency → der Lade-Effekt feuerte neu, löschte `errorInfo` und selektierte still `list[0]` → der User landete ungefragt auf einem fremden Board, der „nicht gefunden"-Hinweis flashte nur einen Frame. **Regel:** Einen Fehler-/Leerzustand aus dem `errorInfo`-State rendern, NICHT durch Mutation einer Effect-Dependency „heilen". State-Mutation, die einen keyed Effekt re-triggert, ist ein verstecktes Kontrollfluss-Sprungbrett. Der elegante Fix war *weniger* Code (die Zeile entfernen). [[act-on-clear-directive]]
+
+### 2026-06-09 — Funktionierende Datenquelle gelöscht, bevor der Ersatz verifiziert war (GitHub-Board als App-Feature-Backend)
+
+**Fehler:** User wollte „ARO-LABS wird globales Board" + „die anderen zwei löschen". Ich habe beide User-Boards gelöscht — eines davon (`hovOG Global Board #4`) war exakt die Datenquelle, die smashqs „Globales Board"-Kanban anzeigt (`project.rs` listet via `@me`, `KanbanBoard.tsx` nimmt `list[0]`). Damit ein laufendes Feature zerstört. Erst DANACH entdeckt, dass der gewünschte Ersatz (ARO-LABS) ein **Org**-Board ist, das die App per Design (`viewer { projectV2 }`) gar nicht laden kann. Projects v2 haben keine Restore-Funktion → irreversibel.
+
+**Erkenntnis:** Ich habe den Inhalt der zu löschenden Boards geprüft (Issue-Verlust), aber NICHT, ob (a) das Gelöschte ein laufendes Feature speist und (b) der Ersatz den Zweck überhaupt erfüllen kann. Der irreversible Schritt kam vor der Verifikation des Ziels. Die Löschung von Board #4 war für das Ziel zudem unnötig.
+
+**Regel:** Vor jeder irreversiblen Löschung (GitHub-Board/Repo/Datei/Tabelle): (1) Prüfen, ob das Target von einem laufenden Feature/Code referenziert wird — grep nach Name/Number/ID in der Codebase, nicht nur den Inhalt ansehen. (2) Den ERSATZ vollständig verifizieren (lädt er? gleicher Owner-Typ? gleiche Scopes?), SOLANGE der alte Zustand noch existiert. (3) Erst löschen, wenn der Ersatz bewiesen funktioniert. Reihenfolge ist nie „destroy then verify". [[act-on-clear-directive]] gilt für Defaults — NICHT für irreversible Schritte mit unverifiziertem Ziel.
+
 ### 2026-06-09 — Armada-Review→v1.0.1: TDZ-Klasse wiederholte sich; Rebrand ≠ Key-Rename; Agent-Patches strikt verifizieren
 
 **Kontext:** 20-Agenten-Review (97 Findings) → Fix-Sweep + adversariale End-Verifikation → v1.0.1-Release inkl. Old-Name-Cleanup.

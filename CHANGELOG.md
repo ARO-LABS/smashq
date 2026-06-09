@@ -4,6 +4,23 @@ Alle relevanten Änderungen an Smashq werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [Unreleased]
+
+Kanban-Overhaul Phase A+B — das Kanban-Board kann jetzt **Organisations-Boards** als
+globales Board laden, nicht mehr nur die persönlichen Boards des angemeldeten Users.
+
+### Hinzugefügt
+- Globales Kanban: Boards von Organisationen wählbar. Der Picker hat ein Konto-Dropdown (eigenes Konto + Organisationen); das gewählte Board wird über seine global eindeutige ID geladen.
+- Backend-Command `list_project_owners` (eigenes Konto + Organisationen für das Konto-Dropdown).
+
+### Behoben
+- Kanban zeigte bei einem gelöschten/unauffindbaren Board fälschlich „GitHub-Scope fehlt". Fehler werden jetzt ehrlich unterschieden (Board nicht gefunden / Scope fehlt / nicht angemeldet / kein Zugriff / Netzwerk / Rate-Limit) mit handlungsleitendem Hinweis.
+- Ein gelöschtes globales Board führt nicht mehr in eine Sackgasse: ein Board-Auswahl-Dialog erscheint, statt still ein fremdes Board zu laden.
+- Persistierte Board-Auswahl wird bei Korruption/veralteten Einträgen bereinigt (Schema-Migration + Rehydrate-Validierung).
+
+### Geändert
+- Board wird intern über die global eindeutige Projekt-ID adressiert (statt der pro-Konto wiederholten Projekt-Nummer) — verhindert Verwechslung gleichnummerierter Boards verschiedener Konten.
+
 ## [1.0.1] — 2026-06-09
 
 Wartungs-Release: Bugfixes, Sicherheits- und A11y-Härtung aus einem umfassenden
