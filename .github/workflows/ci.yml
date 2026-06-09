@@ -69,6 +69,9 @@ jobs:
       - name: Run tests with coverage
         run: npm run test:coverage
 
+      - name: Run Layer-B integration tests
+        run: npm run test:integration
+
       - name: Install Tauri v2 system dependencies
         run: |
           sudo apt-get update
