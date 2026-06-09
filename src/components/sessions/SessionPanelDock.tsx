@@ -167,6 +167,18 @@ export function SessionPanelDock({ onNewSession, onAddFavorite }: SessionPanelDo
       showRestartToast();
       return;
     }
+    if (status === "downloading") {
+      // A download is already in flight — fire NO concurrent re-check. The
+      // isCheckingRef guard only covers the check phase, so falling through here
+      // would spawn a stray checkForUpdate alongside the running download.
+      // Surface the in-progress state instead.
+      addToast({
+        type: "info",
+        title: "Update wird geladen",
+        duration: 1500,
+      });
+      return;
+    }
     // idle / checking / upToDate / error → trigger fresh check with immediate "Suche..."-Feedback.
     userInitiatedRef.current = true;
     addToast({
@@ -209,7 +221,7 @@ export function SessionPanelDock({ onNewSession, onAddFavorite }: SessionPanelDo
   const SettingsIcon = ICONS.nav.settings;
   const AddFavoriteIcon = ICONS.action.addFavorite;
   const NewSessionIcon = ICONS.action.newSession;
-  const showStatusDot = status === "available" || status === "ready";
+  const showStatusDot = status === "available" || status === "ready" || status === "downloading";
 
   return (
     <div className="shrink-0 border-t border-neutral-800 bg-surface-base px-3 py-2.5 flex flex-col gap-2">

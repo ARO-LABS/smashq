@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { useUIStore, isPinTab, getPinIdFromTab, type ConfigSubTab } from "./uiStore";
+import {
+  useUIStore,
+  isPinTab,
+  getPinIdFromTab,
+  sanitizeBoolRecord,
+  type ConfigSubTab,
+} from "./uiStore";
 
 // ============================================================================
 // Helpers
@@ -234,6 +240,30 @@ describe("librarySectionOpen_setSectionOpen_persists_per_key", () => {
 
   it("unknown key returns undefined (component falls back to defaultOpen)", () => {
     expect(getState().librarySectionOpen["nonexistent:key"]).toBeUndefined();
+  });
+});
+
+// ============================================================================
+// sanitizeBoolRecord — persisted bool-record coercion (corruption recovery)
+// ============================================================================
+
+describe("sanitizeBoolRecord", () => {
+  // happy: a valid bool-record survives untouched
+  it("keeps a valid Record<string, boolean> intact", () => {
+    const valid = { global: true, "project:/foo": false };
+    expect(sanitizeBoolRecord(valid)).toEqual(valid);
+  });
+
+  // edge: corrupt inputs (string / array / null / non-bool values) recover to a clean object
+  it("recovers corrupt inputs to a clean object", () => {
+    expect(sanitizeBoolRecord("corrupt")).toEqual({});
+    expect(sanitizeBoolRecord(["a", "b"])).toEqual({});
+    expect(sanitizeBoolRecord(null)).toEqual({});
+    expect(sanitizeBoolRecord(undefined)).toEqual({});
+    // mixed object: only boolean values are retained, junk values dropped
+    expect(
+      sanitizeBoolRecord({ ok: true, num: 1, str: "x", nested: {}, alsoOk: false }),
+    ).toEqual({ ok: true, alsoOk: false });
   });
 });
 

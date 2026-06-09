@@ -22,6 +22,34 @@ function makeLocalStorage(): StateStorage {
   }
 }
 
+/**
+ * Coerce an unknown persisted value into a clean Record<string, boolean>.
+ * Drops every non-boolean entry; non-object inputs collapse to {}. Shared
+ * between the store default, `migrate` (schema bump) and `onRehydrateStorage`
+ * (same-version corruption recovery) so a tampered blob can never spread
+ * non-boolean junk onto state.
+ */
+export function sanitizeBoolRecord(raw: unknown): Record<string, boolean> {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return {};
+  const clean: Record<string, boolean> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value === "boolean") clean[key] = value;
+  }
+  return clean;
+}
+
+const CONFIG_PANEL_WIDTH_MIN = 250;
+const CONFIG_PANEL_WIDTH_MAX = 800;
+const CONFIG_PANEL_WIDTH_DEFAULT = 400;
+
+/** Clamp the config-panel width into its valid range; non-finite → default. */
+export function sanitizeConfigPanelWidth(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return CONFIG_PANEL_WIDTH_DEFAULT;
+  }
+  return Math.max(CONFIG_PANEL_WIDTH_MIN, Math.min(CONFIG_PANEL_WIDTH_MAX, value));
+}
+
 export type ConfigSubTab =
   | "claude-md"
   | "skills"
@@ -124,8 +152,8 @@ export const useUIStore = create<UIState>()(
   toggleConfigPanel: () => set((state) => ({ configPanelOpen: !state.configPanelOpen })),
   setConfigPanelOpen: (open) => set({ configPanelOpen: open }),
 
-  configPanelWidth: 400,
-  setConfigPanelWidth: (width) => set({ configPanelWidth: Math.max(250, Math.min(800, width)) }),
+  configPanelWidth: CONFIG_PANEL_WIDTH_DEFAULT,
+  setConfigPanelWidth: (width) => set({ configPanelWidth: sanitizeConfigPanelWidth(width) }),
 
   hasDirtyEditor: false,
   setHasDirtyEditor: (dirty) => set({ hasDirtyEditor: dirty }),
@@ -185,6 +213,33 @@ export const useUIStore = create<UIState>()(
         libraryScopeOpen: state.libraryScopeOpen,
         librarySectionOpen: state.librarySectionOpen,
       }),
+      version: 1,
+      // Schema-bump path: coerce both persisted records to clean bool-maps so a
+      // pre-version blob (or a tampered one) cannot inject non-boolean values.
+      migrate: (persisted: unknown): Partial<UIState> => {
+        const p = (persisted ?? {}) as Record<string, unknown>;
+        return {
+          libraryScopeOpen: sanitizeBoolRecord(p.libraryScopeOpen),
+          librarySectionOpen: sanitizeBoolRecord(p.librarySectionOpen),
+        };
+      },
+      // Same-version corruption recovery: migrate only fires on a version change,
+      // so re-run the coercion here to heal a corrupt blob carrying the current
+      // version (mirrors settingsStore's migrate + onRehydrateStorage split).
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        const scope = sanitizeBoolRecord(state.libraryScopeOpen);
+        const section = sanitizeBoolRecord(state.librarySectionOpen);
+        if (
+          JSON.stringify(scope) !== JSON.stringify(state.libraryScopeOpen) ||
+          JSON.stringify(section) !== JSON.stringify(state.librarySectionOpen)
+        ) {
+          useUIStore.setState({
+            libraryScopeOpen: scope,
+            librarySectionOpen: section,
+          });
+        }
+      },
     }
   )
 );

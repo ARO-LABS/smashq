@@ -41,9 +41,9 @@ const TOAST_CONFIG: Record<
   },
   achievement: {
     icon: ICONS.toast.achievement,
-    border: "border-info",
-    text: "text-info",
-    glow: "0 0 8px oklch(60% 0.20 300), 0 0 12px oklch(60% 0.20 300 / 0.2)",
+    border: "border-warning",
+    text: "text-warning",
+    glow: "0 0 8px oklch(75% 0.14 70), 0 0 12px oklch(75% 0.14 70 / 0.2)",
   },
   info: {
     icon: ICONS.toast.info,

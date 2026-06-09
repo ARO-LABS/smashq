@@ -148,12 +148,21 @@ export function useAutoUpdate(): UseAutoUpdateReturn {
 
   const confirmRelaunch = useCallback(async () => {
     if (!isTauri) return;
-    // Install the previously downloaded update, then relaunch
-    if (update) {
-      await update.install();
+    // Install the previously downloaded update, then relaunch. A failure here is
+    // user-visible-critical: the "Update bereit" toast has already been dismissed
+    // by the action click, so without surfacing an error the user is stranded on
+    // the old version with no signal. Transition to "error" so the existing error
+    // toast re-appears as a retry signal.
+    try {
+      if (update) {
+        await update.install();
+      }
+      await relaunch();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      safeSetState((s) => ({ ...s, status: "error", error: msg }));
     }
-    await relaunch();
-  }, [update]);
+  }, [update, safeSetState]);
 
   const dismiss = useCallback(() => {
     if (state.newVersion) {
