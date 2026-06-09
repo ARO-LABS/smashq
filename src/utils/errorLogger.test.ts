@@ -404,4 +404,41 @@ describe("frontend log persistence flush", () => {
     await flushFrontendLogs();
     expect(called).toBe(false);
   });
+
+  it("re-queues entries when the invoke fails so the next flush retries them", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "debug").mockImplementation(() => {});
+    let attempt = 0;
+    const seen: number[] = [];
+    mockIPC((cmd, args) => {
+      if (cmd !== "append_frontend_logs") return undefined;
+      attempt++;
+      if (attempt === 1) throw new Error("sink down"); // first flush fails
+      seen.push((args as { entries: unknown[] }).entries.length);
+      return undefined;
+    });
+    wirePersistenceGate(() => true);
+    logError("test", new Error("boom"));
+    await flushFrontendLogs(); // fails -> re-queues
+    await flushFrontendLogs(); // retry -> succeeds, entry not lost
+    expect(attempt).toBe(2);
+    expect(seen).toEqual([1]);
+  });
+
+  it("caps the re-queue so a permanently-down sink cannot grow unbounded", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "debug").mockImplementation(() => {});
+    let lastBatchLen = 0;
+    mockIPC((cmd, args) => {
+      if (cmd !== "append_frontend_logs") return undefined;
+      lastBatchLen = (args as { entries: unknown[] }).entries.length;
+      throw new Error("sink stays down"); // every flush fails
+    });
+    wirePersistenceGate(() => true);
+    // Push well past the 1000-entry bound; FLUSH_THRESHOLD (25) auto-flushes,
+    // each flush fails and re-queues, exercising the slice() cap.
+    for (let i = 0; i < 1100; i++) logError("test", new Error(`e${i}`));
+    await flushFrontendLogs();
+    expect(lastBatchLen).toBeLessThanOrEqual(1000);
+  });
 });

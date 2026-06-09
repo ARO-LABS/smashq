@@ -51,9 +51,9 @@ describe("ErrorBoundary", () => {
         <Bomb shouldThrow={true} />
       </ErrorBoundary>,
     );
-    expect(screen.getByText("RUNTIME ERROR")).toBeTruthy();
+    expect(screen.getByText("LAUFZEITFEHLER")).toBeTruthy();
     expect(screen.getByText("Kaboom!")).toBeTruthy();
-    expect(screen.getByText("RELOAD")).toBeTruthy();
+    expect(screen.getByText("Neu laden")).toBeTruthy();
   });
 
   it("adds error toast to uiStore when error caught", () => {
@@ -77,10 +77,10 @@ describe("ErrorBoundary", () => {
       </ErrorBoundary>,
     );
     expect(screen.getByText("custom fallback here")).toBeTruthy();
-    expect(screen.queryByText("RUNTIME ERROR")).toBeNull();
+    expect(screen.queryByText("LAUFZEITFEHLER")).toBeNull();
   });
 
-  it("resets error state when RELOAD button clicked", () => {
+  it("resets error state when recover button clicked", () => {
     // Use a ref-controlled child so flipping its behavior doesn't require
     // passing new children through rerender (which would race with setState).
     let shouldThrow = true;
@@ -93,13 +93,26 @@ describe("ErrorBoundary", () => {
         <ControlledBomb />
       </ErrorBoundary>,
     );
-    expect(screen.getByText("RUNTIME ERROR")).toBeTruthy();
+    expect(screen.getByText("LAUFZEITFEHLER")).toBeTruthy();
 
-    // Flip behavior FIRST, then click RELOAD so re-render uses new behavior
+    // Flip behavior FIRST, then click recover so re-render uses new behavior
     shouldThrow = false;
-    fireEvent.click(screen.getByText("RELOAD"));
+    fireEvent.click(screen.getByText("Neu laden"));
 
-    expect(screen.queryByText("RUNTIME ERROR")).toBeNull();
+    expect(screen.queryByText("LAUFZEITFEHLER")).toBeNull();
     expect(screen.getByText("All good")).toBeTruthy();
+  });
+
+  it("keeps showing fallback if the child still throws after recover (edge)", () => {
+    render(
+      <ErrorBoundary>
+        <Bomb shouldThrow={true} />
+      </ErrorBoundary>,
+    );
+    expect(screen.getByText("LAUFZEITFEHLER")).toBeTruthy();
+
+    // Child still throws -> recover re-mounts it, error is caught again.
+    fireEvent.click(screen.getByText("Neu laden"));
+    expect(screen.getByText("LAUFZEITFEHLER")).toBeTruthy();
   });
 });

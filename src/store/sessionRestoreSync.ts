@@ -87,14 +87,23 @@ export function initSessionRestoreSync(): () => void {
       .map((gid) => alive.find((s) => s.id === gid)?.folder)
       .filter((f): f is string => !!f);
 
-    // Shallow comparison to avoid redundant writes. MUST include layoutMode
-    // and gridFolders so layout-only mutations (single→grid switch, addToGrid)
-    // also trigger a persist write — without these, the layout change rides
-    // along the next sessions-array mutation and is otherwise lost on restart.
+    // Single source for the active folder — reused in BOTH the comparison key
+    // and the persist call so they can never diverge. (Earlier this was only
+    // in the setter; a pure active-session switch left sessions/layoutMode/
+    // gridFolders identical, the guard hit, and the stale activeFolder was
+    // never written — restore then re-activated the wrong session.)
+    const activeFolder = activeSession?.folder ?? null;
+
+    // Shallow comparison to avoid redundant writes. MUST include layoutMode,
+    // gridFolders AND activeFolder so layout-only or active-only mutations
+    // (single→grid switch, addToGrid, active-session switch) also trigger a
+    // persist write — without these, the change rides along the next
+    // sessions-array mutation and is otherwise lost on restart.
     const json = JSON.stringify({
       sessions,
       layoutMode: state.layoutMode,
       gridFolders,
+      activeFolder,
     });
     if (json === lastJson) return;
     lastJson = json;
@@ -102,7 +111,7 @@ export function initSessionRestoreSync(): () => void {
     settings.setSessionRestore({
       enabled: true,
       sessions,
-      activeFolder: activeSession?.folder ?? null,
+      activeFolder,
       layoutMode: state.layoutMode,
       gridFolders,
     });

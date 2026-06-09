@@ -313,4 +313,64 @@ describe("Modal", () => {
     expect(closeBtn.querySelector("svg")).toBeTruthy();
     expect(container).toBeTruthy();
   });
+
+  it("does not apply backdrop-blur (no glassmorphism)", () => {
+    const { container } = render(
+      <Modal open onClose={vi.fn()}>
+        <p>Body</p>
+      </Modal>,
+    );
+    const backdrop = container.querySelector(".bg-black\\/70");
+    expect(backdrop).toBeTruthy();
+    expect(backdrop?.className).not.toContain("backdrop-blur");
+  });
+
+  it("traps Tab focus within the dialog (wraps last to first)", () => {
+    render(
+      <Modal open onClose={vi.fn()}>
+        <button>Erste</button>
+        <button>Letzte</button>
+      </Modal>,
+    );
+    const last = screen.getByRole("button", { name: "Letzte" });
+    const first = screen.getByRole("button", { name: "Erste" });
+    last.focus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(document.activeElement).toBe(first);
+  });
+
+  it("wraps Shift+Tab from first focusable back to last", () => {
+    render(
+      <Modal open onClose={vi.fn()}>
+        <button>Erste</button>
+        <button>Letzte</button>
+      </Modal>,
+    );
+    const last = screen.getByRole("button", { name: "Letzte" });
+    const first = screen.getByRole("button", { name: "Erste" });
+    first.focus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(last);
+  });
+
+  it("restores focus to the previously focused element on close", () => {
+    const trigger = document.createElement("button");
+    trigger.textContent = "Ausloeser";
+    document.body.appendChild(trigger);
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+
+    const { rerender } = render(
+      <Modal open onClose={vi.fn()}>
+        <p>Body</p>
+      </Modal>,
+    );
+    rerender(
+      <Modal open={false} onClose={vi.fn()}>
+        <p>Body</p>
+      </Modal>,
+    );
+    expect(document.activeElement).toBe(trigger);
+    document.body.removeChild(trigger);
+  });
 });

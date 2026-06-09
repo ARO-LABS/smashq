@@ -1,5 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
-import { Loader2 } from "lucide-react";
+import { ICONS, ICON_SIZE } from "../../utils/icons";
+
+const LoadingIcon = ICONS.action.loading;
 
 // ============================================================================
 // Types
@@ -65,7 +67,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {...rest}
       >
         {loading ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <LoadingIcon className={`${ICON_SIZE.card} animate-spin`} />
         ) : icon ? (
           <span className="shrink-0">{icon}</span>
         ) : null}

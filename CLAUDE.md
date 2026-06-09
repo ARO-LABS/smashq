@@ -87,7 +87,7 @@ Der Tauri-Auto-Updater ist der einzige Pfad, ueber den Bugfixes die installierte
 ### Geschuetzte Pfade
 
 - `src/hooks/useAutoUpdate.ts` (+ `.test.ts`)
-- `src/components/layout/SideNav.tsx` — speziell `handleVersionClick`, `showInstallToast`, `showRestartToast`, der Status-Dot-Render (`bg-success` / `bg-accent`)
+- `src/components/sessions/SessionPanelDock.tsx` (+ `.test.tsx`) — speziell `handleVersionClick`, `showInstallToast`, `showRestartToast`, der Status-Dot-Render (`bg-success` / `bg-accent`). Die Updater-UI wurde 1:1 aus dem inzwischen geloeschten `SideNav.tsx` hierher migriert.
 - `src/components/layout/AppShell.tsx` — `<ToastContainer />` MUSS gemounted bleiben
 - `src/components/shared/ToastContainer.tsx`
 - `src/components/shared/Toast.tsx`
@@ -98,10 +98,10 @@ Der Tauri-Auto-Updater ist der einzige Pfad, ueber den Bugfixes die installierte
 
 ### Triple-Check (alle drei Schritte, keine Abkuerzung)
 
-1. **Automatisierte Tests gruen**: `npx vitest run src/components/layout src/components/shared src/hooks/useAutoUpdate.test.ts`. Der Regression-Guard `mounts ToastContainer so addToast renders a visible toast` in `AppShell.test.tsx` MUSS bleiben und passen — er fangt genau die "Renderer-orphan"-Klasse, die im Mai 2026 alle Update-Toasts stumm geschaltet hat.
+1. **Automatisierte Tests gruen**: `npx vitest run src/components/layout src/components/shared src/components/sessions/SessionPanelDock.test.tsx src/hooks/useAutoUpdate.test.ts`. Der Regression-Guard `mounts ToastContainer so addToast renders a visible toast` in `AppShell.test.tsx` MUSS bleiben und passen — er fangt genau die "Renderer-orphan"-Klasse, die im Mai 2026 alle Update-Toasts stumm geschaltet hat.
 2. **Production-Build sauber**: `npm run tauri build` ohne Errors. `.exe` + signierte `latest.json` werden erzeugt.
 3. **Manuelle Smoke in der installierten .exe** (Dev-Mode reicht NICHT, weil `__TAURI_INTERNALS__` & Updater-Endpoint nur produktiv greifen):
-   - v-Badge unten in der SideNav klicken → Toast "Suche nach Updates..." erscheint oben rechts (Beweis: ToastContainer rendert)
+   - v-Badge unten im SessionPanelDock (Session-Leiste) klicken → Toast "Suche nach Updates..." erscheint oben rechts (Beweis: ToastContainer rendert)
    - Bei verfuegbarem Update → Toast `Update vX verfuegbar` mit Button **Installieren**, Status-Dot accent (cyan)
    - Klick "Installieren" → Download laeuft, Status-Dot wechselt auf success (gruen) sobald `status === "ready"`
    - Klick v-Badge erneut → Toast `Update bereit` mit Button **Neu starten**

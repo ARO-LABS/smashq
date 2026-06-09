@@ -492,6 +492,26 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
     : {});
   const { showProtokolleTab: _dropShowProtokolleTab, ...prefsWithoutLegacy } = rawPrefs;
 
+  // Validate apiKeys structure: ApiKeyMetadataEntry[]. Mirrors validatePinnedDocs
+  // below — a tampered or stale settings.json must not widen unknown[] into a
+  // typed ApiKeyMetadataEntry[] without per-element shape checks. Malformed
+  // entries are dropped (defense in depth, same posture as validateSessionRestore).
+  const validateApiKeys = (raw: unknown): ApiKeyMetadataEntry[] => {
+    if (!Array.isArray(raw)) return defaults.apiKeys;
+    return raw.filter((k): k is ApiKeyMetadataEntry =>
+      k != null &&
+      typeof k === "object" &&
+      typeof (k as ApiKeyMetadataEntry).id === "string" &&
+      typeof (k as ApiKeyMetadataEntry).provider === "string" &&
+      typeof (k as ApiKeyMetadataEntry).label === "string" &&
+      typeof (k as ApiKeyMetadataEntry).redactedKey === "string" &&
+      typeof (k as ApiKeyMetadataEntry).addedAt === "number" &&
+      typeof (k as ApiKeyMetadataEntry).isValid === "boolean" &&
+      ((k as ApiKeyMetadataEntry).lastUsedAt === undefined ||
+        typeof (k as ApiKeyMetadataEntry).lastUsedAt === "number")
+    );
+  };
+
   // Validate pinnedDocs structure: Record<string, PinnedDoc[]>
   const validatePinnedDocs = (raw: unknown): Record<string, PinnedDoc[]> => {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
@@ -558,7 +578,7 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
     sound: { ...defaults.sound, ...(p.sound && typeof p.sound === "object" ? p.sound : {}) },
     pipeline: { ...defaults.pipeline, ...(p.pipeline && typeof p.pipeline === "object" ? p.pipeline : {}) },
     preferences: { ...defaults.preferences, ...prefsWithoutLegacy },
-    apiKeys: Array.isArray(p.apiKeys) ? p.apiKeys : defaults.apiKeys,
+    apiKeys: validateApiKeys(p.apiKeys),
     favorites: migratedFavorites,
     favoriteGroups: migratedGroups,
     locale: p.locale === "de" || p.locale === "en" ? p.locale : defaults.locale,

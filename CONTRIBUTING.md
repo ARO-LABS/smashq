@@ -88,11 +88,8 @@ These documents are essential for contributors — they contain project conventi
 | [CLAUDE.md](CLAUDE.md) | Projekt-Konventionen, Architektur, Arbeitsweise, Quality Gates. Das ist quasi euer "Contributing Guide" fuer KI-gestuetzte Entwicklung. |
 | [tasks/todo.md](tasks/todo.md) | Sprint-Backlog mit aktuellem Plan |
 | [tasks/lessons.md](tasks/lessons.md) | Lessons Learned (verhindert dass Contributors die gleichen Fehler machen) |
-| [tasks/ideas.md](tasks/ideas.md) | Ideen-Sammlung |
-| [tasks/user-stories-pipeline.md](tasks/user-stories-pipeline.md) | User Stories fuer Pipeline-Feature |
 | [Softwareprozess/arc42-specification.md](Softwareprozess/arc42-specification.md) | arc42-Spezifikation: Architektur & Roadmap (Single Source of Truth, wird nach jedem Sprint-Review erweitert) |
 | [CHANGELOG.md](CHANGELOG.md) | Release-Historie (Keep-a-Changelog-Format) |
-| [tasks/docs-inventory.md](tasks/docs-inventory.md) | Inventar aller aktiven Projekt-Dokumente |
 
 > **Wichtig**: Wer mit Claude Code (oder anderen KI-Agenten) am Projekt arbeitet, sollte `CLAUDE.md` und `tasks/lessons.md` **vor** Arbeitsbeginn lesen. Das spart Fehler und Kontext-Wechsel.
 

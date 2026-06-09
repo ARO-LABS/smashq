@@ -2,8 +2,6 @@
 
 A desktop app for managing and monitoring multiple [Claude CLI](https://docs.anthropic.com/en/docs/claude-cli) sessions. Multi-session terminal with project context, favorites, and notes — built with Tauri v2 and React.
 
-> ⚠️ **v1.6.31 / v1.6.32 — keyboard input is broken in the production build.** Roll back to v1.6.30 via the manual NSIS installer from GitHub Releases; the auto-updater cannot recover from this. See [CHANGELOG.md](CHANGELOG.md).
-
 ## Features
 
 - **Multi-Session Terminal** — Run multiple Claude CLI sessions side by side in one window

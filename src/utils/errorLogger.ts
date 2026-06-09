@@ -52,6 +52,10 @@ export function wirePersistenceGate(gate: LoggingGate): void {
 
 const FLUSH_INTERVAL_MS = 2000;
 const FLUSH_THRESHOLD = 25;
+// Upper bound on the re-queue buffer. If the Rust sink stays down, we keep the
+// newest MAX_PENDING_ENTRIES and drop the oldest overflow so a permanently
+// failing flush cannot grow `pending` without limit.
+const MAX_PENDING_ENTRIES = 1000;
 let pending: StructuredEntry[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -74,8 +78,18 @@ export async function flushFrontendLogs(): Promise<void> {
   pending = [];
   try {
     await invoke("append_frontend_logs", { entries: batch });
-  } catch {
-    console.debug("[errorLogger] frontend log flush failed"); // eslint-disable-line no-console
+  } catch (e) {
+    // IPC failed — the batch was already detached from `pending`. Re-queue it
+    // ahead of anything buffered since (preserving chronological order) and
+    // reschedule a retry, so a transient sink failure does not silently drop
+    // log entries. Bound the result to avoid unbounded growth if the sink
+    // stays down — keep the newest entries, drop the oldest overflow.
+    pending = batch.concat(pending);
+    if (pending.length > MAX_PENDING_ENTRIES) {
+      pending = pending.slice(pending.length - MAX_PENDING_ENTRIES);
+    }
+    scheduleFlush();
+    console.debug("[errorLogger] frontend log flush failed, re-queued", e); // eslint-disable-line no-console
   }
 }
 

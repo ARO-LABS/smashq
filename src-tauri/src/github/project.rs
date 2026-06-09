@@ -6,6 +6,11 @@ use super::commands::{effective_cwd, ensure_gh, run_command};
 /// Fallback hex color for project-board labels with no color from `gh`.
 const BOARD_LABEL_FALLBACK_COLOR: &str = "6b7280";
 
+/// Hard cap on board pages. GitHub returns 100 items/page, so 100 pages =
+/// 10 000 items — far beyond any realistic board. Acts as a backstop against
+/// a pagination loop that never terminates.
+const MAX_BOARD_PAGES: usize = 100;
+
 // ── Types ────────────────────────────────────────────────────────────
 
 #[derive(Serialize, Clone)]
@@ -327,7 +332,7 @@ pub mod commands {
         let mut cursor: Option<String> = None;
         let mut first_page = true;
 
-        loop {
+        for _ in 0..MAX_BOARD_PAGES {
             let val = fetch_board_page(&cwd_str, &query_arg, &number_arg, cursor.as_deref())?;
 
             let project = &val["data"]["viewer"]["projectV2"];
@@ -348,7 +353,19 @@ pub mod commands {
             if !items["pageInfo"]["hasNextPage"].as_bool().unwrap_or(false) {
                 break;
             }
-            cursor = items["pageInfo"]["endCursor"].as_str().map(String::from);
+            // hasNextPage is true: a usable endCursor is required to make
+            // forward progress. A null/missing endCursor (GitHub edge case)
+            // would otherwise refetch page 1 forever, hammering the API.
+            let next_cursor = match items["pageInfo"]["endCursor"].as_str() {
+                Some(c) => c.to_string(),
+                None => break,
+            };
+            // No-forward-progress guard: identical cursor means the next fetch
+            // would return the same page — stop instead of looping.
+            if cursor.as_deref() == Some(next_cursor.as_str()) {
+                break;
+            }
+            cursor = Some(next_cursor);
         }
 
         let items = parse_items_from_graphql(&all_nodes, &lanes);
@@ -439,6 +456,55 @@ mod tests {
                 ]
             }
         })
+    }
+
+    // ── pagination loop-termination logic (finding 4) ─────────────────
+
+    /// Mirrors the cursor-advance decision in get_project_board's loop so the
+    /// termination logic is testable without shelling out to `gh`. Returns the
+    /// next cursor to fetch, or `None` to stop the loop.
+    fn next_board_cursor(page_info: &serde_json::Value, prev: Option<&str>) -> Option<String> {
+        if !page_info["hasNextPage"].as_bool().unwrap_or(false) {
+            return None;
+        }
+        let next = page_info["endCursor"].as_str()?;
+        if prev == Some(next) {
+            return None;
+        }
+        Some(next.to_string())
+    }
+
+    #[test]
+    fn pagination_advances_with_valid_next_cursor() {
+        let pi = serde_json::json!({"hasNextPage": true, "endCursor": "CUR2"});
+        assert_eq!(
+            next_board_cursor(&pi, Some("CUR1")),
+            Some("CUR2".to_string())
+        );
+    }
+
+    #[test]
+    fn pagination_stops_when_next_page_true_but_cursor_null() {
+        // The original infinite-loop bug: hasNextPage true, endCursor null →
+        // must terminate (return None) instead of refetching page 1.
+        let pi = serde_json::json!({"hasNextPage": true, "endCursor": null});
+        assert_eq!(next_board_cursor(&pi, Some("CUR1")), None);
+        // endCursor key entirely missing behaves the same way.
+        let pi_missing = serde_json::json!({"hasNextPage": true});
+        assert_eq!(next_board_cursor(&pi_missing, None), None);
+    }
+
+    #[test]
+    fn pagination_stops_on_no_forward_progress() {
+        // Same cursor returned again → stop to avoid an endless loop.
+        let pi = serde_json::json!({"hasNextPage": true, "endCursor": "SAME"});
+        assert_eq!(next_board_cursor(&pi, Some("SAME")), None);
+    }
+
+    #[test]
+    fn pagination_stops_when_no_next_page() {
+        let pi = serde_json::json!({"hasNextPage": false, "endCursor": "CUR9"});
+        assert_eq!(next_board_cursor(&pi, None), None);
     }
 
     #[test]

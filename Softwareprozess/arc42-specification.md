@@ -162,7 +162,7 @@ graph TB
 **Protokolle und Formate:**
 - Frontend zu Backend: `invoke("command_name", { params })` — JSON-serialisiert
 - Backend zu Frontend: `app.emit("event_name", data)` — Tauri Event System
-- Persistenz: JSON-Dateien in AppData
+- Persistenz: JSON-Dateien in `Documents/Smashq/` (NDJSON-Log separat in `%LOCALAPPDATA%/smashq/`)
 - Agent-Erkennung: Regex auf PTY-Output (Unicode-Zeichen: Bullet, Square, etc.)
 
 ### 3.3 Kontextdiagramm (C4 Level 0)
@@ -390,11 +390,11 @@ graph TD
 |-------|-----|---------------|
 | `sessionStore` | Ephemeral | Session-CRUD, Status, PTY-Output |
 | `settingsStore` | Persistent | Favoriten, Notizen, Theme, API-Keys |
-| `uiStore` | Ephemeral | Tabs, Toasts, UI-Flags |
-| `pipelineStore` | Ephemeral | Pipeline-State, Worktrees, QA-Gate |
-| `agentStore` | Ephemeral | Erkannte Agenten, Hierarchie |
-| `workflowStore` | Ephemeral | Skill/Hook-basierte Workflows |
+| `uiStore` | Ephemeral (Library-UI-Flags persistiert) | Tabs, Toasts, UI-Flags |
+| `configDiscoveryStore` | Ephemeral | Erkannte CLAUDE.md/Skills/Hooks/Agents pro Projekt |
 | `editorStore` | Ephemeral | Markdown-Editor-State |
+
+> Weitere Stores in `src/store/`: `logViewerStore`, `projectStore`, `tasksStore`, `sessionRestoreSync` (+ `tasksStorage`/`tauriStorage`-Helper). Die frueher gelisteten `pipelineStore`/`agentStore`/`workflowStore` existieren nicht (Pipeline ist Mock-only, siehe §4.1).
 
 ### 5.3 Level 2 — Backend-Module (Rust)
 
@@ -650,7 +650,7 @@ graph LR
 
 | Anforderung | Details |
 |-------------|---------|
-| OS | Windows 7+ / Server 2008 R2+ |
+| OS | Windows 10 1809+ / Windows 11 (WebView2-Anforderung, Tauri v2) |
 | Runtime | WebView2 (Tauri v2 auf Windows) |
 | Abhängigkeiten | Claude CLI installiert + im PATH |
 | Optional | `gh` CLI für GitHub-Integration |
@@ -724,13 +724,13 @@ graph TD
 | Input-Validierung | Implementiert | Shell-Injection-Whitelist (`[a-z0-9\-_]`) für Session-IDs |
 | Path-Traversal-Schutz | Implementiert | `folder_path.exists()` + `is_dir()` Checks |
 | Subprocess-Timeouts | Implementiert | Timeouts für `gh`/`git`/`claude` Prozesse |
-| CSP-Policy | Teilweise | Aktiv, aber `'unsafe-eval'` noetig (Vite/HMR) |
+| CSP-Policy | Implementiert | Produktion: `script-src 'self'` (kein `unsafe-eval`); nur `style-src` nutzt `'unsafe-inline'` (Fonts) |
 | Secret-Management | Offen | API-Keys in Settings ohne Encryption |
 | HTML-Sanitization | Implementiert | DOMPurify für Markdown-Rendering |
 
 ### 8.3 Persistenz
 
-- **Technologie**: JSON-Dateien in AppData (via Tauri)
+- **Technologie**: JSON-Dateien in `Documents/Smashq/` (settings.json, favorites.json, notes/, tasks.json); NDJSON-Log separat in `%LOCALAPPDATA%/smashq/`
 - **Backup**: Rotation mit max. 3 Versionen (seit v1.3.1)
 - **State-Trennung**: Ephemeral (sessionStore) vs. Persistent (settingsStore)
 - **Schwaeche**: Kein Atomic Write implementiert
@@ -745,7 +745,7 @@ graph TD
 | **DEBUG** | `log::debug!()` + File only | Detaillierter Flow (Development) |
 
 Frontend: `perfLogger.ts` mit 24 Instrumentierungspunkten (IPC/Event/Store/Render-Zeiten).
-Backend: Rust `log` + `env_logger` nach `<AppData>/agentic-explorer.log`.
+Backend: strukturiertes NDJSON nach `%LOCALAPPDATA%/smashq/app-log.ndjson` (+ `.1`..`.3` rotiert), eine JSON-Zeile pro Eintrag; live via `log-line`-Event.
 
 ### 8.5 UI/UX-Konsistenz
 

@@ -63,6 +63,47 @@ describe("useGitBranch", () => {
     expect(result.current).toBeNull();
   });
 
+  it("pauses the poll loop while the document is hidden and resumes on visibilitychange (edge)", async () => {
+    vi.useFakeTimers();
+    try {
+      mockInvoke.mockResolvedValue({ branch: "main" });
+      const visState = vi.spyOn(document, "visibilityState", "get");
+      visState.mockReturnValue("visible");
+      const addSpy = vi.spyOn(document, "addEventListener");
+
+      renderHook(() => useGitBranch("/repo"));
+      // Initial fetch resolves, then scheduleNext arms the 30s timer.
+      await vi.advanceTimersByTimeAsync(0);
+      const callsAfterInitial = mockInvoke.mock.calls.length;
+      expect(callsAfterInitial).toBeGreaterThan(0);
+
+      // Tab goes hidden. The next scheduled tick fires fetch-then-schedule;
+      // scheduleNext now sees hidden → parks on a visibilitychange listener
+      // instead of re-arming a timer.
+      visState.mockReturnValue("hidden");
+      await vi.advanceTimersByTimeAsync(30_000);
+      const callsWhileHidden = mockInvoke.mock.calls.length;
+
+      // No further timer ticks happen while hidden — advancing time is a no-op.
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(mockInvoke.mock.calls.length).toBe(callsWhileHidden);
+      expect(
+        addSpy.mock.calls.some((c) => c[0] === "visibilitychange"),
+      ).toBe(true);
+
+      // Becoming visible again triggers an immediate fetch.
+      visState.mockReturnValue("visible");
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mockInvoke.mock.calls.length).toBeGreaterThan(callsWhileHidden);
+
+      visState.mockRestore();
+      addSpy.mockRestore();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("resets the branch to null when folder changes to undefined", async () => {
     mockInvoke.mockResolvedValue({ branch: "main" });
     const { result, rerender } = renderHook(
