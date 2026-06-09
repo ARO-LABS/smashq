@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { FileText, Puzzle, Webhook, Settings, Bot, Github, GitBranch, Columns3, Clock } from "lucide-react";
+import { FileText, Puzzle, Webhook, Settings, Bot, Github, GitBranch, Clock } from "lucide-react";
 import type { ConfigSubTab } from "../../store/uiStore";
 import { isPinTab, getPinIdFromTab } from "../../store/uiStore";
 
@@ -10,7 +10,6 @@ export const SettingsViewer = lazy(() => import("./SettingsViewer").then(m => ({
 export const AgentsViewer = lazy(() => import("./AgentsViewer").then(m => ({ default: m.AgentsViewer })));
 export const GitHubViewer = lazy(() => import("./GitHubViewer").then(m => ({ default: m.GitHubViewer })));
 export const WorktreeViewer = lazy(() => import("./WorktreeViewer").then(m => ({ default: m.WorktreeViewer })));
-export const KanbanBoard = lazy(() => import("../kanban/KanbanBoard").then(m => ({ default: m.KanbanBoard })));
 export const SessionHistoryViewer = lazy(() => import("./SessionHistoryViewer"));
 export const PinnedDocViewer = lazy(() => import("./PinnedDocViewer").then(m => ({ default: m.PinnedDocViewer })));
 
@@ -43,7 +42,6 @@ export const CONFIG_TABS: ConfigTab[] = [
   { id: "agents",    label: "Agents",    icon: Bot,      group: "context", requiresPresence: "agents" },
   { id: "github",    label: "GitHub",    icon: Github,   group: "project", requiresPresence: "github" },
   { id: "worktrees", label: "Worktrees", icon: GitBranch, group: "project", requiresPresence: "git" },
-  { id: "kanban",    label: "Kanban",    icon: Columns3, group: "project", requiresPresence: "github" },
   { id: "history",   label: "History",   icon: Clock,    group: "history" },
 ];
 
@@ -80,8 +78,6 @@ export function ConfigPanelContent({ folder, activeTab, onResumeSession }: Confi
         <GitHubViewer folder={folder} />
       ) : activeTab === "worktrees" ? (
         <WorktreeViewer folder={folder} />
-      ) : activeTab === "kanban" ? (
-        <KanbanBoard folder={folder} />
       ) : activeTab === "history" ? (
         <SessionHistoryViewer folder={folder} onResumeSession={onResumeSession} />
       ) : null}
