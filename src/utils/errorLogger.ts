@@ -58,6 +58,11 @@ const FLUSH_THRESHOLD = 25;
 const MAX_PENDING_ENTRIES = 1000;
 let pending: StructuredEntry[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
+// Re-entrancy guard. flushFrontendLogs is async; the threshold path, the timer,
+// and the close/unmount paths can all trigger it concurrently. Without this,
+// two in-flight flushes that both fail would re-queue out of chronological
+// order. Only one flush drains at a time; concurrent callers reschedule.
+let flushing = false;
 
 function scheduleFlush(): void {
   if (flushTimer !== null) return;
@@ -73,23 +78,34 @@ export async function flushFrontendLogs(): Promise<void> {
     clearTimeout(flushTimer);
     flushTimer = null;
   }
-  if (pending.length === 0) return;
-  const batch = pending;
-  pending = [];
-  try {
-    await invoke("append_frontend_logs", { entries: batch });
-  } catch (e) {
-    // IPC failed — the batch was already detached from `pending`. Re-queue it
-    // ahead of anything buffered since (preserving chronological order) and
-    // reschedule a retry, so a transient sink failure does not silently drop
-    // log entries. Bound the result to avoid unbounded growth if the sink
-    // stays down — keep the newest entries, drop the oldest overflow.
-    pending = batch.concat(pending);
-    if (pending.length > MAX_PENDING_ENTRIES) {
-      pending = pending.slice(pending.length - MAX_PENDING_ENTRIES);
-    }
+  if (flushing) {
+    // A flush is already draining; let it finish and reschedule so entries
+    // buffered since are picked up next tick. Keeps sends strictly serialized.
     scheduleFlush();
-    console.debug("[errorLogger] frontend log flush failed, re-queued", e); // eslint-disable-line no-console
+    return;
+  }
+  if (pending.length === 0) return;
+  flushing = true;
+  try {
+    const batch = pending;
+    pending = [];
+    try {
+      await invoke("append_frontend_logs", { entries: batch });
+    } catch (e) {
+      // IPC failed — the batch was already detached from `pending`. Re-queue it
+      // ahead of anything buffered since (preserving chronological order) and
+      // reschedule a retry, so a transient sink failure does not silently drop
+      // log entries. Bound the result to avoid unbounded growth if the sink
+      // stays down — keep the newest entries, drop the oldest overflow.
+      pending = batch.concat(pending);
+      if (pending.length > MAX_PENDING_ENTRIES) {
+        pending = pending.slice(pending.length - MAX_PENDING_ENTRIES);
+      }
+      scheduleFlush();
+      console.debug("[errorLogger] frontend log flush failed, re-queued", e); // eslint-disable-line no-console
+    }
+  } finally {
+    flushing = false;
   }
 }
 
