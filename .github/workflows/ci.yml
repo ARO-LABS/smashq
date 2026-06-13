@@ -47,6 +47,38 @@ jobs:
         working-directory: src-tauri
         run: cargo fmt --check
 
+  # macOS-Kompilier-Guard: faengt Mac-spezifische Build-Bruche (cfg-Branches,
+  # Plattform-APIs) auf PRs ab, statt sie erst im Release-Job (build-macos)
+  # sichtbar werden zu lassen. Nur `cargo check` — kein Bundle, kein Clippy,
+  # haelt den Job schlank.
+  macos-check:
+    name: macOS Build Check
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Frontend build (Tauri braucht ../dist)
+        run: npm run build
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95.0"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Cargo check (macOS)
+        working-directory: src-tauri
+        run: cargo check
+
   test:
     name: Tests
     runs-on: ubuntu-latest

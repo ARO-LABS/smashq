@@ -26,7 +26,8 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": ["nsis", "app", "dmg"],
+    "category": "DeveloperTool",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -41,6 +42,9 @@
         "installMode": "currentUser",
         "startMenuFolder": "Smashq"
       }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15"
     },
     "createUpdaterArtifacts": true,
     "shortDescription": "Smashq - Manage and monitor Claude CLI sessions"
