@@ -288,6 +288,24 @@ describe("classifyGithubError", () => {
     expect(r.hint).toContain("some entirely unexpected failure");
   });
 
+  it("classifies a raw string error (legacy pre-ADPError path) as unknown", () => {
+    // Backward-compat: before the Result<T, ADPError> migration, invoke rejected
+    // with a plain string. parseInvokeError must still yield a usable info object.
+    const r = classifyGithubError("irgendein roher Fehlertext");
+    expect(r.kind).toBe("unknown");
+    expect(r.hint).toContain("irgendein roher Fehlertext");
+  });
+
+  it("still detects gh_missing from a raw legacy string message", () => {
+    const r = classifyGithubError("gh CLI not found");
+    expect(r.kind).toBe("gh_missing");
+  });
+
+  it("does not throw on a null/undefined error and falls back to unknown", () => {
+    expect(classifyGithubError(null).kind).toBe("unknown");
+    expect(classifyGithubError(undefined).kind).toBe("unknown");
+  });
+
   it("gives every kind a non-empty German title and hint", () => {
     for (const sample of [
       { code: "SERVICE_AUTH_FAILED", message: "x", details: "scope", retryable: false },

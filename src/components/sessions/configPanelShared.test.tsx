@@ -39,7 +39,6 @@ describe("CONFIG_TABS", () => {
     expect(history!.requiresPresence).toBeUndefined();
   });
 
-  it("does not include a kanban tab (moved to its own window)", () => {
-    expect(CONFIG_TABS.find((t) => t.id === "kanban")).toBeUndefined();
-  });
+  // (The former "does not include a kanban tab" test is now enforced by the
+  // type system itself — "kanban" was removed from the ConfigSubTab union.)
 });
