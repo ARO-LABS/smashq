@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { useEffect, useReducer } from "react";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { KanbanBoard, __resetKanbanCachesForTest } from "./KanbanBoard";
 import { invoke } from "@tauri-apps/api/core";
@@ -164,17 +165,34 @@ function setupGlobalStore() {
  * Stateful store fixture: `setGlobalProject` mutates a backing variable that
  * `getGlobalProject` reads, so the auto-select/picker flow runs end-to-end
  * (loadProjects → setGlobalProject → loadBoard), which `setupStore` cannot model.
+ *
+ * Crucially it also RE-RENDERS the consumer on every set, modelling Zustand's
+ * re-render-on-set (the real `useProjectStore()` subscribes to all state). This
+ * is what re-runs the load effect via its `selectedProject?.projectId` dep — the
+ * production path that loads the board after an auto-select/picker selection,
+ * rather than a (removed) inline `loadBoard` call.
  */
 function setupStatefulStore(): { current: unknown } {
   const ref: { current: unknown } = { current: undefined };
+  const listeners = new Set<() => void>();
   const setGlobal = vi.fn((proj: unknown) => {
     ref.current = proj;
+    listeners.forEach((notify) => notify());
   });
-  vi.mocked(useProjectStore).mockReturnValue({
-    globalProject: null,
-    setGlobalProject: setGlobal,
-    getGlobalProject: () => ref.current,
-  } as unknown as ReturnType<typeof useProjectStore>);
+  vi.mocked(useProjectStore).mockImplementation((() => {
+    const [, forceRender] = useReducer((n: number) => n + 1, 0);
+    useEffect(() => {
+      listeners.add(forceRender);
+      return () => {
+        listeners.delete(forceRender);
+      };
+    }, []);
+    return {
+      globalProject: ref.current ?? null,
+      setGlobalProject: setGlobal,
+      getGlobalProject: () => ref.current,
+    };
+  }) as unknown as typeof useProjectStore);
   return ref;
 }
 
@@ -562,6 +580,56 @@ describe("KanbanBoard — Projects v2", () => {
     // Switching to the org re-lists that owner's boards.
     fireEvent.change(ownerSelect, { target: { value: "ARO-LABS" } });
     await waitFor(() => expect(screen.getByText("Org Board")).toBeTruthy());
+  });
+
+  it("drops a stale owner-switch resolve on a rapid A→B→A switch", async () => {
+    setupStatefulStore();
+    // The org list call hangs until we resolve it by hand — long after the user
+    // has switched back to their own boards.
+    let resolveOrg!: (v: unknown) => void;
+    const orgPending = new Promise<unknown>((r) => {
+      resolveOrg = r;
+    });
+    mockInvoke.mockImplementation((cmd: string, args?: unknown) => {
+      if (cmd === "list_project_owners") {
+        return Promise.resolve([
+          { login: "me", kind: "user" },
+          { login: "ARO-LABS", kind: "org" },
+        ]);
+      }
+      if (cmd === "list_user_projects") {
+        const owner = (args as { owner?: string } | undefined)?.owner;
+        if (owner === "ARO-LABS") return orgPending;
+        return Promise.resolve([
+          { id: "PVT_abc123", number: 2, title: "Smashq", items_total: 5 },
+        ]);
+      }
+      return Promise.resolve(makeBoard());
+    });
+
+    render(<Board folder="/test/owner-race" />);
+    await waitFor(() => expect(screen.getByText("Backlog")).toBeTruthy());
+
+    fireEvent.click(screen.getByText("Smashq")); // open picker → loads owners
+    const ownerSelect = await screen.findByLabelText("Konto");
+
+    // A→B: switch to the org (its list call hangs), then B→A: back to own boards.
+    // ("Smashq" renders twice once the picker is open — header + list entry.)
+    fireEvent.change(ownerSelect, { target: { value: "ARO-LABS" } });
+    fireEvent.change(ownerSelect, { target: { value: "me" } });
+    await waitFor(() =>
+      expect(screen.getAllByText("Smashq").length).toBeGreaterThan(0),
+    );
+    expect(screen.queryByText("Org Board")).toBeNull();
+
+    // The stale org resolve lands late. The abort guard (signal.aborted check
+    // before setProjects) must drop it so it can't clobber the current list.
+    resolveOrg([{ id: "PVT_org", number: 1, title: "Org Board", items_total: 0 }]);
+    await orgPending;
+    await waitFor(() =>
+      expect(screen.getAllByText("Smashq").length).toBeGreaterThan(0),
+    );
+    expect(screen.queryByText("Org Board")).toBeNull();
   });
 
   it("shows onboarding guidance + owner chooser when an owner has no boards", async () => {

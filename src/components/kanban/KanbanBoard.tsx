@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { RefreshCw, Columns3, AlertCircle, ChevronDown } from "lucide-react";
+import { RefreshCw, Columns3, AlertCircle, ChevronDown, X } from "lucide-react";
 import {
   getErrorMessage,
   classifyGithubError,
@@ -338,9 +338,10 @@ export function KanbanBoard() {
           return;
         }
         const auto = { projectNumber: list[0].number, projectId: list[0].id, title: list[0].title };
+        // Selecting the board changes `selectedProject.projectId`, which re-runs
+        // this effect and loads it via the `proj` branch above. Loading inline
+        // here too would fire `get_project_board` twice for the same board.
         setGlobalProject(auto);
-        // loadBoard reads store — defer one tick so Zustand state has updated.
-        void loadBoard(signal);
       });
     }
 
@@ -674,9 +675,10 @@ export function KanbanBoard() {
           <span>{moveError}</span>
           <button
             onClick={() => setMoveError(null)}
-            className="ml-2 text-red-400 hover:text-red-300"
+            className="ml-2 text-error/70 hover:text-error"
+            aria-label="Fehler schließen"
           >
-            ✕
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       )}

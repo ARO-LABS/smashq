@@ -312,7 +312,7 @@ describe("getPinIdFromTab", () => {
 
   it("returns null for non-pin tabs", () => {
     expect(getPinIdFromTab("claude-md")).toBeNull();
-    expect(getPinIdFromTab("kanban")).toBeNull();
+    expect(getPinIdFromTab("github")).toBeNull();
   });
 
   it("preserves colons inside the pin id", () => {

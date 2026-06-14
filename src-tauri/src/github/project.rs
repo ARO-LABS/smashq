@@ -86,7 +86,7 @@ pub struct ProjectBoard {
 /// the exact same path, since the node id is globally unique and not relative
 /// to the authenticated viewer. The previous viewer-scoping made every org
 /// board resolve to NOT_FOUND.
-const PROJECT_BOARD_QUERY: &str = r#"query($id: ID!, $cursor: String) { node(id: $id) { ... on ProjectV2 { id field(name: "Status") { ... on ProjectV2SingleSelectField { id options { id name } } } items(first: 100, after: $cursor) { pageInfo { hasNextPage endCursor } nodes { id fieldValues(first: 20) { nodes { __typename ... on ProjectV2ItemFieldSingleSelectValue { optionId field { ... on ProjectV2FieldCommon { name } } } } } content { __typename ... on Issue { number title url state repository { nameWithOwner } labels(first: 10) { nodes { name color } } assignees(first: 5) { nodes { login } } } } } } } } }"#;
+const PROJECT_BOARD_QUERY: &str = r#"query($id: ID!, $cursor: String) { node(id: $id) { __typename ... on ProjectV2 { id field(name: "Status") { ... on ProjectV2SingleSelectField { id options { id name } } } items(first: 100, after: $cursor) { pageInfo { hasNextPage endCursor } nodes { id fieldValues(first: 20) { nodes { __typename ... on ProjectV2ItemFieldSingleSelectValue { optionId field { ... on ProjectV2FieldCommon { name } } } } } content { __typename ... on Issue { number title url state repository { nameWithOwner } labels(first: 10) { nodes { name color } } assignees(first: 5) { nodes { login } } } } } } } } }"#;
 
 /// GraphQL query listing the viewer's own login plus the organizations they
 /// belong to — the set of owners whose Projects v2 boards the user can browse
@@ -98,12 +98,14 @@ const PROJECT_OWNERS_QUERY: &str =
 // ── Validation ───────────────────────────────────────────────────────
 
 /// Validates that a Projects v2 ID contains only safe characters.
-/// Prevents shell injection: IDs must be alphanumeric + underscore + hyphen.
+/// Prevents shell injection: IDs must be ASCII-alphanumeric + underscore +
+/// hyphen. ASCII-only (matching `validate_repo`): real gh node ids are ASCII,
+/// and a Unicode-aware check would needlessly admit `café`/`Ω123`.
 fn validate_id(id: &str) -> Result<(), ADPError> {
     if id.is_empty()
         || !id
             .chars()
-            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
     {
         return Err(ADPError::validation(format!("Invalid ID format: '{}'", id)));
     }
@@ -397,12 +399,15 @@ pub mod commands {
             let val = fetch_board_page(&cwd_str, &query_arg, &id_arg, cursor.as_deref())?;
 
             // `node(id:)` resolves to null when the board was deleted, the id is
-            // wrong, or the viewer lost access — surface that as a distinct
-            // "not found" error (with the project number for context) so the
-            // frontend can drop a stale selection instead of showing a generic
-            // or misleading scope message.
+            // wrong, or the viewer lost access. A non-null node of the WRONG type
+            // (a stale `PVTI_`/Issue id) silently lacks the ProjectV2 fields and
+            // would otherwise fall through to a misleading "no Status field"
+            // error — so a wrong `__typename` is treated as not-found too. Surface
+            // both as a distinct "not found" (with the project number for context)
+            // so the frontend can drop a stale selection instead of showing a
+            // generic or misleading scope message.
             let project = &val["data"]["node"];
-            if project.is_null() {
+            if project.is_null() || project["__typename"].as_str() != Some("ProjectV2") {
                 return Err(ADPError::new(
                     ADPErrorCode::ServiceRequestFailed,
                     format!(
@@ -479,12 +484,12 @@ pub mod commands {
         option_id: String,
         folder: Option<String>,
     ) -> Result<(), ADPError> {
+        ensure_gh("gh CLI not found")?;
+
         validate_id(&project_id)?;
         validate_id(&item_id)?;
         validate_id(&field_id)?;
         validate_id(&option_id)?;
-
-        ensure_gh("gh CLI not found")?;
 
         let cwd = effective_cwd(folder.as_deref());
         let cwd_str = cwd.to_string_lossy().to_string();
@@ -833,10 +838,10 @@ mod tests {
     }
 
     #[test]
-    fn validate_id_accepts_alphanumeric_unicode() {
-        // is_alphanumeric() is Unicode-aware — accented letters pass.
-        assert!(validate_id("café").is_ok());
-        assert!(validate_id("Ω123").is_ok());
+    fn validate_id_rejects_non_ascii_alphanumeric() {
+        // ASCII-only (matches validate_repo): accented/Greek letters are rejected.
+        assert!(validate_id("café").is_err());
+        assert!(validate_id("Ω123").is_err());
     }
 
     // ── parse_status_field — additional cases ─────────────────────────

@@ -6,7 +6,7 @@
  * These utilities provide type-safe parsing and backward-compatible handling.
  */
 
-import type { ADPError, ADPErrorCode } from "../protocols/schema";
+import type { ADPError } from "../protocols/schema";
 
 /**
  * Type guard: checks if an unknown error value is a structured ADPError.
@@ -39,7 +39,7 @@ export function parseInvokeError(err: unknown): ADPError {
         : String(err);
 
   return {
-    code: "INTERNAL_ERROR" as ADPErrorCode,
+    code: "INTERNAL_ERROR",
     message,
     retryable: false,
   };

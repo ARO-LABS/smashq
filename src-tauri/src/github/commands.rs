@@ -143,7 +143,7 @@ pub(crate) fn ensure_gh(not_found_msg: &str) -> Result<(), ADPError> {
 /// vec (matching the per-command empty guard). Parse errors carry the exact
 /// "Failed to parse gh output: {}" message all three call sites used.
 pub(crate) fn run_json_array(cwd: &str, args: &[&str]) -> Result<Vec<serde_json::Value>, ADPError> {
-    let output = run_command(cwd, "gh", args)?;
+    let output = run_gh(cwd, args)?;
 
     if output.is_empty() {
         return Ok(Vec::new());
@@ -212,6 +212,15 @@ pub(crate) fn classify_gh_error(msg: &str, gql_type: Option<&str>) -> ADPError {
     let lower = msg.to_lowercase();
     let ty = gql_type.unwrap_or("").to_uppercase();
 
+    // gh binary vanished between the `ensure_gh` guard and the spawn (TOCTOU),
+    // or became non-executable. `timed_output` emits this exact English literal
+    // prefix only on spawn failure (util.rs) — matching the prefix is precise,
+    // unlike the OS-localised `{e}` suffix. Surface it as `gh_missing` so the
+    // frontend shows the install hint instead of a generic `unknown` error.
+    if lower.contains("failed to spawn command") {
+        return ADPError::new(ADPErrorCode::ServiceRequestFailed, msg.to_string())
+            .with_details("gh_missing");
+    }
     // Board / node not found (deleted, renamed, or no access via this path).
     if ty == "NOT_FOUND"
         || lower.contains("could not resolve to a")
@@ -591,7 +600,7 @@ pub mod commands {
             args.extend_from_slice(&["--repo", r]);
         }
 
-        let output = run_command(&cwd_str, "gh", &args)?;
+        let output = run_gh(&cwd_str, &args)?;
 
         if output.is_empty() {
             return Err(ADPError::parse("Empty response from gh"));
@@ -674,7 +683,7 @@ pub mod commands {
         if let Some(ref r) = repo {
             args.extend_from_slice(&["--repo", r]);
         }
-        run_command(&cwd_str, "gh", &args)?;
+        run_gh(&cwd_str, &args)?;
         Ok(())
     }
 }
@@ -1557,6 +1566,20 @@ mod tests {
     fn classify_gh_error_unknown_falls_back_to_command_failed() {
         let err = classify_gh_error("some entirely unexpected failure", None);
         assert_eq!(err.code, ADPErrorCode::CommandExecutionFailed);
+        assert!(!err.retryable);
+    }
+
+    #[test]
+    fn classify_gh_error_spawn_failure_maps_to_gh_missing() {
+        // TOCTOU: gh disappears after the ensure_gh guard. timed_output emits the
+        // "Failed to spawn command: ..." literal, which must surface as gh_missing
+        // (with the install hint) rather than a generic CommandExecutionFailed.
+        let err = classify_gh_error(
+            "Failed to spawn command: program not found (os error 2)",
+            None,
+        );
+        assert_eq!(err.code, ADPErrorCode::ServiceRequestFailed);
+        assert_eq!(err.details.as_deref(), Some("gh_missing"));
         assert!(!err.retryable);
     }
 

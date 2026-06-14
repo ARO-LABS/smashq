@@ -80,6 +80,9 @@ export const useProjectStore = create<ProjectState>()(
       name: "agentic-project-store",
       version: 2,
       storage: createJSONStorage(() => localStorage),
+      // Persist only the board selection — explicit, instead of relying on JSON
+      // silently dropping the action functions. Matches uiStore/settingsStore.
+      partialize: (state) => ({ globalProject: state.globalProject }),
       // Schema-bump path (incl. v1→v2 which dropped per-folder boards): keep ONLY
       // the validated `globalProject`. A pre-v2 `projectByFolder` is intentionally
       // not carried over (it is not spread back in).
