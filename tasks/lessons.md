@@ -7,6 +7,16 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-06-14 — Prod-korrekter Fix brach 3 Tests, weil der Store-Mock Zustand-Reaktivitaet nicht modellierte
+
+**Kontext:** Armada-Review-Fix — der First-Visit-Auto-Select feuerte `get_project_board` doppelt (inline `loadBoard` + der durch `setGlobalProject` re-getriggerte Effekt). Ich entfernte den inline-Call. In Produktion korrekt: `useProjectStore()` (ohne Selector) subscribt den ganzen Store → `setGlobalProject` triggert Re-Render → der Effekt (Dep `selectedProject?.projectId`) laeuft neu und laedt das Board genau einmal.
+
+**Fehler:** 3 bestehende Picker-Tests brachen (`Lade Kanban-Daten...` haengt). `setupStatefulStore` gab ein STATISCHES `mockReturnValue`-Objekt zurueck — `setGlobalProject` mutierte eine Ref, loeste aber KEIN Re-Render aus. Der inline-`loadBoard` war in den Tests der EINZIGE Ladepfad; in Prod der redundante Double-Fetch. Der Mock verbarg den echten Re-Trigger-Pfad.
+
+**Korrektur:** NICHT den Prod-Fix zurueckgenommen, sondern den Mock realistisch gemacht — `setupStatefulStore` re-rendert jetzt den Consumer auf jedes `set` (Listener-Set + `useReducer`-Force-Render). Die Suite testet nun den echten Produktions-Ladepfad statt der inline-Kruecke.
+
+**Regel:** Wenn ein Fix einen Code-Pfad entfernt, den nur ein Test-Mock am Leben hielt — pruefen, ob der Mock die Produktion ueberhaupt modelliert. Ein statisches `mockReturnValue` fuer einen reaktiven Zustand-Store ist ein Phantom: es testet einen Pfad, den es in Prod nicht gibt. Fix = Mock an die Realitaet angleichen (Reaktivitaet nachbilden), nicht den korrekten Prod-Fix opfern. Verwandt: Test-Phantom-Pfad-Klasse (2026-05-21 fireEvent-Target-Override) und [[feedback_subagent_report_skepticism]].
+
 ### 2026-06-09 — Kanban-Vereinfachung: Prop entfernt ohne ALLE Caller zu greppen; + Cache-Key-Wechsel brach Test-Isolation
 
 **Fehler 1 — Caller nicht vollständig gegreppt:** Ich entfernte das `folder`-Prop von `KanbanBoard`, nachdem ich nur `KanbanDashboardView` als Consumer angenommen hatte. Tatsächlich gab es einen zweiten: `configPanelShared.tsx` (Kanban-Tab pro Session, folder-scoped). tsc fing es — aber erst nach dem halben Refactor; ich hätte VORHER `grep "<KanbanBoard"` über das ganze Repo laufen lassen müssen. **Regel:** Bevor eine Komponenten-/Funktions-Signatur geändert wird, IMMER alle Aufrufstellen greppen (`<Component`, `funcName(`) — nicht nur die eine, die man im Kopf hat. (Wiederholung der [[verify-git-head-before-branching]]-Klasse: live prüfen statt annehmen.) Folge: STOP + re-plan + User-Rückfrage, weil die Design-Annahme falsch war.
