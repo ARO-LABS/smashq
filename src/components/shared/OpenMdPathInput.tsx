@@ -1,6 +1,8 @@
 import { useState, useCallback, type FormEvent } from "react";
 import { ICONS, ICON_SIZE } from "../../utils/icons";
 
+const OpenIcon = ICONS.action.chevronRight;
+
 interface OpenMdPathInputProps {
   /** Called with the trimmed, non-empty path when the user submits. */
   onOpen: (path: string) => void;
@@ -16,7 +18,6 @@ interface OpenMdPathInputProps {
  */
 export function OpenMdPathInput({ onOpen, variant = "panel" }: OpenMdPathInputProps): JSX.Element {
   const [path, setPath] = useState("");
-  const OpenIcon = ICONS.action.chevronRight;
 
   const handleSubmit = useCallback(
     (e: FormEvent) => {

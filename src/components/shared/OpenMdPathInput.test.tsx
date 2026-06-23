@@ -19,4 +19,13 @@ describe("OpenMdPathInput", () => {
     fireEvent.click(screen.getByLabelText("Markdown-Datei öffnen"));
     expect(onOpen).not.toHaveBeenCalled();
   });
+
+  it("submits on Enter (form submit)", () => {
+    const onOpen = vi.fn();
+    render(<OpenMdPathInput onOpen={onOpen} />);
+    const input = screen.getByLabelText("Pfad zur Markdown-Datei") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "./a.md" } });
+    fireEvent.submit(input.closest("form")!);
+    expect(onOpen).toHaveBeenCalledWith("./a.md");
+  });
 });
