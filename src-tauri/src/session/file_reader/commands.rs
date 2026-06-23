@@ -62,12 +62,17 @@ pub(crate) fn validate_md_target(
     }
 
     let size = std::fs::metadata(&path)
-        .map(|m| m.len() as usize)
-        .unwrap_or(0);
+        .map_err(|e| {
+            ADPError::file_io(format!(
+                "Cannot read metadata for '{}': {}",
+                relative_path, e
+            ))
+        })?
+        .len() as usize;
     if size > MAX_WRITE_SIZE {
         return Err(ADPError::validation(format!(
-            "File too large: {}MB exceeds {}MB limit",
-            size / (1024 * 1024),
+            "File too large: {} bytes exceeds {}MB limit",
+            size,
             MAX_WRITE_SIZE / (1024 * 1024)
         )));
     }
@@ -319,7 +324,9 @@ pub async fn resolve_project_root(folder: String) -> Result<String, ADPError> {
 // without requiring a tokio dev-dependency.
 #[cfg(test)]
 mod command_tests {
-    use super::{list_project_dir, read_project_file, validate_md_target, write_project_file};
+    use super::{
+        list_project_dir, read_project_file, validate_md_target, write_project_file, MAX_WRITE_SIZE,
+    };
     use std::fs;
     use tempfile::TempDir;
 
@@ -696,5 +703,14 @@ mod command_tests {
         let tmp = tempfile::tempdir().unwrap();
         std::fs::write(tmp.path().join("README.MD"), "x").unwrap();
         assert!(validate_md_target(&tmp.path().to_string_lossy(), "README.MD").is_ok());
+    }
+
+    #[test]
+    fn validate_md_target_rejects_oversize_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let big = vec![b'a'; MAX_WRITE_SIZE + 1];
+        std::fs::write(tmp.path().join("big.md"), &big).unwrap();
+        let err = validate_md_target(&tmp.path().to_string_lossy(), "big.md").unwrap_err();
+        assert!(err.message.contains("too large"));
     }
 }
