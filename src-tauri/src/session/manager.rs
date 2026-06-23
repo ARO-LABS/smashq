@@ -296,12 +296,17 @@ impl SessionManager {
         // Reader-Thread: liest PTY-Output und emittiert Events
         let read_id = id.clone();
         let read_app = app.clone();
+        let read_folder = info.folder.clone();
         thread::spawn(move || {
             log::info!("Session {} reader thread started", read_id);
             let mut buf = [0u8; 4096];
             // Track last emitted status to deduplicate — only emit on transitions.
             // Empty string forces the first detected status to always emit.
             let mut last_emitted_status = String::new();
+            // Sentinel detector state (per-session, thread-local).
+            let mut line_buf = String::new();
+            let mut last_open: Option<(String, std::time::Instant)> = None;
+            const DEDUP_WINDOW: std::time::Duration = std::time::Duration::from_millis(1500);
             loop {
                 match reader.read(&mut buf) {
                     Ok(0) => {
@@ -320,6 +325,37 @@ impl SessionManager {
                             },
                         ) {
                             log::debug!("Session {} failed to emit session-output: {}", read_id, e);
+                        }
+
+                        // Sentinel: detect «SMASHQ:open-md» <path> lines and open
+                        // them in the editor window. Reuses the shared dispatch.
+                        line_buf.push_str(&data);
+                        for printed in extract_open_paths(&mut line_buf) {
+                            let p = std::path::Path::new(&printed);
+                            let abs = if p.is_absolute() {
+                                p.to_path_buf()
+                            } else {
+                                std::path::Path::new(&read_folder).join(p)
+                            };
+                            let now = std::time::Instant::now();
+                            let abs_key = abs.to_string_lossy().to_string();
+                            if is_recent_duplicate(&last_open, &abs_key, now, DEDUP_WINDOW) {
+                                continue;
+                            }
+                            let (Some(parent), Some(file)) = (abs.parent(), abs.file_name()) else {
+                                continue;
+                            };
+                            let folder = parent.to_string_lossy().to_string();
+                            let rel = file.to_string_lossy().to_string();
+                            match crate::dispatch_md_open(&read_app, &folder, &rel) {
+                                Ok(()) => last_open = Some((abs_key, now)),
+                                Err(e) => log::debug!(
+                                    "Session {} sentinel open skipped for '{}': {}",
+                                    read_id,
+                                    printed,
+                                    e.message
+                                ),
+                            }
                         }
 
                         // Status-Heuristik: letzte Zeile pruefen
@@ -716,13 +752,11 @@ impl Drop for SessionManager {
 
 /// Exact line-prefix the LLM prints to request an editor open. Guillemets are
 /// rare in normal terminal/code output, lowering accidental-trigger risk.
-#[allow(dead_code)]
 const OPEN_MARKER_PREFIX: &str = "«SMASHQ:open-md»";
 
 /// Returns the path if `line` is exactly an open-marker line. The trimmed line
 /// must START with the marker prefix; mid-prose occurrences do not match. Empty
 /// paths return None.
-#[allow(dead_code)]
 fn parse_open_marker(line: &str) -> Option<&str> {
     let rest = line.trim().strip_prefix(OPEN_MARKER_PREFIX)?;
     let path = rest.trim();
@@ -737,7 +771,6 @@ fn parse_open_marker(line: &str) -> Option<&str> {
 /// in them. A trailing partial line stays buffered for the next PTY chunk —
 /// necessary because PTY output arrives in raw 4 KiB chunks, not whole lines.
 /// Caps the buffer at 8 KiB so a newline-less stream cannot grow it unbounded.
-#[allow(dead_code)]
 fn extract_open_paths(buf: &mut String) -> Vec<String> {
     let mut paths = Vec::new();
     while let Some(nl) = buf.find('\n') {
@@ -747,6 +780,7 @@ fn extract_open_paths(buf: &mut String) -> Vec<String> {
         }
     }
     if buf.len() > 8192 {
+        log::warn!("open-md sentinel: line buffer exceeded 8 KiB without newline, discarding");
         buf.clear();
     }
     paths
@@ -754,7 +788,6 @@ fn extract_open_paths(buf: &mut String) -> Vec<String> {
 
 /// True if `path` was opened as `last` within `window`. Debounces redraw/loop
 /// spam (e.g. terminal scroll-back re-emitting the same marker line).
-#[allow(dead_code)]
 fn is_recent_duplicate(
     last: &Option<(String, std::time::Instant)>,
     path: &str,
@@ -1271,6 +1304,23 @@ mod tests {
             src.contains("let killer = child.clone_killer();"),
             "a killer handle must be cloned from the child at spawn time so \
              close_session can terminate the shell deterministically"
+        );
+    }
+
+    // --- Sentinel detector wiring guard ---
+    // The actual open requires a real PTY + AppHandle and cannot be unit-tested
+    // in isolation; pin the wiring so a deletion turns this red.
+    #[test]
+    fn reader_thread_wires_sentinel_detector() {
+        let src = include_str!("manager.rs");
+        let prod = src.split("#[cfg(test)]").next().unwrap_or(src);
+        assert!(
+            prod.contains("extract_open_paths(&mut line_buf)"),
+            "reader thread must drain open-paths from its line buffer"
+        );
+        assert!(
+            prod.contains("crate::dispatch_md_open("),
+            "reader thread must dispatch detected open-paths to the editor"
         );
     }
 
