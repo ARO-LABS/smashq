@@ -26,6 +26,7 @@ interface EditorState {
 
   openFileFromProject: (folder: string, relativePath: string) => Promise<void>;
   openFileFromDialog: () => Promise<void>;
+  openFileByPath: (absolutePath: string) => Promise<void>;
   updateContent: (content: string) => void;
   saveFile: () => Promise<boolean>;
   closeFile: () => void;
@@ -34,6 +35,23 @@ interface EditorState {
 
 function isDirty(file: EditorFile | null): boolean {
   return file != null && file.content !== file.savedContent;
+}
+
+/**
+ * Split an absolute path into `folder` (parent dir) + `relativePath` (filename).
+ * Reused by the dialog flow, the path-input, and the editor empty-state. The
+ * "folder = own parent" split lets `read_project_file` accept any absolute path
+ * (the filename is trivially inside its parent) without subtree confinement.
+ */
+export function splitAbsolutePath(absolutePath: string): {
+  folder: string;
+  relativePath: string;
+} {
+  const normalized = absolutePath.replace(/\\/g, "/");
+  const lastSlash = normalized.lastIndexOf("/");
+  const folder = lastSlash >= 0 ? normalized.slice(0, lastSlash) : "";
+  const relativePath = normalized.slice(lastSlash + 1);
+  return { folder, relativePath };
 }
 
 function addToRecent(
@@ -83,10 +101,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!filePath || typeof filePath !== "string") return;
 
       // Derive folder (parent) and relativePath (filename) from absolute path
-      const normalized = filePath.replace(/\\/g, "/");
-      const lastSlash = normalized.lastIndexOf("/");
-      const folder = normalized.slice(0, lastSlash);
-      const relativePath = normalized.slice(lastSlash + 1);
+      const { folder, relativePath } = splitAbsolutePath(filePath);
 
       await get().openFileFromProject(folder, relativePath);
     } catch (err) {
@@ -97,6 +112,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         message: getErrorMessage(err),
       });
     }
+  },
+
+  openFileByPath: async (absolutePath: string) => {
+    const trimmed = absolutePath.trim();
+    if (!trimmed) return;
+    const { folder, relativePath } = splitAbsolutePath(trimmed);
+    if (!relativePath || !folder) return; // directory path, trailing slash, or bare filename
+    await get().openFileFromProject(folder, relativePath);
   },
 
   updateContent: (content: string) => {
@@ -164,3 +187,4 @@ export const selectOpenFileFromDialog = (state: EditorState) =>
   state.openFileFromDialog;
 export const selectCloseFile = (state: EditorState) => state.closeFile;
 export const selectUpdateContent = (state: EditorState) => state.updateContent;
+export const selectOpenFileByPath = (state: EditorState) => state.openFileByPath;

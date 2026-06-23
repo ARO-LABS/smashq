@@ -24,6 +24,8 @@ import { useUIStore } from "../../store/uiStore";
 import { SessionCard } from "./SessionCard";
 import { FavoritesList } from "./FavoritesList";
 import { SessionPanelDock } from "./SessionPanelDock";
+import { OpenMdPathInput } from "../shared/OpenMdPathInput";
+import { splitAbsolutePath } from "../../store/editorStore";
 import { logError } from "../../utils/errorLogger";
 import { ICONS, ICON_SIZE } from "../../utils/icons";
 import type { ClaudeSession } from "../../store/sessionStore";
@@ -168,6 +170,14 @@ export function SessionList({ onNewSession, onQuickStart }: SessionListProps): J
     useSessionStore.getState().removeSession(sessionId);
   }, []);
 
+  const handleOpenMd = useCallback((p: string) => {
+    const { folder, relativePath } = splitAbsolutePath(p);
+    if (!folder || !relativePath) return;
+    invoke("open_md_in_editor", { folder, relativePath }).catch((err: unknown) =>
+      logError("SessionList.openMdInEditor", err),
+    );
+  }, []);
+
   return (
     <div className="relative flex flex-col h-full bg-surface-base">
       {/* Scrollable content: Favorites + Sessions */}
@@ -209,6 +219,11 @@ export function SessionList({ onNewSession, onQuickStart }: SessionListProps): J
             <div className="p-3 text-center text-neutral-500 text-xs">Keine Sessions vorhanden</div>
           )}
         </div>
+      </div>
+
+      {/* Quick-open: paste a .md path → editor opens it (one step, no dialog) */}
+      <div className="shrink-0 border-t border-neutral-800">
+        <OpenMdPathInput variant="panel" onOpen={handleOpenMd} />
       </div>
 
       {/* Bottom dock — global launchers + theme + notes + version + session actions */}

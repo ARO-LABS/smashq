@@ -7,6 +7,21 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-06-23 — "MD per Pfad öffnen" (subagent-driven, 8 Tasks): Review-Schleife fing wiederholt dieselbe Klasse — *stilles Ok auf dem Fehlerpfad* + fehlende async-Cleanup-Races
+
+**Kontext:** Feature über Subagent-Driven-Development gebaut (Sentinel `«SMASHQ:open-md» <pfad>` im PTY-Output → Editor öffnet die Datei; plus manuelle Pfad-Eingabe). Pro Task zweistufiges Review (Spec → Code-Quality). Die Code-Quality-Stufe fing in 5 von 8 Tasks denselben Fehlertyp, den die Erstimplementierung + alle grünen Gates durchließen.
+
+**Fehler (wiederkehrende Klasse):** Erfolgs-Rückgabe trotz Fehler / fehlende Lifecycle-Sicherung:
+- `validate_md_target`: `std::fs::metadata(...).map(...).unwrap_or(0)` → ein nach `exists()` nicht mehr lesbares File (TOCTOU/Permission) umging die Size-Guard und gab `Ok`.
+- `dispatch_md_open`: `if let Ok(guard) = mutex.lock()` → vergifteter Mutex wurde still übersprungen, Funktion gab trotzdem `Ok` → Cold-Start-Pull liefert `None` → leerer Editor, kein Log.
+- PTY-Detektor: `dispatch_md_open` (synchroner `WebviewWindowBuilder::build()`, 50–200 ms) lief AUF dem PTY-Reader-Thread → blockiert das Leeren des PTY-Buffers (ConPTY 64 KiB) → Child-stdout-Back-Pressure.
+- Editor-`useEffect`: `unlisten` wurde nach `await listen()` gesetzt; unmountet die Komponente während des `await`, lief das Cleanup mit `unlisten === undefined` → Listener leakt permanent (React-StrictMode-Doppel-Invoke triggert genau das).
+- Warm-Event-Open überschrieb `openFile` bedingungslos → ungespeicherte Edits weg, ohne dass der User eine Geste machte.
+
+**Korrektur:** `?`-Propagation statt `unwrap_or`/`if let Ok`-Schlucken; Window-Build per `std::thread::spawn` vom Reader-Thread lösen (Debounce optimistisch VOR dem Spawn setzen); nach `await listen()` das `cancelled`-Flag erneut prüfen und den Handle sofort abreißen; bei auto-getriggertem (Nicht-User-Geste-)Open via `selectIsDirty` gegen Clobber schützen (skip + Info-Toast).
+
+**Regel:** (1) Jeder Tauri-Command-/Detektor-Fehlerpfad propagiert via `?` — nie `unwrap_or`/`if let Ok(..)`, das auf Fehler `Ok` zurückgibt (stiller Ok-Pfad ist in Tauri besonders übel: Ursache in Rust, Symptom "nichts passiert" in der UI). (2) Den PTY-Reader-Thread NIE mit synchronen OS-Calls (Fenster-Build, Datei-Dialog) blockieren — off-thread spawnen. (3) `async`-IIFE in `useEffect` mit `listen()`: nach dem `await` `cancelled` erneut prüfen + Handle abreißen, sonst Listener-Leak bei Unmount-während-`await` (StrictMode deckt es auf). (4) Auto-getriggerte (nicht user-initiierte) Mutationen müssen ungespeicherte Edits prüfen, bevor sie überschreiben. (5) Meta: grüne tsc/clippy/vitest beweisen "kompiliert + Happy-Path", NICHT "Fehlerpfad korrekt" — die adversariale Code-Quality-Stufe ist der Filter dafür. Verwandt: [[feedback_subagent_report_skepticism]], [[act-on-clear-directive]].
+
 ### 2026-06-14 — Prod-korrekter Fix brach 3 Tests, weil der Store-Mock Zustand-Reaktivitaet nicht modellierte
 
 **Kontext:** Armada-Review-Fix — der First-Visit-Auto-Select feuerte `get_project_board` doppelt (inline `loadBoard` + der durch `setGlobalProject` re-getriggerte Effekt). Ich entfernte den inline-Call. In Produktion korrekt: `useProjectStore()` (ohne Selector) subscribt den ganzen Store → `setGlobalProject` triggert Re-Render → der Effekt (Dep `selectedProject?.projectId`) laeuft neu und laedt das Board genau einmal.
