@@ -42,7 +42,8 @@ pub(crate) struct PendingEditorOpen(pub std::sync::Mutex<Option<EditorOpenReques
 /// Folder + file name for an editor open. `relative_path` is the bare file name
 /// (caller passes the file's own parent as `folder`), serialized camelCase to
 /// match the frontend `read_project_file` arg shape.
-#[derive(Clone, serde::Serialize)]
+/// Concurrent calls: last writer wins (single-slot by design).
+#[derive(Clone, Debug, serde::Serialize)]
 pub(crate) struct EditorOpenRequest {
     pub folder: String,
     #[serde(rename = "relativePath")]
@@ -93,7 +94,12 @@ pub(crate) fn dispatch_md_open(
 
     crate::session::file_reader::commands::validate_md_target(folder, relative_path)?;
 
-    if let Ok(mut guard) = app.state::<PendingEditorOpen>().0.lock() {
+    {
+        let pending = app.state::<PendingEditorOpen>();
+        let mut guard = pending
+            .0
+            .lock()
+            .map_err(|_| crate::error::ADPError::internal("editor pending-state mutex poisoned"))?;
         *guard = Some(EditorOpenRequest {
             folder: folder.to_string(),
             relative_path: relative_path.to_string(),
@@ -102,6 +108,11 @@ pub(crate) fn dispatch_md_open(
 
     ensure_detached_window(app, "editor", "Editor")?;
 
+    // NOTE: On cold start the new window may receive BOTH the pending-pull (via
+    // take_pending_editor_open on mount) and this event. In practice Tauri drops
+    // the event before the window's JS listener registers; the pending slot is the
+    // authoritative cold-start path and the event is best-effort for the warm case.
+    // The frontend open is idempotent (re-reads the same file), so a rare double is harmless.
     let _ = app.emit_to(
         "detached-editor",
         "open-md-file",
