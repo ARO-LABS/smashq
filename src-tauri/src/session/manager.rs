@@ -339,23 +339,37 @@ impl SessionManager {
                             };
                             let now = std::time::Instant::now();
                             let abs_key = abs.to_string_lossy().to_string();
+                            // Debounce tracks only the single most-recent path. Covers the
+                            // common case (terminal redraw re-emitting the SAME marker line).
+                            // Alternating distinct paths within the window are not deduped —
+                            // acceptable (worst case: one extra window focus). See backlog.
                             if is_recent_duplicate(&last_open, &abs_key, now, DEDUP_WINDOW) {
                                 continue;
                             }
                             let (Some(parent), Some(file)) = (abs.parent(), abs.file_name()) else {
                                 continue;
                             };
-                            let folder = parent.to_string_lossy().to_string();
+                            let parent_dir = parent.to_string_lossy().to_string();
                             let rel = file.to_string_lossy().to_string();
-                            match crate::dispatch_md_open(&read_app, &folder, &rel) {
-                                Ok(()) => last_open = Some((abs_key, now)),
-                                Err(e) => log::debug!(
-                                    "Session {} sentinel open skipped for '{}': {}",
-                                    read_id,
-                                    printed,
-                                    e.message
-                                ),
-                            }
+                            // Record optimistically BEFORE dispatch so the debounce holds
+                            // even though the open runs off-thread.
+                            last_open = Some((abs_key, now));
+                            // Dispatch OFF the reader thread: build() is a synchronous OS
+                            // call and would otherwise stall PTY draining.
+                            let dispatch_app = read_app.clone();
+                            let dispatch_sid = read_id.clone();
+                            std::thread::spawn(move || {
+                                if let Err(e) =
+                                    crate::dispatch_md_open(&dispatch_app, &parent_dir, &rel)
+                                {
+                                    log::debug!(
+                                        "Session {} sentinel open skipped for '{}': {}",
+                                        dispatch_sid,
+                                        printed,
+                                        e.message
+                                    );
+                                }
+                            });
                         }
 
                         // Status-Heuristik: letzte Zeile pruefen
@@ -1313,7 +1327,7 @@ mod tests {
     #[test]
     fn reader_thread_wires_sentinel_detector() {
         let src = include_str!("manager.rs");
-        let prod = src.split("#[cfg(test)]").next().unwrap_or(src);
+        let prod = src.split("\n#[cfg(test)]").next().unwrap_or(src);
         assert!(
             prod.contains("extract_open_paths(&mut line_buf)"),
             "reader thread must drain open-paths from its line buffer"
