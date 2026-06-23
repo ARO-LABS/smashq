@@ -34,6 +34,86 @@ fn read_persisted_backend_logging() -> Option<bool> {
         .as_bool()
 }
 
+/// Holds a single pending editor-open request. The detached editor window pulls
+/// it on mount via `take_pending_editor_open` (cold-start, before its event
+/// listener exists). A live `open-md-file` event covers the already-open case.
+pub(crate) struct PendingEditorOpen(pub std::sync::Mutex<Option<EditorOpenRequest>>);
+
+/// Folder + file name for an editor open. `relative_path` is the bare file name
+/// (caller passes the file's own parent as `folder`), serialized camelCase to
+/// match the frontend `read_project_file` arg shape.
+#[derive(Clone, serde::Serialize)]
+pub(crate) struct EditorOpenRequest {
+    pub folder: String,
+    #[serde(rename = "relativePath")]
+    pub relative_path: String,
+}
+
+/// Create the `detached-<view>` window, or focus it if it already exists.
+/// Extracted from `open_detached_window` so the editor-open path can reuse the
+/// exact same create-or-focus behaviour.
+pub(crate) fn ensure_detached_window(
+    app: &tauri::AppHandle,
+    view: &str,
+    title: &str,
+) -> Result<(), crate::error::ADPError> {
+    use tauri::{Manager, WebviewWindowBuilder};
+
+    let label = format!("detached-{}", view);
+    if let Some(win) = app.get_webview_window(&label) {
+        let _ = win.set_focus();
+        return Ok(());
+    }
+
+    WebviewWindowBuilder::new(
+        app,
+        &label,
+        tauri::WebviewUrl::App(format!("index.html?view={}", view).into()),
+    )
+    .title(format!("Smashq — {}", title))
+    .inner_size(1200.0, 800.0)
+    .resizable(true)
+    .build()
+    .map_err(|e| {
+        crate::error::ADPError::internal(format!("Failed to create {} window: {}", view, e))
+    })?;
+
+    Ok(())
+}
+
+/// Shared editor-open core for all triggers (sentinel detector, main-window
+/// command, editor store). Validates the target, stashes it as pending, opens or
+/// focuses the editor window, then emits `open-md-file` to it.
+pub(crate) fn dispatch_md_open(
+    app: &tauri::AppHandle,
+    folder: &str,
+    relative_path: &str,
+) -> Result<(), crate::error::ADPError> {
+    use tauri::{Emitter, Manager};
+
+    crate::session::file_reader::commands::validate_md_target(folder, relative_path)?;
+
+    if let Ok(mut guard) = app.state::<PendingEditorOpen>().0.lock() {
+        *guard = Some(EditorOpenRequest {
+            folder: folder.to_string(),
+            relative_path: relative_path.to_string(),
+        });
+    }
+
+    ensure_detached_window(app, "editor", "Editor")?;
+
+    let _ = app.emit_to(
+        "detached-editor",
+        "open-md-file",
+        EditorOpenRequest {
+            folder: folder.to_string(),
+            relative_path: relative_path.to_string(),
+        },
+    );
+
+    Ok(())
+}
+
 fn init_logging() {
     use env_logger::Builder;
     use log::LevelFilter;
@@ -138,27 +218,23 @@ mod commands {
         view: String,
         title: String,
     ) -> Result<(), ADPError> {
-        use tauri::{Manager, WebviewWindowBuilder};
+        crate::ensure_detached_window(&app, &view, &title)
+    }
 
-        let label = format!("detached-{}", view);
+    #[tauri::command]
+    pub async fn open_md_in_editor(
+        app: tauri::AppHandle,
+        folder: String,
+        relative_path: String,
+    ) -> Result<(), ADPError> {
+        crate::dispatch_md_open(&app, &folder, &relative_path)
+    }
 
-        if let Some(win) = app.get_webview_window(&label) {
-            let _ = win.set_focus();
-            return Ok(());
-        }
-
-        WebviewWindowBuilder::new(
-            &app,
-            &label,
-            tauri::WebviewUrl::App(format!("index.html?view={}", view).into()),
-        )
-        .title(format!("Smashq — {}", title))
-        .inner_size(1200.0, 800.0)
-        .resizable(true)
-        .build()
-        .map_err(|e| ADPError::internal(format!("Failed to create {} window: {}", view, e)))?;
-
-        Ok(())
+    #[tauri::command]
+    pub fn take_pending_editor_open(
+        state: tauri::State<crate::PendingEditorOpen>,
+    ) -> Option<crate::EditorOpenRequest> {
+        state.0.lock().ok().and_then(|mut g| g.take())
     }
 }
 
@@ -198,6 +274,7 @@ pub fn run() {
         })
         .plugin(tauri_plugin_process::init())
         .manage(session_manager)
+        .manage(PendingEditorOpen(std::sync::Mutex::new(None)))
         .setup(|app| {
             // Capture the handle so the log format-closure can emit live
             // `log-line` events to open log windows. Set exactly once.
@@ -207,6 +284,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::open_log_window,
             commands::open_detached_window,
+            commands::open_md_in_editor,
+            commands::take_pending_editor_open,
             commands::set_file_logging_enabled,
             // Session-Commands
             session::commands::commands::create_session,
@@ -285,5 +364,21 @@ pub fn run() {
             eprintln!("Fatal: Tauri application failed to run: {}", e);
             std::process::exit(1);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn editor_open_request_serializes_camel_case() {
+        let req = EditorOpenRequest {
+            folder: "C:/p".to_string(),
+            relative_path: "x.md".to_string(),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("\"folder\":\"C:/p\""));
+        assert!(json.contains("\"relativePath\":\"x.md\""));
     }
 }

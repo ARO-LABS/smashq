@@ -35,7 +35,6 @@ const MAX_WRITE_SIZE: usize = 10 * 1024 * 1024;
 /// No subtree confinement: callers pass `folder` = the file's own parent dir and
 /// `relative_path` = the file name, so any absolute path is reachable while
 /// `safe_resolve` still canonicalizes away `..`.
-#[allow(dead_code)]
 pub(crate) fn validate_md_target(
     folder: &str,
     relative_path: &str,
