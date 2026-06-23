@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FileEdit } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { Button } from "../ui/Button";
 import {
   useEditorStore,
@@ -9,13 +11,17 @@ import {
   selectSaveFile,
   selectUpdateContent,
   selectOpenFileFromDialog,
+  selectOpenFileByPath,
 } from "../../store/editorStore";
+import { logError } from "../../utils/errorLogger";
+import { OpenMdPathInput } from "../shared/OpenMdPathInput";
 import { EditorToolbar } from "./EditorToolbar";
 import { CodeMirrorEditor } from "./CodeMirrorEditor";
 import { MarkdownPreview } from "./MarkdownPreview";
 
 function EmptyState() {
   const openFileFromDialog = useEditorStore(selectOpenFileFromDialog);
+  const openFileByPath = useEditorStore(selectOpenFileByPath);
 
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 text-neutral-400">
@@ -28,6 +34,7 @@ function EmptyState() {
       >
         Markdown-Datei öffnen
       </Button>
+      <OpenMdPathInput variant="empty" onOpen={openFileByPath} />
     </div>
   );
 }
@@ -38,6 +45,43 @@ export function MarkdownEditorView() {
   const isDirty = useEditorStore(selectIsDirty);
   const saveFile = useEditorStore(selectSaveFile);
   const updateContent = useEditorStore(selectUpdateContent);
+  const openFileFromProject = useEditorStore((s) => s.openFileFromProject);
+
+  // Receive a file to open: pull any pending request (cold-start, before the
+  // listener exists), then subscribe to live `open-md-file` events (warm case).
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const pending = await invoke<{
+          folder: string;
+          relativePath: string;
+        } | null>("take_pending_editor_open");
+        if (pending?.folder && pending?.relativePath && !cancelled) {
+          await openFileFromProject(pending.folder, pending.relativePath);
+        }
+      } catch (err) {
+        logError("MarkdownEditorView.takePending", err);
+      }
+      try {
+        unlisten = await listen<{ folder: string; relativePath: string }>(
+          "open-md-file",
+          (e) => {
+            if (e.payload?.folder && e.payload?.relativePath) {
+              openFileFromProject(e.payload.folder, e.payload.relativePath);
+            }
+          },
+        );
+      } catch (err) {
+        logError("MarkdownEditorView.listenOpenMd", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unlisten) unlisten();
+    };
+  }, [openFileFromProject]);
 
   // Debounced content for preview (300ms delay)
   const [previewContent, setPreviewContent] = useState("");
