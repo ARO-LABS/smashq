@@ -28,6 +28,53 @@ pub async fn read_project_file(folder: String, relative_path: String) -> Result<
 /// Max file size for write operations (10 MB)
 const MAX_WRITE_SIZE: usize = 10 * 1024 * 1024;
 
+/// Validate that `folder`/`relative_path` resolves to an existing `.md` file
+/// within the size limit. Shared by the `open_md_in_editor` command and the PTY
+/// sentinel detector. Returns the resolved absolute path on success.
+///
+/// No subtree confinement: callers pass `folder` = the file's own parent dir and
+/// `relative_path` = the file name, so any absolute path is reachable while
+/// `safe_resolve` still canonicalizes away `..`.
+#[allow(dead_code)]
+pub(crate) fn validate_md_target(
+    folder: &str,
+    relative_path: &str,
+) -> Result<std::path::PathBuf, ADPError> {
+    let path = safe_resolve(folder, relative_path)?;
+
+    if !path.exists() || !path.is_file() {
+        return Err(ADPError::validation(format!(
+            "Markdown file not found: {}",
+            relative_path
+        )));
+    }
+
+    let is_md = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("md"))
+        .unwrap_or(false);
+    if !is_md {
+        return Err(ADPError::validation(format!(
+            "Not a Markdown (.md) file: {}",
+            relative_path
+        )));
+    }
+
+    let size = std::fs::metadata(&path)
+        .map(|m| m.len() as usize)
+        .unwrap_or(0);
+    if size > MAX_WRITE_SIZE {
+        return Err(ADPError::validation(format!(
+            "File too large: {}MB exceeds {}MB limit",
+            size / (1024 * 1024),
+            MAX_WRITE_SIZE / (1024 * 1024)
+        )));
+    }
+
+    Ok(path)
+}
+
 #[tauri::command]
 pub async fn write_project_file(
     folder: String,
@@ -272,7 +319,7 @@ pub async fn resolve_project_root(folder: String) -> Result<String, ADPError> {
 // without requiring a tokio dev-dependency.
 #[cfg(test)]
 mod command_tests {
-    use super::{list_project_dir, read_project_file, write_project_file};
+    use super::{list_project_dir, read_project_file, validate_md_target, write_project_file};
     use std::fs;
     use tempfile::TempDir;
 
@@ -616,5 +663,38 @@ mod command_tests {
             "expected traversal error, got: {}",
             err.message
         );
+    }
+
+    // --- validate_md_target (4 tests) ---
+
+    #[test]
+    fn validate_md_target_accepts_existing_md() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("a.md"), "# hi").unwrap();
+        let res = validate_md_target(&tmp.path().to_string_lossy(), "a.md");
+        assert!(res.is_ok());
+        assert!(res.unwrap().ends_with("a.md"));
+    }
+
+    #[test]
+    fn validate_md_target_rejects_non_md() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("a.txt"), "x").unwrap();
+        let err = validate_md_target(&tmp.path().to_string_lossy(), "a.txt").unwrap_err();
+        assert!(err.message.contains("Not a Markdown"));
+    }
+
+    #[test]
+    fn validate_md_target_rejects_missing_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let err = validate_md_target(&tmp.path().to_string_lossy(), "nope.md").unwrap_err();
+        assert!(err.message.contains("not found"));
+    }
+
+    #[test]
+    fn validate_md_target_accepts_uppercase_extension() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("README.MD"), "x").unwrap();
+        assert!(validate_md_target(&tmp.path().to_string_lossy(), "README.MD").is_ok());
     }
 }
