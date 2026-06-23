@@ -1486,4 +1486,15 @@ mod tests {
             std::time::Duration::from_millis(1500)
         ));
     }
+
+    #[test]
+    fn dedupe_none_last_is_not_duplicate() {
+        let last: Option<(String, std::time::Instant)> = None;
+        assert!(!is_recent_duplicate(
+            &last,
+            "/p/a.md",
+            std::time::Instant::now(),
+            std::time::Duration::from_millis(1500)
+        ));
+    }
 }
