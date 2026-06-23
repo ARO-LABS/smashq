@@ -13,6 +13,7 @@ import {
   selectOpenFileFromDialog,
   selectOpenFileByPath,
 } from "../../store/editorStore";
+import { useUIStore } from "../../store/uiStore";
 import { logError } from "../../utils/errorLogger";
 import { OpenMdPathInput } from "../shared/OpenMdPathInput";
 import { EditorToolbar } from "./EditorToolbar";
@@ -54,10 +55,9 @@ export function MarkdownEditorView() {
     let cancelled = false;
     (async () => {
       try {
-        const pending = await invoke<{
-          folder: string;
-          relativePath: string;
-        } | null>("take_pending_editor_open");
+        const pending = await invoke<{ folder: string; relativePath: string } | null>(
+          "take_pending_editor_open",
+        );
         if (pending?.folder && pending?.relativePath && !cancelled) {
           await openFileFromProject(pending.folder, pending.relativePath);
         }
@@ -65,14 +65,32 @@ export function MarkdownEditorView() {
         logError("MarkdownEditorView.takePending", err);
       }
       try {
-        unlisten = await listen<{ folder: string; relativePath: string }>(
+        const handle = await listen<{ folder: string; relativePath: string }>(
           "open-md-file",
           (e) => {
-            if (e.payload?.folder && e.payload?.relativePath) {
-              openFileFromProject(e.payload.folder, e.payload.relativePath);
+            if (cancelled) return;
+            if (!e.payload?.folder || !e.payload?.relativePath) return;
+            // Don't clobber unsaved edits on an auto-triggered (warm) open.
+            if (selectIsDirty(useEditorStore.getState())) {
+              useUIStore.getState().addToast({
+                type: "info",
+                title: "Öffnen übersprungen",
+                message: "Editor hat ungespeicherte Änderungen.",
+                duration: 4000,
+              });
+              return;
             }
+            openFileFromProject(e.payload.folder, e.payload.relativePath).catch((err) =>
+              logError("MarkdownEditorView.listenOpenMd", err),
+            );
           },
         );
+        // Cleanup may have already run while listen() was in flight → tear down now.
+        if (cancelled) {
+          handle();
+        } else {
+          unlisten = handle;
+        }
       } catch (err) {
         logError("MarkdownEditorView.listenOpenMd", err);
       }
