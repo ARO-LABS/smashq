@@ -714,6 +714,56 @@ impl Drop for SessionManager {
     }
 }
 
+/// Exact line-prefix the LLM prints to request an editor open. Guillemets are
+/// rare in normal terminal/code output, lowering accidental-trigger risk.
+#[allow(dead_code)]
+const OPEN_MARKER_PREFIX: &str = "«SMASHQ:open-md»";
+
+/// Returns the path if `line` is exactly an open-marker line. The trimmed line
+/// must START with the marker prefix; mid-prose occurrences do not match. Empty
+/// paths return None.
+#[allow(dead_code)]
+fn parse_open_marker(line: &str) -> Option<&str> {
+    let rest = line.trim().strip_prefix(OPEN_MARKER_PREFIX)?;
+    let path = rest.trim();
+    if path.is_empty() {
+        None
+    } else {
+        Some(path)
+    }
+}
+
+/// Drains complete (`\n`-terminated) lines from `buf`, returning open-paths found
+/// in them. A trailing partial line stays buffered for the next PTY chunk —
+/// necessary because PTY output arrives in raw 4 KiB chunks, not whole lines.
+/// Caps the buffer at 8 KiB so a newline-less stream cannot grow it unbounded.
+#[allow(dead_code)]
+fn extract_open_paths(buf: &mut String) -> Vec<String> {
+    let mut paths = Vec::new();
+    while let Some(nl) = buf.find('\n') {
+        let line: String = buf.drain(..=nl).collect();
+        if let Some(p) = parse_open_marker(&line) {
+            paths.push(p.to_string());
+        }
+    }
+    if buf.len() > 8192 {
+        buf.clear();
+    }
+    paths
+}
+
+/// True if `path` was opened as `last` within `window`. Debounces redraw/loop
+/// spam (e.g. terminal scroll-back re-emitting the same marker line).
+#[allow(dead_code)]
+fn is_recent_duplicate(
+    last: &Option<(String, std::time::Instant)>,
+    path: &str,
+    now: std::time::Instant,
+    window: std::time::Duration,
+) -> bool {
+    matches!(last, Some((p, t)) if p == path && now.duration_since(*t) < window)
+}
+
 /// Check if an executable exists on PATH (simple cross-platform check).
 fn which_executable(name: &str) -> Option<std::path::PathBuf> {
     let cmd_name = if cfg!(windows) { "where" } else { "which" };
@@ -1334,5 +1384,106 @@ mod tests {
         };
         let json = serde_json::to_string(&ev).unwrap();
         assert!(json.contains("\"claudeSessionId\":\"uuid-123\""));
+    }
+
+    // --- Sentinel marker parsing (open-md) ---
+
+    #[test]
+    fn parse_marker_happy_relative() {
+        assert_eq!(
+            parse_open_marker("«SMASHQ:open-md» ./tasks/todo.md"),
+            Some("./tasks/todo.md")
+        );
+    }
+
+    #[test]
+    fn parse_marker_trims_surrounding_whitespace_and_cr() {
+        assert_eq!(
+            parse_open_marker("  «SMASHQ:open-md»   C:/x/y.md  \r"),
+            Some("C:/x/y.md")
+        );
+    }
+
+    #[test]
+    fn parse_marker_rejects_midline_occurrence() {
+        assert_eq!(parse_open_marker("echo «SMASHQ:open-md» x.md"), None);
+    }
+
+    #[test]
+    fn parse_marker_rejects_empty_path() {
+        assert_eq!(parse_open_marker("«SMASHQ:open-md»   "), None);
+    }
+
+    #[test]
+    fn parse_marker_rejects_plain_text() {
+        assert_eq!(parse_open_marker("just some output"), None);
+    }
+
+    #[test]
+    fn extract_paths_handles_marker_split_across_chunks() {
+        // The critical PTY case: marker line arrives in two reads.
+        let mut b = String::new();
+        b.push_str("noise\n«SMASHQ:open-md» ./a.m");
+        let r1 = extract_open_paths(&mut b);
+        assert!(r1.is_empty(), "partial marker line must not match yet");
+        b.push_str("d\n");
+        let r2 = extract_open_paths(&mut b);
+        assert_eq!(r2, vec!["./a.md".to_string()]);
+        assert!(b.is_empty(), "completed line drained from buffer");
+    }
+
+    #[test]
+    fn extract_paths_keeps_partial_trailing_line() {
+        let mut b = String::new();
+        b.push_str("«SMASHQ:open-md» ./done.md\npartial without newline");
+        let r = extract_open_paths(&mut b);
+        assert_eq!(r, vec!["./done.md".to_string()]);
+        assert_eq!(b, "partial without newline");
+    }
+
+    #[test]
+    fn extract_paths_caps_runaway_buffer() {
+        let mut b = "x".repeat(9000); // no newline → exceeds 8 KiB cap
+        let r = extract_open_paths(&mut b);
+        assert!(r.is_empty());
+        assert!(b.is_empty(), "oversized partial buffer is cleared");
+    }
+
+    #[test]
+    fn dedupe_same_path_within_window_is_duplicate() {
+        let base = std::time::Instant::now();
+        let last = Some(("/p/a.md".to_string(), base));
+        let now = base + std::time::Duration::from_millis(1000);
+        assert!(is_recent_duplicate(
+            &last,
+            "/p/a.md",
+            now,
+            std::time::Duration::from_millis(1500)
+        ));
+    }
+
+    #[test]
+    fn dedupe_same_path_after_window_is_not_duplicate() {
+        let base = std::time::Instant::now();
+        let last = Some(("/p/a.md".to_string(), base));
+        let now = base + std::time::Duration::from_millis(2000);
+        assert!(!is_recent_duplicate(
+            &last,
+            "/p/a.md",
+            now,
+            std::time::Duration::from_millis(1500)
+        ));
+    }
+
+    #[test]
+    fn dedupe_different_path_is_not_duplicate() {
+        let base = std::time::Instant::now();
+        let last = Some(("/p/a.md".to_string(), base));
+        assert!(!is_recent_duplicate(
+            &last,
+            "/p/b.md",
+            base,
+            std::time::Duration::from_millis(1500)
+        ));
     }
 }
