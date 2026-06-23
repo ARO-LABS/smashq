@@ -170,6 +170,14 @@ export function SessionList({ onNewSession, onQuickStart }: SessionListProps): J
     useSessionStore.getState().removeSession(sessionId);
   }, []);
 
+  const handleOpenMd = useCallback((p: string) => {
+    const { folder, relativePath } = splitAbsolutePath(p);
+    if (!folder || !relativePath) return;
+    invoke("open_md_in_editor", { folder, relativePath }).catch((err: unknown) =>
+      logError("SessionList.openMdInEditor", err),
+    );
+  }, []);
+
   return (
     <div className="relative flex flex-col h-full bg-surface-base">
       {/* Scrollable content: Favorites + Sessions */}
@@ -215,16 +223,7 @@ export function SessionList({ onNewSession, onQuickStart }: SessionListProps): J
 
       {/* Quick-open: paste a .md path → editor opens it (one step, no dialog) */}
       <div className="shrink-0 border-t border-neutral-800">
-        <OpenMdPathInput
-          variant="panel"
-          onOpen={(p) => {
-            const { folder, relativePath } = splitAbsolutePath(p);
-            if (!folder || !relativePath) return;
-            invoke("open_md_in_editor", { folder, relativePath }).catch((err: unknown) =>
-              logError("SessionList.openMdInEditor", err),
-            );
-          }}
-        />
+        <OpenMdPathInput variant="panel" onOpen={handleOpenMd} />
       </div>
 
       {/* Bottom dock — global launchers + theme + notes + version + session actions */}
