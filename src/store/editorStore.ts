@@ -118,6 +118,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const trimmed = absolutePath.trim();
     if (!trimmed) return;
     const { folder, relativePath } = splitAbsolutePath(trimmed);
+    if (!relativePath || !folder) return; // directory path, trailing slash, or bare filename
     await get().openFileFromProject(folder, relativePath);
   },
 

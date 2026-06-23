@@ -16,6 +16,14 @@ describe("splitAbsolutePath", () => {
       relativePath: "readme.md",
     });
   });
+
+  it("bare filename with no slash returns empty folder", () => {
+    expect(splitAbsolutePath("readme.md")).toEqual({ folder: "", relativePath: "readme.md" });
+  });
+
+  it("trailing slash returns empty relativePath", () => {
+    expect(splitAbsolutePath("C:/projects/")).toEqual({ folder: "C:/projects", relativePath: "" });
+  });
 });
 
 describe("openFileByPath", () => {
@@ -28,9 +36,10 @@ describe("openFileByPath", () => {
   });
 
   it("reads the file via read_project_file and sets openFile", async () => {
+    let capturedArgs: unknown;
     mockIPC((cmd, args) => {
       if (cmd === "read_project_file") {
-        expect(args).toMatchObject({ folder: "C:/p", relativePath: "x.md" });
+        capturedArgs = args;
         return "# content";
       }
       return undefined;
@@ -38,6 +47,7 @@ describe("openFileByPath", () => {
 
     await useEditorStore.getState().openFileByPath("C:\\p\\x.md");
 
+    expect(capturedArgs).toMatchObject({ folder: "C:/p", relativePath: "x.md" });
     const f = useEditorStore.getState().openFile;
     expect(f?.relativePath).toBe("x.md");
     expect(f?.content).toBe("# content");
@@ -50,6 +60,16 @@ describe("openFileByPath", () => {
       return "";
     });
     await useEditorStore.getState().openFileByPath("   ");
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("no-ops on a trailing-slash path (directory, no filename)", async () => {
+    const spy = vi.fn();
+    mockIPC((cmd) => {
+      spy(cmd);
+      return "";
+    });
+    await useEditorStore.getState().openFileByPath("C:/projects/smashq/");
     expect(spy).not.toHaveBeenCalled();
   });
 });
