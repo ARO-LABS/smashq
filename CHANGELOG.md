@@ -17,6 +17,8 @@ globales Board laden, nicht mehr nur die persönlichen Boards des angemeldeten U
 - Kanban zeigte bei einem gelöschten/unauffindbaren Board fälschlich „GitHub-Scope fehlt". Fehler werden jetzt ehrlich unterschieden (Board nicht gefunden / Scope fehlt / nicht angemeldet / kein Zugriff / Netzwerk / Rate-Limit) mit handlungsleitendem Hinweis.
 - Ein gelöschtes globales Board führt nicht mehr in eine Sackgasse: ein Board-Auswahl-Dialog erscheint, statt still ein fremdes Board zu laden.
 - Persistierte Board-Auswahl wird bei Korruption/veralteten Einträgen bereinigt (Schema-Migration + Rehydrate-Validierung).
+- Notizen gingen beim Schließen der App verloren: zwei unabhängige `onCloseRequested`-Listener rasten um `destroy()` des Hauptfensters — zu einem konsolidierten Listener zusammengeführt, der alle Flushes abwartet.
+- Projekt-Notizen verschwanden nach jedem Neustart (globale Notizen waren nicht betroffen): der Dateiname-Schlüssel für Notizen war verlustbehaftet kodiert und beim Laden nicht mehr rekonstruierbar. Auf reversibles Percent-Encoding umgestellt + Merge statt Replace beim Rehydrate.
 
 ### Geändert
 - Board wird intern über die global eindeutige Projekt-ID adressiert (statt der pro-Konto wiederholten Projekt-Nummer) — verhindert Verwechslung gleichnummerierter Boards verschiedener Konten.
@@ -24,6 +26,7 @@ globales Board laden, nicht mehr nur die persönlichen Boards des angemeldeten U
 
 ### Entfernt
 - Der Kanban-Tab in der Session-Config-Sidebar. Kanban öffnet weiterhin als eigenes Fenster (SideNav). Der pro-Ordner-Board-Modus (Folder-Mode) ist damit entfallen.
+- Die automatische «SMASHQ:open-md»-Sentinel-Erkennung im Session-Output (öffnete eine MD-Datei automatisch, wenn die Zeile im PTY-Output erschien). Zuverlässig nur mit rohem, unformatiertem Terminal-Output nutzbar — Claude Codes eigenes TUI-Rendering verpackt auch scheinbar sauberen Text in ANSI-Codes, wodurch die Erkennung in einer echten Claude-CLI-Session nie zuverlässig feuerte. Die manuelle Pfad-Eingabe (Session-Panel/Editor) bleibt unverändert bestehen und ist der empfohlene Weg, eine MD-Datei zu öffnen.
 
 ## [1.0.1] — 2026-06-09
 

@@ -29,8 +29,8 @@ pub async fn read_project_file(folder: String, relative_path: String) -> Result<
 const MAX_WRITE_SIZE: usize = 10 * 1024 * 1024;
 
 /// Validate that `folder`/`relative_path` resolves to an existing `.md` file
-/// within the size limit. Shared by the `open_md_in_editor` command and the PTY
-/// sentinel detector. Returns the resolved absolute path on success.
+/// within the size limit, used by the `open_md_in_editor` command. Returns the
+/// resolved absolute path on success.
 ///
 /// No subtree confinement: callers pass `folder` = the file's own parent dir and
 /// `relative_path` = the file name, so any absolute path is reachable while

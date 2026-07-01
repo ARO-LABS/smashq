@@ -82,9 +82,9 @@ pub(crate) fn ensure_detached_window(
     Ok(())
 }
 
-/// Shared editor-open core for all triggers (sentinel detector, main-window
-/// command, editor store). Validates the target, stashes it as pending, opens or
-/// focuses the editor window, then emits `open-md-file` to it.
+/// Shared editor-open core for all triggers (main-window command, editor
+/// store). Validates the target, stashes it as pending, opens or focuses the
+/// editor window, then emits `open-md-file` to it.
 pub(crate) fn dispatch_md_open(
     app: &tauri::AppHandle,
     folder: &str,

@@ -68,26 +68,11 @@ The Markdown editor can open a file directly from a path — no file dialog need
 This is handy because Claude CLI sessions often create `.md` files (`tasks/todo.md`,
 plans, reports) that you then want to inspect.
 
-- **Manually:** paste a path into the input field in the session panel (or in the
-  empty editor view) and confirm. The editor window opens (or focuses) and loads
-  the file in one step.
-- **From a Claude CLI session:** print a sentinel line to the session output:
-
-  ```bash
-  echo "«SMASHQ:open-md» ./tasks/todo.md"
-  ```
-
-  Smashq detects the line in the session's output stream and opens the file in the
-  editor. Relative paths resolve against the session's working directory; absolute
-  paths are used as-is.
-
-**Guarding against accidental triggers:** only a line that begins *exactly* with
-`«SMASHQ:open-md»` (the guillemets are intentional — they rarely appear in normal
-output) and points to an existing `.md` file will trigger an open. The same path is
-not re-opened within 1.5 s, so a redraw or loop cannot spam the editor. A marker
-embedded mid-sentence, or a path that does not exist, is ignored. If the editor has
-unsaved changes, an auto-triggered open is skipped (you are notified) so your edits
-are never clobbered.
+Paste a path into the input field in the session panel (or in the empty editor
+view) and confirm. The editor window opens (or focuses) and loads the file in
+one step. Relative paths resolve against the session's working directory;
+absolute paths are used as-is. If the editor has unsaved changes, the open is
+skipped (you are notified) so your edits are never clobbered.
 
 ## Documentation
 

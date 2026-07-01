@@ -296,17 +296,12 @@ impl SessionManager {
         // Reader-Thread: liest PTY-Output und emittiert Events
         let read_id = id.clone();
         let read_app = app.clone();
-        let read_folder = info.folder.clone();
         thread::spawn(move || {
             log::info!("Session {} reader thread started", read_id);
             let mut buf = [0u8; 4096];
             // Track last emitted status to deduplicate — only emit on transitions.
             // Empty string forces the first detected status to always emit.
             let mut last_emitted_status = String::new();
-            // Sentinel detector state (per-session, thread-local).
-            let mut line_buf = String::new();
-            let mut last_open: Option<(String, std::time::Instant)> = None;
-            const DEDUP_WINDOW: std::time::Duration = std::time::Duration::from_millis(1500);
             loop {
                 match reader.read(&mut buf) {
                     Ok(0) => {
@@ -325,51 +320,6 @@ impl SessionManager {
                             },
                         ) {
                             log::debug!("Session {} failed to emit session-output: {}", read_id, e);
-                        }
-
-                        // Sentinel: detect «SMASHQ:open-md» <path> lines and open
-                        // them in the editor window. Reuses the shared dispatch.
-                        line_buf.push_str(&data);
-                        for printed in extract_open_paths(&mut line_buf) {
-                            let p = std::path::Path::new(&printed);
-                            let abs = if p.is_absolute() {
-                                p.to_path_buf()
-                            } else {
-                                std::path::Path::new(&read_folder).join(p)
-                            };
-                            let now = std::time::Instant::now();
-                            let abs_key = abs.to_string_lossy().to_string();
-                            // Debounce tracks only the single most-recent path. Covers the
-                            // common case (terminal redraw re-emitting the SAME marker line).
-                            // Alternating distinct paths within the window are not deduped —
-                            // acceptable (worst case: one extra window focus). See backlog.
-                            if is_recent_duplicate(&last_open, &abs_key, now, DEDUP_WINDOW) {
-                                continue;
-                            }
-                            let (Some(parent), Some(file)) = (abs.parent(), abs.file_name()) else {
-                                continue;
-                            };
-                            let parent_dir = parent.to_string_lossy().to_string();
-                            let rel = file.to_string_lossy().to_string();
-                            // Record optimistically BEFORE dispatch so the debounce holds
-                            // even though the open runs off-thread.
-                            last_open = Some((abs_key, now));
-                            // Dispatch OFF the reader thread: build() is a synchronous OS
-                            // call and would otherwise stall PTY draining.
-                            let dispatch_app = read_app.clone();
-                            let dispatch_sid = read_id.clone();
-                            std::thread::spawn(move || {
-                                if let Err(e) =
-                                    crate::dispatch_md_open(&dispatch_app, &parent_dir, &rel)
-                                {
-                                    log::debug!(
-                                        "Session {} sentinel open skipped for '{}': {}",
-                                        dispatch_sid,
-                                        printed,
-                                        e.message
-                                    );
-                                }
-                            });
                         }
 
                         // Status-Heuristik: letzte Zeile pruefen
@@ -762,60 +712,6 @@ impl Drop for SessionManager {
         }
         sessions.clear(); // Drop aller SessionHandles → PTY Master geschlossen.
     }
-}
-
-/// Exact line-prefix the LLM prints to request an editor open. Guillemets are
-/// rare in normal terminal/code output, lowering accidental-trigger risk.
-const OPEN_MARKER_PREFIX: &str = "«SMASHQ:open-md»";
-
-/// Returns the path if `line` is exactly an open-marker line. The trimmed line
-/// must START with the marker prefix; mid-prose occurrences do not match. Empty
-/// paths return None.
-fn parse_open_marker(line: &str) -> Option<&str> {
-    let rest = line.trim().strip_prefix(OPEN_MARKER_PREFIX)?;
-    let path = rest.trim();
-    if path.is_empty() {
-        None
-    } else {
-        Some(path)
-    }
-}
-
-/// Drains complete (`\n`-terminated) lines from `buf`, returning open-paths found
-/// in them. A trailing partial line stays buffered for the next PTY chunk —
-/// necessary because PTY output arrives in raw 4 KiB chunks, not whole lines.
-/// Caps the buffer at 8 KiB so a newline-less stream cannot grow it unbounded.
-fn extract_open_paths(buf: &mut String) -> Vec<String> {
-    let mut paths = Vec::new();
-    while let Some(nl) = buf.find('\n') {
-        let line: String = buf.drain(..=nl).collect();
-        // Claude Code's interactive TUI wraps even short, plain-looking text
-        // in ANSI codes (proven by detect_status's own tests above, which
-        // needed the same strip_ansi step for exactly this reason). Without
-        // this, an un-stripped ESC byte at the line start defeats
-        // trim()+strip_prefix in parse_open_marker silently — the marker
-        // line looks clean on screen but never matches in the raw PTY bytes.
-        let line = SessionManager::strip_ansi(&line);
-        if let Some(p) = parse_open_marker(&line) {
-            paths.push(p.to_string());
-        }
-    }
-    if buf.len() > 8192 {
-        log::warn!("open-md sentinel: line buffer exceeded 8 KiB without newline, discarding");
-        buf.clear();
-    }
-    paths
-}
-
-/// True if `path` was opened as `last` within `window`. Debounces redraw/loop
-/// spam (e.g. terminal scroll-back re-emitting the same marker line).
-fn is_recent_duplicate(
-    last: &Option<(String, std::time::Instant)>,
-    path: &str,
-    now: std::time::Instant,
-    window: std::time::Duration,
-) -> bool {
-    matches!(last, Some((p, t)) if p == path && now.duration_since(*t) < window)
 }
 
 /// Check if an executable exists on PATH (simple cross-platform check).
@@ -1328,23 +1224,6 @@ mod tests {
         );
     }
 
-    // --- Sentinel detector wiring guard ---
-    // The actual open requires a real PTY + AppHandle and cannot be unit-tested
-    // in isolation; pin the wiring so a deletion turns this red.
-    #[test]
-    fn reader_thread_wires_sentinel_detector() {
-        let src = include_str!("manager.rs");
-        let prod = src.split("\n#[cfg(test)]").next().unwrap_or(src);
-        assert!(
-            prod.contains("extract_open_paths(&mut line_buf)"),
-            "reader thread must drain open-paths from its line buffer"
-        );
-        assert!(
-            prod.contains("crate::dispatch_md_open("),
-            "reader thread must dispatch detected open-paths to the editor"
-        );
-    }
-
     // --- Finding 2: watcher cancellation flag ---
     #[test]
     fn close_session_cancels_watcher() {
@@ -1455,148 +1334,5 @@ mod tests {
         };
         let json = serde_json::to_string(&ev).unwrap();
         assert!(json.contains("\"claudeSessionId\":\"uuid-123\""));
-    }
-
-    // --- Sentinel marker parsing (open-md) ---
-
-    #[test]
-    fn parse_marker_happy_relative() {
-        assert_eq!(
-            parse_open_marker("«SMASHQ:open-md» ./tasks/todo.md"),
-            Some("./tasks/todo.md")
-        );
-    }
-
-    #[test]
-    fn parse_marker_trims_surrounding_whitespace_and_cr() {
-        assert_eq!(
-            parse_open_marker("  «SMASHQ:open-md»   C:/x/y.md  \r"),
-            Some("C:/x/y.md")
-        );
-    }
-
-    #[test]
-    fn parse_marker_rejects_midline_occurrence() {
-        assert_eq!(parse_open_marker("echo «SMASHQ:open-md» x.md"), None);
-    }
-
-    #[test]
-    fn parse_marker_rejects_empty_path() {
-        assert_eq!(parse_open_marker("«SMASHQ:open-md»   "), None);
-    }
-
-    #[test]
-    fn parse_marker_rejects_plain_text() {
-        assert_eq!(parse_open_marker("just some output"), None);
-    }
-
-    #[test]
-    fn extract_paths_handles_marker_split_across_chunks() {
-        // The critical PTY case: marker line arrives in two reads.
-        let mut b = String::new();
-        b.push_str("noise\n«SMASHQ:open-md» ./a.m");
-        let r1 = extract_open_paths(&mut b);
-        assert!(r1.is_empty(), "partial marker line must not match yet");
-        b.push_str("d\n");
-        let r2 = extract_open_paths(&mut b);
-        assert_eq!(r2, vec!["./a.md".to_string()]);
-        assert!(b.is_empty(), "completed line drained from buffer");
-    }
-
-    #[test]
-    fn extract_paths_keeps_partial_trailing_line() {
-        let mut b = String::new();
-        b.push_str("«SMASHQ:open-md» ./done.md\npartial without newline");
-        let r = extract_open_paths(&mut b);
-        assert_eq!(r, vec!["./done.md".to_string()]);
-        assert_eq!(b, "partial without newline");
-    }
-
-    #[test]
-    fn extract_paths_caps_runaway_buffer() {
-        let mut b = "x".repeat(9000); // no newline → exceeds 8 KiB cap
-        let r = extract_open_paths(&mut b);
-        assert!(r.is_empty());
-        assert!(b.is_empty(), "oversized partial buffer is cleared");
-    }
-
-    // Claude Code's interactive TUI wraps even short, plain-looking text in
-    // ANSI codes — proven by detect_status's own
-    // waiting_prompt_behind_ansi_color_codes-style tests above. An un-stripped
-    // ESC byte at the line start defeats trim()+strip_prefix silently, so the
-    // marker line never matches inside a live session even though it looks
-    // clean on screen. These three cover the fix.
-
-    #[test]
-    fn extract_paths_detects_marker_wrapped_in_ansi_color_codes() {
-        let mut b = "\x1b[32m«SMASHQ:open-md» ./tasks/todo.md\x1b[0m\n".to_string();
-        assert_eq!(
-            extract_open_paths(&mut b),
-            vec!["./tasks/todo.md".to_string()]
-        );
-    }
-
-    #[test]
-    fn extract_paths_detects_marker_behind_leading_cursor_reset() {
-        // "\x1b[2K" (clear line) + "\x1b[1G" (cursor to column 1) is a common
-        // real-world TUI redraw sequence preceding a freshly-drawn line.
-        let mut b = "\x1b[2K\x1b[1G«SMASHQ:open-md» ./x.md\n".to_string();
-        assert_eq!(extract_open_paths(&mut b), vec!["./x.md".to_string()]);
-    }
-
-    #[test]
-    fn extract_paths_still_rejects_ansi_wrapped_noise_text() {
-        // Stripping ANSI must not introduce false positives on ordinary output.
-        let mut b = "\x1b[32mjust some output\x1b[0m\n".to_string();
-        assert!(extract_open_paths(&mut b).is_empty());
-    }
-
-    #[test]
-    fn dedupe_same_path_within_window_is_duplicate() {
-        let base = std::time::Instant::now();
-        let last = Some(("/p/a.md".to_string(), base));
-        let now = base + std::time::Duration::from_millis(1000);
-        assert!(is_recent_duplicate(
-            &last,
-            "/p/a.md",
-            now,
-            std::time::Duration::from_millis(1500)
-        ));
-    }
-
-    #[test]
-    fn dedupe_same_path_after_window_is_not_duplicate() {
-        let base = std::time::Instant::now();
-        let last = Some(("/p/a.md".to_string(), base));
-        let now = base + std::time::Duration::from_millis(2000);
-        assert!(!is_recent_duplicate(
-            &last,
-            "/p/a.md",
-            now,
-            std::time::Duration::from_millis(1500)
-        ));
-    }
-
-    #[test]
-    fn dedupe_different_path_is_not_duplicate() {
-        let base = std::time::Instant::now();
-        let last = Some(("/p/a.md".to_string(), base));
-        assert!(!is_recent_duplicate(
-            &last,
-            "/p/b.md",
-            base,
-            std::time::Duration::from_millis(1500)
-        ));
-    }
-
-    #[test]
-    fn dedupe_none_last_is_not_duplicate() {
-        let last: Option<(String, std::time::Instant)> = None;
-        assert!(!is_recent_duplicate(
-            &last,
-            "/p/a.md",
-            std::time::Instant::now(),
-            std::time::Duration::from_millis(1500)
-        ));
     }
 }
