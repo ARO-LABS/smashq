@@ -7,6 +7,16 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-07-01 — «SMASHQ:open-md»-Sentinel feuerte nie in einer echten Claude-Session: ANSI-Stripping vergessen, obwohl im selben File schon geloest
+
+**Kontext:** User testete den open-md-Sentinel live (Chat-Prosa UND rohes Bash-`echo`) — beides oeffnete die Datei nicht. Multi-Agenten-Analyse (3 parallele Audits: Frontend-Rendering, bestehende PTY-Parsing-Muster, Test-Coverage) fand die Ursache im selben File, in dem sie schon einmal geloest worden war.
+
+**Fehler:** `parse_open_marker`/`extract_open_paths` (`manager.rs`) pruefen `line.trim().strip_prefix("«SMASHQ:open-md»")` — OHNE ANSI-Stripping. Claude Codes interaktives TUI verpackt aber auch kurze, "sauber" aussehende Textausschnitte in ANSI-Codes — bewiesen durch die EIGENEN Tests von `detect_status` (`waiting_prompt_behind_ansi_color_codes` etc.), die genau deshalb `strip_ansi` VOR dem Pattern-Match aufrufen. `extract_open_paths` im selben File hat diesen bereits bewiesenen, notwendigen Schritt schlicht nie uebernommen — vermutlich weil beide Parser in getrennten Task-Kontexten gebaut wurden. Alle 11 bestehenden Sentinel-Tests nutzten idealisierte Strings ganz ohne ANSI-Rauschen, daher fiel es nie auf.
+
+**Korrektur:** `SessionManager::strip_ansi(&line)` in `extract_open_paths` VOR dem `parse_open_marker`-Aufruf ergaenzt (identisches Muster wie `detect_status`). 3 neue Tests mit realistischem ANSI-Rauschen (Farbcodes, Cursor-Reset-Sequenzen) belegen den Fix; zuvor RED reproduziert (leeres Ergebnis trotz vorhandenem Marker), danach GREEN.
+
+**Regel:** Bei JEDEM neuen Parser, der PTY-/Terminal-Output nach einem Marker durchsucht: IMMER zuerst pruefen, ob im selben Modul schon ein Parser fuer denselben Rohdaten-Strom existiert (hier: `detect_status`) — dessen Umgang mit ANSI/Redraw-Rauschen ist die Referenz, nicht optional. Unit-Tests fuer PTY-Parser MUESSEN mindestens einen Fall mit eingebetteten ANSI-Sequenzen enthalten (`\x1b[...`), sonst beweisen sie nur "funktioniert bei idealem Input", nie "funktioniert an echtem Terminal-Output". Verwandt: [[armada-review-open-items]] (Cross-Cutting-Concern-Pattern: "in einer Datei geloest" != "ueberall geloest").
+
 ### 2026-07-01 — Projekt-Notizen "verschwanden" nach Neustart: verlustbehaftetes Sanitize + Replace-statt-Merge beim Rehydrate
 
 **Kontext:** User meldete NACH dem Close-Race-Fix (siehe Eintrag darunter) weiterhin verschwindende Notizen — aber nur Projekt-Notizen, globale blieben erhalten. Multi-Agenten-Systematik (Deployment-Check, Rust-Audit, UI-Audit, Close-Race-Re-Audit, Rehydrate-Audit) plus direkte Verifikation auf der echten Platte des Users (`Documents/Smashq/notes/` enthielt `c__projects_smashq.md`, 4 Bytes, mit dem exakten getippten Inhalt) bestätigten einen ZWEITEN, unabhängigen Bug.

@@ -789,6 +789,13 @@ fn extract_open_paths(buf: &mut String) -> Vec<String> {
     let mut paths = Vec::new();
     while let Some(nl) = buf.find('\n') {
         let line: String = buf.drain(..=nl).collect();
+        // Claude Code's interactive TUI wraps even short, plain-looking text
+        // in ANSI codes (proven by detect_status's own tests above, which
+        // needed the same strip_ansi step for exactly this reason). Without
+        // this, an un-stripped ESC byte at the line start defeats
+        // trim()+strip_prefix in parse_open_marker silently — the marker
+        // line looks clean on screen but never matches in the raw PTY bytes.
+        let line = SessionManager::strip_ansi(&line);
         if let Some(p) = parse_open_marker(&line) {
             paths.push(p.to_string());
         }
@@ -1511,6 +1518,37 @@ mod tests {
         let r = extract_open_paths(&mut b);
         assert!(r.is_empty());
         assert!(b.is_empty(), "oversized partial buffer is cleared");
+    }
+
+    // Claude Code's interactive TUI wraps even short, plain-looking text in
+    // ANSI codes — proven by detect_status's own
+    // waiting_prompt_behind_ansi_color_codes-style tests above. An un-stripped
+    // ESC byte at the line start defeats trim()+strip_prefix silently, so the
+    // marker line never matches inside a live session even though it looks
+    // clean on screen. These three cover the fix.
+
+    #[test]
+    fn extract_paths_detects_marker_wrapped_in_ansi_color_codes() {
+        let mut b = "\x1b[32m«SMASHQ:open-md» ./tasks/todo.md\x1b[0m\n".to_string();
+        assert_eq!(
+            extract_open_paths(&mut b),
+            vec!["./tasks/todo.md".to_string()]
+        );
+    }
+
+    #[test]
+    fn extract_paths_detects_marker_behind_leading_cursor_reset() {
+        // "\x1b[2K" (clear line) + "\x1b[1G" (cursor to column 1) is a common
+        // real-world TUI redraw sequence preceding a freshly-drawn line.
+        let mut b = "\x1b[2K\x1b[1G«SMASHQ:open-md» ./x.md\n".to_string();
+        assert_eq!(extract_open_paths(&mut b), vec!["./x.md".to_string()]);
+    }
+
+    #[test]
+    fn extract_paths_still_rejects_ansi_wrapped_noise_text() {
+        // Stripping ANSI must not introduce false positives on ordinary output.
+        let mut b = "\x1b[32mjust some output\x1b[0m\n".to_string();
+        assert!(extract_open_paths(&mut b).is_empty());
     }
 
     #[test]
