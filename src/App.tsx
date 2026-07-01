@@ -27,7 +27,16 @@ function App() {
     // Wire runtime logging + perf gates against the persisted preferences.
     // The Settings toggle is the sole authority for perf capture (no DEV/
     // localStorage OR); manual dev override remains via window.__perf.enable().
-    const unsubscribePerf = wireRuntimeGates();
+    // The main window's settings/notes/tasks flush rides along on
+    // wireRuntimeGates' own close-requested listener (additionalCloseFlush)
+    // rather than registering a second, independent one — two listeners on
+    // the same window each race to destroy() it once their own async work
+    // resolves, and the (usually near-instant, logging-off-by-default)
+    // frontend-log flush used to win that race before this flush finished.
+    const unsubscribePerf = wireRuntimeGates({
+      additionalCloseFlush: () =>
+        Promise.all([flushPendingSaves(), flushPendingTaskSaves()]).then(() => {}),
+    });
 
     // Push the persisted backend-file-logging value to Rust. Only the main
     // window owns this; detached windows share the same Rust process flag.
@@ -47,30 +56,24 @@ function App() {
     };
     window.addEventListener("storage-save-error", handleSaveError);
 
-    // Flush pending saves on window close to prevent data loss.
-    // Use Tauri's close-requested event which supports async (unlike beforeunload).
-    // The `return` is load-bearing: without it, the outer Promise resolves
-    // BEFORE `unlistenClose` is assigned, so cleanup can fire while the
-    // unlisten reference is still undefined → orphan listener leak.
-    let unlistenClose: (() => void) | undefined;
-    import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
-      return getCurrentWindow().onCloseRequested(async () => {
-        await flushPendingSaves();
-        await flushPendingTaskSaves();
-      }).then((fn) => { unlistenClose = fn; });
-    }).catch(() => {
-      // Fallback for non-Tauri environments (dev browser)
-      window.addEventListener("beforeunload", () => { flushPendingSaves(); flushPendingTaskSaves(); });
-    });
+    // Fallback for non-Tauri environments (dev browser): beforeunload cannot
+    // be awaited, but flushPendingSaves()/flushPendingTaskSaves() already
+    // no-op outside Tauri anyway, so this is a harmless best-effort net for
+    // `npm run dev` in a plain browser tab.
+    const handleBeforeUnload = () => {
+      void flushPendingSaves();
+      void flushPendingTaskSaves();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     // Sync open sessions to settingsStore for restore on next startup
     const unsubscribeRestore = initSessionRestoreSync();
 
     return () => {
-      unlistenClose?.();
       unsubscribeRestore();
       unsubscribePerf();
       window.removeEventListener("storage-save-error", handleSaveError);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
       listenerActive.current = false;
     };
   }, []);

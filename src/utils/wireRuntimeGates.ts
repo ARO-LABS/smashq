@@ -61,6 +61,16 @@ function applyRemoteTasks(tasks: TaskItem[]): void {
   }
 }
 
+export interface WireRuntimeGatesOptions {
+  /**
+   * Extra async work to await before this window is allowed to close (e.g.
+   * the main window's settings/notes/tasks flush). Runs alongside the
+   * internal frontend-log flush in the SAME `onCloseRequested` listener —
+   * see the race this closes below.
+   */
+  additionalCloseFlush?: () => Promise<void>;
+}
+
 /**
  * Wires runtime preference gates for the current React root. Must be called
  * from EVERY entry point (main App, log window, detached views) — each window
@@ -69,7 +79,7 @@ function applyRemoteTasks(tasks: TaskItem[]): void {
  * Returns an unsubscribe function that tears down the perf-store subscription
  * AND the cross-window preferences listener. Pass it to a useEffect cleanup.
  */
-export function wireRuntimeGates(): () => void {
+export function wireRuntimeGates(options?: WireRuntimeGatesOptions): () => void {
   // Frontend gate is a function reference re-read on every log call —
   // no subscription needed, just inject the closure once.
   wireLoggingGate(() => useSettingsStore.getState().preferences.frontendLogging);
@@ -114,18 +124,33 @@ export function wireRuntimeGates(): () => void {
     })
     .catch((err) => logError("wireRuntimeGates.tasksListen", err));
 
-  // Flush buffered frontend logs when THIS window closes. Use Tauri's
-  // close-requested event (async-aware) — NOT `beforeunload`, which Tauri
-  // webviews fire unreliably and cannot await, so the last batch could be lost.
-  // Mirrors the close-flush pattern in App.tsx (flushPendingSaves). The chained
-  // `.then` keeps the unlisten handle assignable so cleanup can remove it
-  // instead of orphaning the listener.
+  // Flush buffered frontend logs (and any caller-supplied additional work,
+  // e.g. App.tsx's settings/notes/tasks flush) when THIS window closes. Use
+  // Tauri's close-requested event (async-aware) — NOT `beforeunload`, which
+  // Tauri webviews fire unreliably and cannot await, so the last batch could
+  // be lost.
+  //
+  // This must be the ONLY `onCloseRequested` listener registered per window.
+  // Tauri fans the close-requested event out to every listener independently
+  // and destroys the window once a given listener's own async callback
+  // resolves (unless that listener called `event.preventDefault()`). Two
+  // separate listeners on the same window therefore race to destroy() it —
+  // previously App.tsx registered its own listener for flushPendingSaves()/
+  // flushPendingTaskSaves() alongside this one. Since frontend logging is off
+  // by default, flushFrontendLogs() resolved near-instantly and won that
+  // race, destroying the window (and its IPC channel) before the slower
+  // notes/settings flush had completed — silently dropping recent edits.
+  // Bundling every flush into one Promise.all here means the window is only
+  // destroyed once ALL of them have actually finished.
   let unlistenClose: (() => void) | undefined;
   void import("@tauri-apps/api/window")
     .then(({ getCurrentWindow }) =>
       getCurrentWindow()
         .onCloseRequested(async () => {
-          await flushFrontendLogs();
+          await Promise.all([
+            flushFrontendLogs(),
+            options?.additionalCloseFlush?.() ?? Promise.resolve(),
+          ]);
         })
         .then((fn) => {
           unlistenClose = fn;

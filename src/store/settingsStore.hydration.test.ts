@@ -62,4 +62,48 @@ describe("settingsStore hydration — synchronous-storage TDZ regression", () =>
       .some((a) => typeof a === "string" && /before initialization/i.test(a));
     expect(loggedTdz).toBe(false);
   });
+
+  it("merges file-loaded project notes into projectNotes instead of replacing it wholesale (in-memory wins on key collision)", async () => {
+    // Seed settings.json's already-hydrated projectNotes (this is what the UI
+    // reads from — see src/components/shared/notes/useProjectNotesContext.ts).
+    localStorage.setItem(
+      KEY,
+      JSON.stringify({
+        state: {
+          projectNotes: {
+            "c:/projects/smashq": "in-memory-fresh",
+            "c:/projects/kept": "still-here",
+          },
+        },
+        version: 9,
+      }),
+    );
+
+    vi.resetModules();
+    vi.doMock("./tauriStorage", async () => {
+      const actual = await vi.importActual<typeof import("./tauriStorage")>("./tauriStorage");
+      return {
+        ...actual,
+        getLoadedNotes: () => ({
+          global: "",
+          project: {
+            // Colliding key: simulates a stale/lagging notes/*.md file — the
+            // already-hydrated settings.json value must win, not be clobbered.
+            "c:/projects/smashq": "stale-file-content",
+            // New key: only exists in notes/*.md (e.g. crash before the
+            // settings.json debounce fired) — must be adopted, not dropped.
+            "c:/projects/new-from-file": "file-only-content",
+          },
+        }),
+      };
+    });
+
+    const mod = await import("./settingsStore");
+    await new Promise((r) => setTimeout(r, 0));
+
+    const notes = mod.useSettingsStore.getState().projectNotes;
+    expect(notes["c:/projects/smashq"]).toBe("in-memory-fresh");
+    expect(notes["c:/projects/kept"]).toBe("still-here");
+    expect(notes["c:/projects/new-from-file"]).toBe("file-only-content");
+  });
 });

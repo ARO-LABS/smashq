@@ -1182,8 +1182,17 @@ export const useSettingsStore = create<SettingsState>()(
           if (fileNotes.global) {
             patches.globalNotes = fileNotes.global;
           }
+          // MERGE, not replace: settings.json's already-hydrated `projectNotes`
+          // (state.projectNotes, written on a 300ms debounce) is normally at
+          // least as fresh as the per-note .md files (800ms debounce) — so it
+          // wins on key collision. The file only backfills keys missing
+          // entirely from the hydrated state (e.g. a crash before the
+          // settings.json debounce fired). A full replace here previously let
+          // a stale/lagging file value clobber a fresher in-memory one, and —
+          // combined with a since-fixed filename-encoding bug — could wipe out
+          // unrelated project notes entirely. See tasks/lessons.md.
           if (Object.keys(fileNotes.project).length > 0) {
-            patches.projectNotes = fileNotes.project;
+            patches.projectNotes = { ...fileNotes.project, ...(state?.projectNotes ?? {}) };
           }
         }
 

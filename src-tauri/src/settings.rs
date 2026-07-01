@@ -23,17 +23,55 @@ fn notes_dir() -> Result<PathBuf, ADPError> {
     Ok(dir)
 }
 
-/// Sanitize a project folder path into a safe filename
-fn sanitize_note_filename(folder_key: &str) -> String {
+/// Characters that cannot appear in a Windows/NTFS filename, plus `%` itself
+/// (the escape character — must be escaped too so decoding stays unambiguous).
+const NOTE_FILENAME_FORBIDDEN: &[char] = &['/', '\\', ':', '*', '?', '"', '<', '>', '|', '%'];
+
+/// Encode a project folder key (e.g. "c:/projects/foo") into a filename-safe,
+/// REVERSIBLE string by percent-escaping only the forbidden characters.
+/// Everything else (letters, digits, spaces, unicode) passes through
+/// unchanged, so filenames stay mostly readable. Replaces the previous
+/// `sanitize_note_filename`, which collapsed every forbidden char to `_` —
+/// lossy and non-injective, so `load_notes()` could never recover the
+/// original key from the filename (see tasks/lessons.md for the resulting
+/// "project notes vanish after restart" bug).
+fn encode_note_filename(folder_key: &str) -> String {
     folder_key
         .chars()
-        .map(|c| match c {
-            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
-            _ => c,
+        .map(|c| {
+            if NOTE_FILENAME_FORBIDDEN.contains(&c) {
+                format!("%{:02x}", c as u32)
+            } else {
+                c.to_string()
+            }
         })
-        .collect::<String>()
-        .trim_matches('_')
-        .to_string()
+        .collect()
+}
+
+/// Reverse `encode_note_filename`. Returns the original key when `stem` is a
+/// validly percent-encoded string. Legacy filenames written by the old
+/// (lossy) `sanitize_note_filename` contain no `%`, so they decode to
+/// themselves unchanged — identical to before this fix, not a regression. A
+/// malformed `%` sequence (not two hex digits) also falls back to the raw
+/// stem rather than failing the whole load.
+fn decode_note_filename(stem: &str) -> String {
+    let mut out = String::new();
+    let mut chars = stem.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '%' {
+            let hex: String = chars.by_ref().take(2).collect();
+            match u32::from_str_radix(&hex, 16)
+                .ok()
+                .and_then(|b| char::try_from(b).ok())
+            {
+                Some(decoded) => out.push(decoded),
+                None => return stem.to_string(),
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
 
 /// Write data to a file atomically via a temp file + rename.
@@ -192,7 +230,9 @@ pub mod commands {
     }
 
     /// Load all notes from Documents/Smashq/notes/
-    /// Returns a JSON object: { "global": "...", "c_/projects/foo": "...", ... }
+    /// Returns a JSON object: { "global": "...", "c:/projects/foo": "...", ... }
+    /// (project keys are percent-decoded back from their on-disk filename via
+    /// `decode_note_filename` — see that function for why this must be reversible).
     #[tauri::command]
     pub async fn load_notes() -> Result<String, ADPError> {
         let dir = notes_dir()?;
@@ -212,7 +252,12 @@ pub mod commands {
                 let content = std::fs::read_to_string(&path).map_err(|e| {
                     ADPError::file_io(format!("Failed to read note {}: {}", stem, e))
                 })?;
-                notes.insert(stem, serde_json::Value::String(content));
+                let key = if stem == "global" {
+                    stem
+                } else {
+                    decode_note_filename(&stem)
+                };
+                notes.insert(key, serde_json::Value::String(content));
             }
         }
 
@@ -221,14 +266,14 @@ pub mod commands {
     }
 
     /// Save a note as a .md file in Documents/Smashq/notes/
-    /// `note_key` is "global" for global notes, or the sanitized folder path for project notes.
+    /// `note_key` is "global" for global notes, or the percent-encoded folder path for project notes.
     #[tauri::command]
     pub async fn save_note_file(note_key: String, content: String) -> Result<(), ADPError> {
         let dir = notes_dir()?;
         let filename = if note_key == "global" {
             "global.md".to_string()
         } else {
-            format!("{}.md", sanitize_note_filename(&note_key))
+            format!("{}.md", encode_note_filename(&note_key))
         };
         let path = dir.join(&filename);
 
@@ -268,39 +313,62 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    // --- sanitize_note_filename ---
+    // --- encode_note_filename / decode_note_filename ---
 
     #[test]
-    fn sanitize_keeps_plain_identifiers() {
-        assert_eq!(sanitize_note_filename("my-project_2024"), "my-project_2024");
+    fn encode_keeps_plain_identifiers_unchanged() {
+        assert_eq!(encode_note_filename("my-project_2024"), "my-project_2024");
     }
 
     #[test]
-    fn sanitize_replaces_path_separators() {
-        // Forward and back slashes both become underscores.
-        assert_eq!(sanitize_note_filename("a/b\\c"), "a_b_c");
+    fn encode_escapes_path_separators() {
+        assert_eq!(encode_note_filename("a/b\\c"), "a%2fb%5cc");
     }
 
     #[test]
-    fn sanitize_replaces_windows_drive_colon() {
-        // "C:/Projects/foo" — colon and slashes are forbidden chars.
-        assert_eq!(sanitize_note_filename("C:/Projects/foo"), "C__Projects_foo");
+    fn encode_escapes_windows_drive_colon() {
+        assert_eq!(
+            encode_note_filename("c:/projects/foo"),
+            "c%3a%2fprojects%2ffoo"
+        );
     }
 
     #[test]
-    fn sanitize_replaces_all_forbidden_glob_chars() {
-        assert_eq!(sanitize_note_filename("a*b?c\"d<e>f|g"), "a_b_c_d_e_f_g");
+    fn encode_escapes_all_forbidden_glob_chars_and_percent() {
+        assert_eq!(
+            encode_note_filename("a*b?c\"d<e>f|g%h"),
+            "a%2ab%3fc%22d%3ce%3ef%7cg%25h"
+        );
     }
 
     #[test]
-    fn sanitize_trims_leading_and_trailing_underscores() {
-        // A leading slash becomes "_" and is then trimmed away.
-        assert_eq!(sanitize_note_filename("/leading/path/"), "leading_path");
+    fn decode_roundtrips_arbitrary_keys() {
+        for key in [
+            "c:/projects/smashq",
+            "my-project_2024",
+            "a/b\\c",
+            "path with spaces/foo",
+            "unicode/pröjéct",
+            "50%done/folder",
+        ] {
+            assert_eq!(decode_note_filename(&encode_note_filename(key)), key);
+        }
     }
 
     #[test]
-    fn sanitize_collapses_all_forbidden_to_empty() {
-        assert_eq!(sanitize_note_filename("***"), "");
+    fn decode_returns_legacy_lossy_names_unchanged() {
+        // Old `sanitize_note_filename` output contains no `%` — must keep
+        // loading exactly as before this fix, not regress to an error.
+        assert_eq!(
+            decode_note_filename("c__projects_smashq"),
+            "c__projects_smashq"
+        );
+    }
+
+    #[test]
+    fn decode_falls_back_to_raw_stem_on_malformed_percent_sequence() {
+        assert_eq!(decode_note_filename("50%zz-folder"), "50%zz-folder");
+        assert_eq!(decode_note_filename("trailing%"), "trailing%");
     }
 
     // --- atomic_write ---
