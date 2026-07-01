@@ -6,8 +6,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [1.0.2] — 2026-07-01
+
 Kanban-Overhaul Phase A+B — das Kanban-Board kann jetzt **Organisations-Boards** als
 globales Board laden, nicht mehr nur die persönlichen Boards des angemeldeten Users.
+Plus Notizen-Persistenz-Fixes und Entfernung der unzuverlässigen open-md-Sentinel-Erkennung.
 
 ### Hinzugefügt
 - Globales Kanban: Boards von Organisationen wählbar. Der Picker hat ein Konto-Dropdown (eigenes Konto + Organisationen); das gewählte Board wird über seine global eindeutige ID geladen.
