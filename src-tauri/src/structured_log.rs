@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 /// One structured log line. `ts` is ISO-8601 UTC, `level` is lowercase
@@ -28,6 +28,18 @@ pub struct StructuredEntry {
 
 const MAX_BYTES: u64 = 5_000_000; // ~5 MB per file
 const KEEP_ROTATED: usize = 3; // app-log.ndjson.1 .. .3
+
+/// Per-field byte cap for frontend-supplied entries. A single uncapped entry
+/// (e.g. a JSON.stringify'd store dump) could otherwise blow the 5-MB
+/// rotation budget in one write.
+pub const MAX_FIELD_BYTES: usize = 16_384;
+/// Max entries per `append_frontend_logs` batch (frontend flushes at 25).
+const MAX_BATCH: usize = 1000;
+
+/// One-shot stderr warning per rotation-failure streak (reset on success) —
+/// the rotation retries on every write while a transient file lock persists;
+/// warning on each would spam stderr.
+static ROTATE_WARNED: AtomicBool = AtomicBool::new(false);
 
 struct WriterState {
     writer: Option<BufWriter<File>>,
@@ -53,19 +65,23 @@ pub fn ndjson_path() -> PathBuf {
             return dir.join("app-log.ndjson");
         }
     }
-    std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("app-log.ndjson")
+    // Fallback: temp dir, NOT cwd — for an installed app the cwd is the
+    // (read-only) install directory, where the append would fail silently
+    // and the file would live outside every documented location.
+    std::env::temp_dir().join("app-log.ndjson")
 }
 
-/// Rotate `path` -> `path.1` -> `path.2` ... dropping the oldest.
-fn rotate(path: &Path, keep: usize) {
+/// Rotate `path` -> `path.1` -> `path.2` ... dropping the oldest. The shift
+/// renames stay best-effort; the PRIMARY rename result is returned so a
+/// Windows file lock (AV scanner, tail tool without FILE_SHARE_DELETE)
+/// becomes observable to the caller instead of silently unbounded growth.
+fn rotate(path: &Path, keep: usize) -> std::io::Result<()> {
     let rotated = |n: usize| path.with_extension(format!("ndjson.{n}"));
     let _ = std::fs::remove_file(rotated(keep));
     for n in (1..keep).rev() {
         let _ = std::fs::rename(rotated(n), rotated(n + 1));
     }
-    let _ = std::fs::rename(path, rotated(1));
+    std::fs::rename(path, rotated(1))
 }
 
 /// Core write routine, parameterised on path/limits for testability.
@@ -81,7 +97,18 @@ fn write_to(
             if let Some(mut w) = st.writer.take() {
                 let _ = w.flush();
             }
-            rotate(path, keep);
+            match rotate(path, keep) {
+                Ok(()) => ROTATE_WARNED.store(false, Ordering::Relaxed),
+                Err(e) => {
+                    if !ROTATE_WARNED.swap(true, Ordering::Relaxed) {
+                        eprintln!(
+                            "[smashq] log rotation failed ({e}); appending to oversized file until the lock clears"
+                        );
+                    }
+                }
+            }
+            // Reopen below re-reads the real size from metadata, so a failed
+            // rotation keeps counting against the (oversized) primary file.
             st.bytes = 0;
         }
         if st.writer.is_none() {
@@ -89,9 +116,7 @@ fn write_to(
             st.bytes = f.metadata().map(|m| m.len()).unwrap_or(0);
             st.writer = Some(BufWriter::new(f));
         }
-        let line = serde_json::to_string(entry).unwrap_or_else(|_| {
-            String::from("{\"level\":\"error\",\"message\":\"serialize failed\"}")
-        });
+        let line = serde_json::to_string(entry).unwrap_or_else(|_| fallback_line(entry));
         if let Some(w) = st.writer.as_mut() {
             writeln!(w, "{line}")?;
             w.flush()?;
@@ -101,16 +126,60 @@ fn write_to(
     Ok(())
 }
 
-/// Public entry: append `entries` to the shared NDJSON file when logging is
-/// enabled. No-ops when the gate is off (defense in depth).
-pub fn write_entries(entries: &[StructuredEntry]) {
+/// Marker line when an entry fails to serialize. Must satisfy the
+/// StructuredEntry schema (ts/source are mandatory) — otherwise read_from
+/// filters it as malformed and the marker is never visible in the viewer.
+/// `json!` escapes the caller-provided strings safely.
+fn fallback_line(entry: &StructuredEntry) -> String {
+    serde_json::json!({
+        "ts": entry.ts,
+        "level": "error",
+        "source": entry.source,
+        "message": "serialize failed",
+    })
+    .to_string()
+}
+
+/// Public entry: append `entries` to the shared NDJSON file. `Ok(true)` =
+/// written, `Ok(false)` = gate off (defense in depth), `Err` = I/O failure.
+/// The env_logger closure ignores the result (it MUST NOT log from the write
+/// path — see the deadlock note in lib.rs); the IPC command propagates it so
+/// the frontend re-queue/retry machinery actually fires.
+pub fn write_entries(entries: &[StructuredEntry]) -> std::io::Result<bool> {
     if !LOGGING_ENABLED.load(Ordering::Relaxed) {
-        return;
+        return Ok(false);
     }
     let path = ndjson_path();
-    if let Ok(mut st) = state().lock() {
-        let _ = write_to(&mut st, &path, entries, MAX_BYTES, KEEP_ROTATED);
+    match state().lock() {
+        Ok(mut st) => write_to(&mut st, &path, entries, MAX_BYTES, KEEP_ROTATED).map(|()| true),
+        Err(_) => Ok(false), // poisoned mutex: skip, never panic the logger
     }
+}
+
+fn truncate_at_boundary(s: &mut String, max: usize) {
+    if s.len() <= max {
+        return;
+    }
+    let mut end = max;
+    while !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    s.truncate(end);
+}
+
+/// Frontend input is a trust boundary: force the source attribution (a
+/// frontend batch claiming source="backend" would falsify the viewer), cap
+/// field sizes so a single entry cannot blow the 5-MB rotation budget.
+fn sanitize_entry(mut e: StructuredEntry) -> StructuredEntry {
+    e.source = "frontend".into();
+    truncate_at_boundary(&mut e.message, MAX_FIELD_BYTES);
+    if let Some(stack) = e.stack.as_mut() {
+        truncate_at_boundary(stack, MAX_FIELD_BYTES);
+    }
+    if let Some(module) = e.module.as_mut() {
+        truncate_at_boundary(module, 256);
+    }
+    e
 }
 
 /// Read the last `max` entries, skipping malformed lines.
@@ -130,11 +199,22 @@ fn read_from(path: &Path, max: usize) -> Vec<StructuredEntry> {
 pub mod commands {
     use super::*;
 
-    /// Frontend batches its log entries here. Each entry's `source` is "frontend".
+    /// Frontend batches its log entries here. Input is validated (source
+    /// forced to "frontend", fields capped). Errors are propagated — a
+    /// silent Ok on gate-off or I/O failure would make the frontend drop
+    /// its batch believing it was persisted. `async` keeps the blocking
+    /// file I/O off the main thread.
     #[tauri::command]
-    pub fn append_frontend_logs(entries: Vec<StructuredEntry>) -> Result<(), ADPError> {
-        write_entries(&entries);
-        Ok(())
+    pub async fn append_frontend_logs(mut entries: Vec<StructuredEntry>) -> Result<(), ADPError> {
+        entries.truncate(MAX_BATCH);
+        let entries: Vec<StructuredEntry> = entries.into_iter().map(sanitize_entry).collect();
+        match write_entries(&entries) {
+            Ok(true) => Ok(()),
+            Ok(false) => Err(ADPError::internal(
+                "file logging disabled — batch not persisted",
+            )),
+            Err(e) => Err(ADPError::internal(format!("log write failed: {e}"))),
+        }
     }
 
     /// Returns the last `max_lines` (default 500) structured entries.
@@ -211,6 +291,49 @@ mod tests {
             "rotated file must exist"
         );
         assert!(path.exists(), "fresh primary file must exist");
+    }
+
+    #[test]
+    fn write_entries_reports_gate_closed() {
+        // LOGGING_ENABLED defaults to false in tests (set in run(), not here).
+        // A silent-Ok drop was indistinguishable from success for the frontend
+        // retry machinery — the gate state must be observable.
+        LOGGING_ENABLED.store(false, Ordering::Relaxed);
+        let r = write_entries(&[entry("info", "dropped")]);
+        assert!(
+            matches!(r, Ok(false)),
+            "gate-closed must be observable, not silent Ok"
+        );
+    }
+
+    #[test]
+    fn sanitize_entry_caps_fields_and_forces_source() {
+        let mut e = entry("info", &"x".repeat(100_000));
+        e.stack = Some("y".repeat(100_000));
+        e.source = "backend".into(); // Frontend darf Attribution nicht faelschen
+        let sanitized = sanitize_entry(e);
+        assert!(sanitized.message.len() <= MAX_FIELD_BYTES);
+        assert!(sanitized.stack.unwrap().len() <= MAX_FIELD_BYTES);
+        assert_eq!(sanitized.source, "frontend");
+    }
+
+    #[test]
+    fn truncate_respects_char_boundaries() {
+        let mut s = "ä".repeat(MAX_FIELD_BYTES); // 2 Bytes je Zeichen
+        truncate_at_boundary(&mut s, MAX_FIELD_BYTES);
+        assert!(s.len() <= MAX_FIELD_BYTES);
+        assert!(s.is_char_boundary(s.len()));
+    }
+
+    #[test]
+    fn serialize_fallback_line_is_schema_complete() {
+        // Der Fallback muss ts/source tragen, sonst filtert read_from ihn als
+        // malformed heraus und der Fehler-Marker ist nie sichtbar.
+        let line = fallback_line(&entry("info", "whatever"));
+        let parsed: StructuredEntry = serde_json::from_str(&line).unwrap();
+        assert_eq!(parsed.message, "serialize failed");
+        assert!(!parsed.ts.is_empty());
+        assert!(!parsed.source.is_empty());
     }
 
     #[test]

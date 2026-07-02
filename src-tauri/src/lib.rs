@@ -165,8 +165,10 @@ fn init_logging() {
             // returning; the emit below runs OUTSIDE that lock. Keep it that way:
             // emitting while holding the lock — or adding any log::* call into the
             // write path — risks a non-reentrant Mutex deadlock, since this closure
-            // runs for every log record on the logging thread.
-            crate::structured_log::write_entries(std::slice::from_ref(&entry));
+            // runs for every log record on the logging thread. The Result is
+            // deliberately dropped here (no log::* allowed in this path); the
+            // IPC command path propagates it instead.
+            let _ = crate::structured_log::write_entries(std::slice::from_ref(&entry));
             if let Some(app) = crate::APP_HANDLE.get() {
                 use tauri::Emitter;
                 let _ = app.emit("log-line", &entry);
