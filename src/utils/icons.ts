@@ -26,7 +26,7 @@ import {
   Sun, Moon,
   // actions
   X, FolderOpen, Terminal, ExternalLink, LayoutGrid, ChevronDown, ChevronLeft, ChevronRight, Loader2,
-  RefreshCw, RotateCcw, Download, Trash2, ArrowDownToLine, Search, Move, FolderPlus, GripVertical, Plus,
+  RefreshCw, RotateCcw, Download, Trash2, ArrowDownToLine, Search, Move, FolderPlus, Plus,
   // diff
   GitCompare,
   // toast
@@ -66,7 +66,6 @@ export const ICONS = {
     collapse: ChevronDown,
     chevronLeft: ChevronLeft,
     chevronRight: ChevronRight,
-    dragHandle: GripVertical,
     addFavorite: FolderPlus,
     newSession: Plus,
     /** Lucide `Move` = 4-direction arrow cross. Used for window drag-handles. */

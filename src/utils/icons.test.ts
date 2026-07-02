@@ -32,7 +32,6 @@ describe("ICONS registry", () => {
       "detach",
       "diff",
       "download",
-      "dragHandle",
       "externalLink",
       "folderOpen",
       "loading",
@@ -149,7 +148,8 @@ describe("ICONS registry — completeness & validity", () => {
     expect(typeof ICONS.pin).toBe("object");
   });
 
-  it("action group has 20 distinct icon entries", () => {
-    expect(Object.keys(ICONS.action).length).toBe(20);
+  it("action group has 19 distinct icon entries", () => {
+    // dragHandle entfiel mit dem Whole-Tile-Drag (Grip-Handles entfernt).
+    expect(Object.keys(ICONS.action).length).toBe(19);
   });
 });
