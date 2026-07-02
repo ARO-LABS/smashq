@@ -11,6 +11,20 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(() => Promise.resolve([])),
 }));
 
+// Controllable listen/emit — the live-tail and cross-window effects register
+// Tauri event listeners; tests steer when the listen() promise resolves.
+const { listenMock, emitMock } = vi.hoisted(() => ({
+  listenMock: vi.fn<(...args: unknown[]) => Promise<() => void>>(),
+  emitMock: vi.fn(() => Promise.resolve()),
+}));
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: listenMock,
+  emit: emitMock,
+}));
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({ label: "test-window" }),
+}));
+
 vi.mock("../../utils/errorLogger", () => ({
   logError: vi.fn(),
   logWarn: vi.fn(),
@@ -55,6 +69,11 @@ beforeEach(async () => {
   const { invoke } = await import("@tauri-apps/api/core");
   vi.mocked(invoke).mockReset();
   vi.mocked(invoke).mockResolvedValue([]);
+  listenMock.mockReset();
+  // Default: pending listener registration (never resolves) — harmless for
+  // tests that don't exercise the event paths.
+  listenMock.mockImplementation(() => new Promise<() => void>(() => {}));
+  emitMock.mockClear();
 });
 
 // ---------------------------------------------------------------------------
@@ -432,5 +451,25 @@ describe("LogViewer — backend log loading", () => {
       );
     });
     expect(screen.getByText("Keine Logs vorhanden")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Listener lifecycle (StrictMode/HMR race)
+// ---------------------------------------------------------------------------
+
+describe("LogViewer — listener lifecycle", () => {
+  it("tears down a log-line listener that resolves after effect cleanup (StrictMode race)", async () => {
+    const unlistenSpy = vi.fn();
+    const resolvers: ((u: () => void) => void)[] = [];
+    listenMock.mockImplementation(
+      () => new Promise<() => void>((resolve) => resolvers.push(resolve)),
+    );
+
+    const { unmount } = render(<LogViewer />);
+    unmount(); // Cleanup laeuft VOR dem listen()-Resolve
+
+    for (const resolve of resolvers) resolve(unlistenSpy);
+    await vi.waitFor(() => expect(unlistenSpy).toHaveBeenCalled());
   });
 });

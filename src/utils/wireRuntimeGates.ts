@@ -100,11 +100,21 @@ export function wireRuntimeGates(options?: WireRuntimeGatesOptions): () => void 
     }
   });
 
+  // Guard for all async listener registrations below: when the cleanup runs
+  // BEFORE a listen() promise resolves (StrictMode double-mount, HMR), the
+  // late-arriving listener would otherwise register after teardown and never
+  // be removable — breaking the documented single-onCloseRequested invariant.
+  let disposed = false;
+
   // Listen for cross-window preferences changes. Promise resolves once Tauri
   // returns the unlisten handle; we hold the promise so cleanup awaits it.
   let unlistenCrossWindow: (() => void) | null = null;
   void listenForPreferencesChanges(applyRemotePartial)
     .then((unlisten) => {
+      if (disposed) {
+        unlisten();
+        return;
+      }
       unlistenCrossWindow = unlisten;
     })
     .catch((err) => logError("wireRuntimeGates.crossWindowListen", err));
@@ -120,6 +130,10 @@ export function wireRuntimeGates(options?: WireRuntimeGatesOptions): () => void 
   let unlistenTasks: (() => void) | null = null;
   void listenForTasksChanges(applyRemoteTasks)
     .then((unlisten) => {
+      if (disposed) {
+        unlisten();
+        return;
+      }
       unlistenTasks = unlisten;
     })
     .catch((err) => logError("wireRuntimeGates.tasksListen", err));
@@ -153,12 +167,17 @@ export function wireRuntimeGates(options?: WireRuntimeGatesOptions): () => void 
           ]);
         })
         .then((fn) => {
+          if (disposed) {
+            fn();
+            return;
+          }
           unlistenClose = fn;
         }),
     )
     .catch((err) => logError("wireRuntimeGates.closeFlush", err));
 
   return () => {
+    disposed = true;
     unsubscribePerf();
     unsubscribeTasks();
     unlistenCrossWindow?.();

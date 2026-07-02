@@ -86,14 +86,23 @@ export function LogViewer() {
   useEffect(() => {
     if (!liveTail) return;
     let unlisten: (() => void) | undefined;
+    let cancelled = false;
     void listen<StructuredEntry>("log-line", (e) => {
+      if (!e.payload) return;
       addEntries([structuredToUnified(e.payload)]);
     })
       .then((u) => {
-        unlisten = u;
+        // Cleanup may have already run while listen() was in flight (Live-
+        // Toggle / unmount / StrictMode double-mount) → tear down now,
+        // otherwise the listener leaks and bypasses the live-tail gate.
+        if (cancelled) u();
+        else unlisten = u;
       })
       .catch((err) => logError("LogViewer.listenLogLine", err));
-    return () => unlisten?.();
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
   }, [liveTail, addEntries]);
 
   // Filter entries, then group consecutive identical ones
