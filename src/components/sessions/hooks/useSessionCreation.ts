@@ -18,15 +18,14 @@ function extractFolderName(path: string): string {
 }
 
 /**
- * Resolves the user's `defaultShell` preference into a concrete shell that the
- * Rust session backend understands. "auto" picks PowerShell on Windows (the
- * primary supported platform); "bash" maps to gitbash since that is the actual
- * Windows-side bash shell available to the PTY backend.
+ * The shell preference (including "auto") is passed straight to the Rust
+ * backend, which resolves it platform-aware (Windows → powershell, macOS →
+ * zsh, Linux → bash) and echoes the concrete shell in `result.shell`. This
+ * helper is only the defensive fallback for the store entry when that echo
+ * is unexpectedly missing.
  */
-function resolveDefaultShell(pref: SettingsState["defaultShell"]): SessionShell {
-  if (pref === "powershell" || pref === "cmd") return pref;
-  if (pref === "bash" || pref === "zsh") return "gitbash";
-  return "powershell"; // "auto" → safe Windows default
+function concreteShellFallback(pref: SettingsState["defaultShell"]): SessionShell {
+  return pref === "auto" ? "powershell" : pref;
 }
 
 export interface UseSessionCreationReturn {
@@ -58,7 +57,9 @@ export function useSessionCreation(): UseSessionCreationReturn {
     async (resumeSessionId: string, cwd: string, resumeTitle?: string) => {
       const id = generateSessionId();
       const title = resumeTitle ?? "Resume Session";
-      const shell = "powershell";
+      // Plattform-Default vom Backend aufloesen lassen — ein hartes
+      // "powershell" liesse Resume auf macOS scheitern.
+      const shell = "auto";
 
       try {
         const result = await wrapInvoke<CreateSessionResult>("create_session", {
@@ -76,7 +77,7 @@ export function useSessionCreation(): UseSessionCreationReturn {
           title: result?.title ?? title,
           displayId: generateUniqueDisplayId(sessions),
           folder: result?.folder ?? cwd,
-          shell: (result?.shell ?? shell) as SessionShell,
+          shell: (result?.shell ?? concreteShellFallback(shell)) as SessionShell,
           claudeSessionId: resumeSessionId,
           isGitRepo: result?.isGitRepo,
           snapshotCommit: result?.snapshotCommit,
@@ -147,7 +148,9 @@ export function useSessionCreation(): UseSessionCreationReturn {
     }
 
     const id = generateSessionId();
-    const shell = resolveDefaultShell(settings.defaultShell);
+    // Preference (inkl. "auto") unaufgeloest ans Backend — nur Rust kennt
+    // die Zielplattform.
+    const shell = settings.defaultShell;
     const title = extractFolderName(folder);
 
     try {
@@ -165,7 +168,7 @@ export function useSessionCreation(): UseSessionCreationReturn {
         title: result?.title ?? title,
         displayId: generateUniqueDisplayId(sessions),
         folder: result?.folder ?? folder,
-        shell: (result?.shell ?? shell) as SessionShell,
+        shell: (result?.shell ?? concreteShellFallback(shell)) as SessionShell,
         isGitRepo: result?.isGitRepo,
         snapshotCommit: result?.snapshotCommit,
       });

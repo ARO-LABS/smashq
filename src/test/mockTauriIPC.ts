@@ -95,7 +95,10 @@ export function buildCreateSessionHandler(opts?: {
       id: typeof args.id === "string" ? args.id : `mock-${calls.length}`,
       title: typeof args.title === "string" ? args.title : "untitled",
       folder: typeof args.folder === "string" ? args.folder : "",
-      shell: typeof args.shell === "string" ? args.shell : "powershell",
+      // Spiegelt resolve_shell_pref im Rust-Backend: "auto" wird zur
+      // konkreten Plattform-Shell aufgeloest (Test-Referenz = Windows).
+      shell:
+        typeof args.shell === "string" && args.shell !== "auto" ? args.shell : "powershell",
     };
   };
   const reset = () => {

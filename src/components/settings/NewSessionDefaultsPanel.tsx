@@ -1,19 +1,61 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useSettingsStore, type SettingsState } from "../../store/settingsStore";
 import { logError } from "../../utils/errorLogger";
+import { wrapInvoke } from "../../utils/perfLogger";
 import { ICONS, ICON_SIZE } from "../../utils/icons";
 import { Button } from "../ui/Button";
 
 const FolderOpenIcon = ICONS.action.folderOpen;
 
-const SHELL_OPTIONS: { value: SettingsState["defaultShell"]; label: string }[] = [
-  { value: "auto", label: "Auto (Plattform-Default)" },
+type ShellValue = SettingsState["defaultShell"];
+
+interface ShellOption {
+  value: ShellValue;
+  label: string;
+}
+
+const AUTO_OPTION: ShellOption = { value: "auto", label: "Auto (Plattform-Default)" };
+
+/**
+ * Statischer Fallback, solange `detect_shells` nicht geantwortet hat oder die
+ * App ausserhalb von Tauri laeuft (Browser-Dev, jsdom-Tests).
+ */
+const FALLBACK_SHELL_OPTIONS: ShellOption[] = [
   { value: "powershell", label: "PowerShell" },
   { value: "cmd", label: "CMD" },
   { value: "bash", label: "Bash" },
   { value: "zsh", label: "Zsh" },
 ];
+
+function isKnownShellValue(id: string): id is Exclude<ShellValue, "auto"> {
+  return FALLBACK_SHELL_OPTIONS.some((o) => o.value === id);
+}
+
+/** Laedt die auf diesem Geraet real installierten Shells vom Rust-Backend. */
+function useDetectedShells(): ShellOption[] | null {
+  const [detected, setDetected] = useState<ShellOption[] | null>(null);
+
+  useEffect(() => {
+    if (!("__TAURI_INTERNALS__" in window)) return;
+    let cancelled = false;
+    wrapInvoke<Array<{ id?: string; label?: string }>>("detect_shells")
+      .then((shells) => {
+        if (cancelled || !Array.isArray(shells)) return;
+        setDetected(
+          shells
+            .filter((s): s is { id: string; label?: string } => isKnownShellValue(s?.id ?? ""))
+            .map((s) => ({ value: s.id as ShellValue, label: s.label ?? s.id })),
+        );
+      })
+      .catch((err) => logError("NewSessionDefaultsPanel.detectShells", err));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return detected;
+}
 
 export function NewSessionDefaultsPanel() {
   const defaultShell = useSettingsStore((s) => s.defaultShell);
@@ -21,6 +63,16 @@ export function NewSessionDefaultsPanel() {
   const setDefaultShell = useSettingsStore((s) => s.setDefaultShell);
   const setDefaultProjectPath = useSettingsStore((s) => s.setDefaultProjectPath);
   const [picking, setPicking] = useState(false);
+  const detectedShells = useDetectedShells();
+
+  const shellOptions = [AUTO_OPTION, ...(detectedShells ?? FALLBACK_SHELL_OPTIONS)];
+  // Gespeicherte, aber nicht (mehr) installierte Shell sichtbar halten —
+  // sonst zeigt das <select> stumm einen leeren Wert an.
+  if (!shellOptions.some((o) => o.value === defaultShell)) {
+    const label =
+      FALLBACK_SHELL_OPTIONS.find((o) => o.value === defaultShell)?.label ?? defaultShell;
+    shellOptions.push({ value: defaultShell, label: `${label} (nicht gefunden)` });
+  }
 
   async function handlePickFolder() {
     setPicking(true);
@@ -60,12 +112,17 @@ export function NewSessionDefaultsPanel() {
             onChange={(e) => setDefaultShell(e.target.value as SettingsState["defaultShell"])}
             className="w-full rounded-md bg-surface-raised shadow-hairline text-neutral-200 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-accent focus:ring-inset transition-shadow duration-150"
           >
-            {SHELL_OPTIONS.map((opt) => (
+            {shellOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
           </select>
+          {detectedShells !== null && (
+            <p className="text-xs text-neutral-500">
+              Angezeigt werden nur Shells, die auf diesem Gerät gefunden wurden.
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-1.5">

@@ -94,7 +94,8 @@ describe("useSessionCreation", () => {
         expect.objectContaining({
           folder: "C:/Projects/test",
           title: "Resume Session",
-          shell: "powershell",
+          // Resume schickt "auto" — die Plattform-Aufloesung ist Backend-Sache.
+          shell: "auto",
           resumeSessionId: "old-session-id",
         }),
       );
@@ -346,7 +347,7 @@ describe("useSessionCreation", () => {
       );
     });
 
-    it("maps the 'auto' shell preference to powershell", async () => {
+    it("passes the 'auto' shell preference through unresolved", async () => {
       settingsSnapshot.defaultProjectPath = "C:/proj/a";
       settingsSnapshot.defaultShell = "auto";
       mockInvoke.mockResolvedValue({});
@@ -356,13 +357,15 @@ describe("useSessionCreation", () => {
         await result.current.handleNewSessionFromDefaults();
       });
 
+      // Aufloesung "auto" -> Plattform-Shell passiert seit macOS-Support im
+      // Rust-Backend, nicht mehr im Frontend.
       expect(mockInvoke).toHaveBeenCalledWith(
         "create_session",
-        expect.objectContaining({ shell: "powershell" }),
+        expect.objectContaining({ shell: "auto" }),
       );
     });
 
-    it("maps the 'bash' shell preference to gitbash", async () => {
+    it("passes the 'bash' shell preference through as bash", async () => {
       settingsSnapshot.defaultProjectPath = "C:/proj/b";
       settingsSnapshot.defaultShell = "bash";
       mockInvoke.mockResolvedValue({});
@@ -374,7 +377,7 @@ describe("useSessionCreation", () => {
 
       expect(mockInvoke).toHaveBeenCalledWith(
         "create_session",
-        expect.objectContaining({ shell: "gitbash" }),
+        expect.objectContaining({ shell: "bash" }),
       );
     });
 

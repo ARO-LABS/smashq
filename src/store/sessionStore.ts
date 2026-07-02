@@ -11,7 +11,9 @@ import {
 // Types
 // ============================================================================
 
-export type SessionShell = "powershell" | "cmd" | "gitbash";
+// "bash"/"zsh" seit der macOS-Unterstuetzung — das Rust-Backend loest die
+// Preference plattformbewusst auf und echot die konkrete Shell zurueck.
+export type SessionShell = "powershell" | "cmd" | "gitbash" | "bash" | "zsh";
 
 export type LayoutMode = "single" | "grid";
 

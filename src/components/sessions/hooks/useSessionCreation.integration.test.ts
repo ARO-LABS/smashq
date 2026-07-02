@@ -10,7 +10,8 @@
  *   3. defaultProjectPath empty + picker cancelled (returns null)
  *                                    → no session, no toast.
  *   4. create_session rejects        → error toast, no session added.
- *   5. resolveDefaultShell mapping   → bash/powershell/auto → correct backend shell.
+ *   5. shell preference pass-through → Preference (inkl. "auto") geht roh ans
+ *      Backend; die Aufloesung ist seit macOS-Support Rust-Sache.
  *
  * Real Zustand stores; no mocks of production code. IPC is intercepted via
  * Tauri's official `mockIPC` helper (see `src/test/mockTauriIPC.ts`).
@@ -76,7 +77,7 @@ describe("useSessionCreation.handleNewSessionFromDefaults — Layer-B", () => {
     // (a) create_session received the configured folder + resolved shell + folder-name title.
     expect(calls).toHaveLength(1);
     expect(calls[0].folder).toBe("C:\\Projects\\test");
-    expect(calls[0].shell).toBe("powershell"); // defaultShell="auto" on Windows → powershell
+    expect(calls[0].shell).toBe("auto"); // Preference geht unaufgeloest ans Backend
     expect(calls[0].title).toBe("test");
     expect(typeof calls[0].id).toBe("string");
 
@@ -181,8 +182,8 @@ describe("useSessionCreation.handleNewSessionFromDefaults — Layer-B", () => {
     expect(errorToast?.message).toContain("boom: backend pty spawn failed");
   });
 
-  describe("resolveDefaultShell mapping", () => {
-    it("defaultShell=bash → invokes create_session with shell='gitbash'", async () => {
+  describe("shell preference pass-through", () => {
+    it("defaultShell=bash → invokes create_session with shell='bash'", async () => {
       useSettingsStore.getState().setDefaultProjectPath("C:\\Projects\\test");
       useSettingsStore.getState().setDefaultShell("bash");
 
@@ -195,7 +196,7 @@ describe("useSessionCreation.handleNewSessionFromDefaults — Layer-B", () => {
       });
 
       expect(calls).toHaveLength(1);
-      expect(calls[0].shell).toBe("gitbash");
+      expect(calls[0].shell).toBe("bash");
     });
 
     it("defaultShell=powershell → invokes create_session with shell='powershell'", async () => {
@@ -214,7 +215,7 @@ describe("useSessionCreation.handleNewSessionFromDefaults — Layer-B", () => {
       expect(calls[0].shell).toBe("powershell");
     });
 
-    it("defaultShell=auto → invokes create_session with shell='powershell' (Windows default)", async () => {
+    it("defaultShell=auto → invokes create_session with shell='auto', store erhaelt die aufgeloeste Shell", async () => {
       useSettingsStore.getState().setDefaultProjectPath("C:\\Projects\\test");
       useSettingsStore.getState().setDefaultShell("auto");
 
@@ -227,7 +228,10 @@ describe("useSessionCreation.handleNewSessionFromDefaults — Layer-B", () => {
       });
 
       expect(calls).toHaveLength(1);
-      expect(calls[0].shell).toBe("powershell");
+      // Die Aufloesung von "auto" ist Backend-Sache — ueber IPC geht die
+      // rohe Preference, zurueck kommt die konkrete Shell (Mock: powershell).
+      expect(calls[0].shell).toBe("auto");
+      expect(useSessionStore.getState().sessions[0]?.shell).toBe("powershell");
     });
   });
 });
