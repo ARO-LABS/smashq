@@ -26,7 +26,7 @@ interface SessionPanelDockProps {
 // Uniform icon-button grammar shared by every dock control (launchers + tools +
 // actions) so the row reads as one designed set, not a loose pile.
 const ICON_BTN =
-  "relative flex items-center justify-center w-9 h-9 rounded-md text-neutral-400 " +
+  "relative flex items-center justify-center w-8 h-8 rounded-md text-neutral-400 " +
   "hover:text-accent hover:bg-accent-a05 transition-colors " +
   "focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2";
 
@@ -226,8 +226,12 @@ export function SessionPanelDock({ onNewSession, onAddFavorite }: SessionPanelDo
 
   return (
     <div className="shrink-0 border-t border-neutral-800 bg-surface-base px-3 py-2.5 flex flex-col gap-2">
-      {/* Row 1 — window launchers · divider · session actions */}
-      <div className="flex items-center gap-1">
+      {/* Row 1 — window launchers · divider · session actions.
+          flex-wrap is a hard guarantee against horizontal overflow: the 240px
+          panel can't hold more than ~6 icon buttons on one line, so an extra
+          launcher (e.g. Protokolle when logging is active) wraps instead of
+          bleeding past the panel's right border. */}
+      <div className="flex flex-wrap items-center gap-0.5">
         {launchers.map((l) => {
           const Icon = l.icon;
           return (

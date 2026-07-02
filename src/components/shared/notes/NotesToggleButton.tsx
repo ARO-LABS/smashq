@@ -34,7 +34,7 @@ export function NotesToggleButton({
               : "text-neutral-400 hover:text-neutral-200 hover:bg-hover-overlay border-transparent"
         }`
       : variant === "dock"
-        ? `relative flex items-center justify-center w-9 h-9 rounded-md transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 ${
+        ? `relative flex items-center justify-center w-8 h-8 rounded-md transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 ${
             open
               ? "text-accent bg-accent-a10"
               : "text-neutral-400 hover:text-accent hover:bg-accent-a05"

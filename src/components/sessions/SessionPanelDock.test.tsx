@@ -89,6 +89,17 @@ describe("SessionPanelDock", () => {
     expect(screen.getByLabelText("Protokolle")).toBeTruthy();
   });
 
+  // Regression guard (overflow bug): the 240px session panel can't hold all
+  // launcher buttons on one line once logging adds a 6th+ icon. flex-wrap is
+  // the escape hatch that makes the extra icon wrap instead of bleeding past
+  // the panel's right border. jsdom can't measure overflow, so we guard the
+  // mechanism itself — do not remove flex-wrap without a replacement.
+  it("wraps the launcher row so it never overflows the narrow panel", () => {
+    renderDock();
+    const row = screen.getByLabelText("Kanban").closest("div");
+    expect(row?.className).toContain("flex-wrap");
+  });
+
   it("opens a detached window when a launcher is clicked", () => {
     invokeMock.mockResolvedValue(undefined);
     renderDock();
