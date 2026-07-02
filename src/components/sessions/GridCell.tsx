@@ -32,7 +32,7 @@ export function GridCellChrome({
   return (
     <div
       data-testid={`grid-cell-chrome-${sessionId}`}
-      className="absolute top-2 right-2 z-10 flex items-center gap-1 px-1 py-0.5 rounded-md bg-surface-base shadow-hairline opacity-60 hover:opacity-100 transition-opacity"
+      className="absolute top-2 right-2 z-10 flex items-center gap-1 px-1 py-0.5 rounded-md bg-surface-base shadow-hairline opacity-90 hover:opacity-100 transition-opacity"
     >
       {branch && (
         <span

@@ -52,6 +52,22 @@ describe("GridCellChrome (floating pill variant)", () => {
     expect(screen.queryByText("Grid Session")).toBeNull();
   });
 
+  it("renders the pill mostly opaque at rest (90, full on hover)", () => {
+    render(
+      <GridCellChrome
+        sessionId="cell-1"
+        onMaximize={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+
+    const pill = screen.getByTestId("grid-cell-chrome-cell-1");
+    // 60% Ruhe-Deckkraft liess die Pille ueber Terminal-Text verwaschen
+    // wirken — 90% haelt sie lesbar, hover:100 bleibt (#Grid-Farben).
+    expect(pill.className).toContain("opacity-90");
+    expect(pill.className).not.toContain("opacity-60");
+  });
+
   it("calls onMaximize when maximize button is clicked", () => {
     const onMaximize = vi.fn();
     render(

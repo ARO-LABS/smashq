@@ -7,6 +7,16 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-07-02 — Session-Farb-Tint fuer Grid-Pille/Popover: zwei Anlaeufe, dann auf User-Wunsch komplett REVERTIERT (nur Opacity-Fix blieb)
+
+**Kontext:** User wollte die schwebende Pille + das Aufgaben-Popover der Grid-Zelle in der Session-Farbe (wie Zellrahmen/Sidebar-Punkt). Nach zwei Iterationen wirkte das Ergebnis nicht wie gewuenscht ("Farbenthematik scheint nicht zu funktionieren") → alles zurueckgedreht via gezieltem `git restore`; einzig die Pillen-Deckkraft 60%→90% blieb (`GridCell.tsx`).
+
+**Fehler (Anlauf 1):** Grid-Zellen-Wrapper setzte nur `--qr-frame` (Border), nie `--accent-h` — der Zell-Unterbaum fiel aufs globale Cyan zurueck. **Fehler (Anlauf 2):** Pillen-Tint via `color-mix(in oklch, accent 30%, --surface-base)` drehte JEDEN Session-Hue Richtung Orange: oklch ist polar, der Hue interpoliert als WINKEL, und das warmweisse `--surface-base` (Hue 20) zieht die Mischung ueber den Farbkreis (Cyan 195 → ~72 = Orange). Abtoenen Richtung Weiss/Grau MUSS in einem rechteckigen Raum passieren (`in oklab`/`in srgb`); oklch nur fuer Verlaeufe zwischen Buntfarben.
+
+**Korrektur:** Revert statt dritter Iteration. Beim Revert kritisch: eine PARALLELE Session arbeitete im selben Working Tree — vor `git restore` jede Datei per `git diff` verifiziert, dass sie NUR eigene Aenderungen enthaelt; fremde modifizierte Dateien (`useSessionCreation.ts`, `sessionStore.ts`, `NewSessionDefaultsPanel.tsx`) explizit ausgenommen.
+
+**Regel:** (1) `color-mix` mit Weiss/Grau/Surface-Tönen: NIE `in oklch` — polare Hue-Interpolation verfaelscht den Farbton; `in oklab` nehmen. (2) Vor jedem `git restore`/Revert in diesem Repo: `git status` + Diff JEDER Kandidat-Datei pruefen — parallele Smashq-Sessions teilen sich den Working Tree, Pauschal-Restores koennen fremde Arbeit vernichten. (3) Nach 2 gescheiterten visuellen Iterationen an Farb-/Design-Themen: stoppen und Umfang mit dem User neu klaeren statt dritter Variante — "funktioniert nicht" kann auch "Konzept unerwuenscht" heissen. Verwandt: [[armada-review-open-items]].
+
 ### 2026-07-01 — «SMASHQ:open-md»-Sentinel feuerte nie in einer echten Claude-Session: ANSI-Stripping vergessen, obwohl im selben File schon geloest
 
 **Kontext:** User testete den open-md-Sentinel live (Chat-Prosa UND rohes Bash-`echo`) — beides oeffnete die Datei nicht. Multi-Agenten-Analyse (3 parallele Audits: Frontend-Rendering, bestehende PTY-Parsing-Muster, Test-Coverage) fand die Ursache im selben File, in dem sie schon einmal geloest worden war.
