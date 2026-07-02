@@ -627,6 +627,50 @@ describe("discoverGlobal — error handling", () => {
   });
 });
 
+// ── deleteMemoryFile ──────────────────────────────────────────────────
+
+describe("deleteMemoryFile", () => {
+  const memA = { name: "a/MEMORY.md", relativePath: "projects/a/memory/MEMORY.md" };
+  const memB = { name: "b/notes.md", relativePath: "projects/b/memory/notes.md" };
+
+  it("invokes the delete command and removes the file from globalConfig", async () => {
+    const handler = vi.fn(async () => undefined);
+    invokeHandlers["delete_user_claude_memory_file"] = handler;
+    useConfigDiscoveryStore.setState({
+      globalConfig: { ...emptyScopeForTest(), memoryFiles: [memA, memB] },
+    });
+
+    await useConfigDiscoveryStore
+      .getState()
+      .deleteMemoryFile("projects/a/memory/MEMORY.md");
+
+    expect(handler).toHaveBeenCalledWith({
+      relativePath: "projects/a/memory/MEMORY.md",
+    });
+    expect(useConfigDiscoveryStore.getState().globalConfig?.memoryFiles).toEqual([
+      memB,
+    ]);
+  });
+
+  it("keeps the file and rethrows when the backend rejects", async () => {
+    invokeHandlers["delete_user_claude_memory_file"] = vi.fn(async () => {
+      throw new Error("trash unavailable");
+    });
+    useConfigDiscoveryStore.setState({
+      globalConfig: { ...emptyScopeForTest(), memoryFiles: [memA] },
+    });
+
+    await expect(
+      useConfigDiscoveryStore
+        .getState()
+        .deleteMemoryFile("projects/a/memory/MEMORY.md"),
+    ).rejects.toThrow("trash unavailable");
+    expect(useConfigDiscoveryStore.getState().globalConfig?.memoryFiles).toEqual([
+      memA,
+    ]);
+  });
+});
+
 // ── hasScopeContent ───────────────────────────────────────────────────
 
 describe("hasScopeContent", () => {

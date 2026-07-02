@@ -258,6 +258,36 @@ describe("LibraryView", () => {
     expect(screen.queryByText(/Other App/)).toBeNull();
   });
 
+  it("omits the redundant dir-name suffix when it equals the favorite label", () => {
+    mockUseSettingsStore.mockImplementation(
+      (sel: CallableFunction) =>
+        sel({
+          favorites: [
+            {
+              id: "fav-7",
+              path: "C:/Projects/my-app",
+              label: "my-app",
+              shell: "powershell",
+              addedAt: 1000,
+              lastUsedAt: 2000,
+            },
+          ],
+        }),
+    );
+
+    useConfigDiscoveryStore.setState({
+      globalConfig: makeConfig(),
+      favoriteConfigs: {
+        "C:/Projects/my-app": makeConfig({ claudeMd: "# x" }),
+      },
+      discoverFavorites: vi.fn(async () => {}),
+    });
+
+    render(<LibraryView />);
+    expect(screen.getByText("my-app")).toBeTruthy();
+    expect(screen.queryByText("my-app (my-app)")).toBeNull();
+  });
+
   it("hides a favorite project panel whose config is empty", () => {
     mockUseSettingsStore.mockImplementation(
       (sel: CallableFunction) =>
@@ -377,6 +407,53 @@ describe("LibraryView", () => {
     fireEvent.click(skillButton);
 
     expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("opens detail modal with full command when hook card is clicked", () => {
+    const longCommand =
+      "node C:/very/long/path/to/hooks/safe-guard.mjs --with --many --flags --that --overflow";
+    useConfigDiscoveryStore.setState({
+      globalConfig: makeConfig({
+        hooks: [
+          {
+            event: "PreToolUse",
+            matcher: "Bash",
+            command: longCommand,
+            scope: "global",
+            source: "settings.json",
+          },
+        ],
+      }),
+    });
+
+    render(<LibraryView />);
+    fireEvent.click(screen.getByText("Global (~/.claude/)").closest("button")!);
+    fireEvent.click(screen.getByText("Hooks").closest("button")!);
+    fireEvent.click(screen.getByText("PreToolUse").closest("button")!);
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeTruthy();
+    // Full command rendered inside the modal (card shows it truncated)
+    expect(screen.getAllByText(longCommand).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("Bash").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("hook detail omits the matcher row when hook has no matcher", () => {
+    useConfigDiscoveryStore.getState().openDetail({
+      category: "hooks",
+      item: {
+        event: "PostToolUse",
+        matcher: "",
+        command: "echo done",
+        scope: "global",
+        source: "hooks.json",
+      },
+    });
+
+    render(<LibraryView />);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.queryByText("matcher")).toBeNull();
+    expect(screen.getByText("echo done")).toBeTruthy();
   });
 
   it("detail modal closes when close button is clicked", async () => {
@@ -537,6 +614,45 @@ describe("LibraryView", () => {
     render(<LibraryView />);
     fireEvent.click(screen.getByText("Global (~/.claude/)").closest("button")!);
     expect(screen.getByText("Memory")).toBeTruthy();
+  });
+
+  it("deletes a memory file after inline confirmation", async () => {
+    useConfigDiscoveryStore.setState({
+      globalConfig: makeConfig({
+        memoryFiles: [
+          { name: "smashq/MEMORY.md", relativePath: "projects/smashq/memory/MEMORY.md" },
+        ],
+      }),
+    });
+    render(<LibraryView />);
+    fireEvent.click(screen.getByText("Global (~/.claude/)").closest("button")!);
+    fireEvent.click(screen.getByText("Memory").closest("button")!);
+
+    fireEvent.click(screen.getByTitle("In Papierkorb verschieben"));
+    fireEvent.click(screen.getByTitle("Löschen bestätigen"));
+
+    await waitFor(() =>
+      expect(screen.queryByText("smashq/MEMORY.md")).toBeNull(),
+    );
+  });
+
+  it("keeps the memory file when the confirmation is cancelled", () => {
+    useConfigDiscoveryStore.setState({
+      globalConfig: makeConfig({
+        memoryFiles: [
+          { name: "smashq/MEMORY.md", relativePath: "projects/smashq/memory/MEMORY.md" },
+        ],
+      }),
+    });
+    render(<LibraryView />);
+    fireEvent.click(screen.getByText("Global (~/.claude/)").closest("button")!);
+    fireEvent.click(screen.getByText("Memory").closest("button")!);
+
+    fireEvent.click(screen.getByTitle("In Papierkorb verschieben"));
+    fireEvent.click(screen.getByTitle("Abbrechen"));
+
+    expect(screen.getByText("smashq/MEMORY.md")).toBeTruthy();
+    expect(screen.queryByTitle("Löschen bestätigen")).toBeNull();
   });
 
   it("expands a memory file card to reveal its name preview", () => {

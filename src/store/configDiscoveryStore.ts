@@ -126,6 +126,8 @@ interface ConfigDiscoveryState {
   discoverProject: (folder: string) => Promise<void>;
   discoverFavorites: (folders: string[]) => Promise<void>;
   loadContent: (key: string, loader: () => Promise<string>) => Promise<string>;
+  /** Move a memory file (projects/<dir>/memory/<file>) to the OS trash and drop it from globalConfig. Rethrows backend errors. */
+  deleteMemoryFile: (relativePath: string) => Promise<void>;
   clearProject: () => void;
   openDetail: (detail: SelectedDetail) => void;
   closeDetail: () => void;
@@ -640,6 +642,22 @@ export const useConfigDiscoveryStore = create<ConfigDiscoveryState>((set, get) =
       }));
       return "";
     }
+  },
+
+  deleteMemoryFile: async (relativePath: string) => {
+    // Backend errors propagate to the caller (card shows a toast); state is
+    // only updated after the trash move succeeded.
+    await invoke("delete_user_claude_memory_file", { relativePath });
+    set((s) => ({
+      globalConfig: s.globalConfig
+        ? {
+            ...s.globalConfig,
+            memoryFiles: s.globalConfig.memoryFiles.filter(
+              (f) => f.relativePath !== relativePath,
+            ),
+          }
+        : null,
+    }));
   },
 
   clearProject: () => {

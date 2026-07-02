@@ -130,12 +130,13 @@ export function LibraryView(): JSX.Element {
               .map((fav) => {
                 const config = favoriteConfigs[fav.path];
                 if (!config || !hasScopeContent(config)) return null;
+                const dirName = fav.path.split(/[\\/]/).pop() ?? fav.path;
                 return (
                   <ScopePanel
                     key={fav.id}
                     scope="project"
                     config={config}
-                    label={`${fav.label} (${fav.path.split(/[\\/]/).pop() ?? fav.path})`}
+                    label={fav.label === dirName ? fav.label : `${fav.label} (${dirName})`}
                     icon={FolderOpen}
                     scopeId={`fav:${fav.id}`}
                     folder={fav.path}

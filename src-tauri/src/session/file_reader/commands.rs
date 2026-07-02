@@ -9,7 +9,7 @@
 #![allow(clippy::module_inception)]
 
 use super::path_safety::{safe_resolve, safe_resolve_user_claude, SkillDirEntry};
-use super::session_delete::delete_claude_session_in;
+use super::session_delete::{delete_claude_session_in, delete_memory_file_in};
 use super::session_history::{scan_sessions_for_project, ClaudeSessionSummary};
 use crate::error::ADPError;
 
@@ -169,6 +169,21 @@ pub async fn delete_claude_session(folder: String, session_id: String) -> Result
         None => return Ok(()),
     };
     delete_claude_session_in(&claude_projects_root, &folder, &session_id)
+}
+
+/// Move a per-project memory file (~/.claude/projects/<dir>/memory/<file>)
+/// to the OS trash. Only that exact path shape is deletable — validated in
+/// `delete_memory_file_in`. Idempotent when ~/.claude/ or the file is missing.
+#[tauri::command]
+pub async fn delete_user_claude_memory_file(relative_path: String) -> Result<(), ADPError> {
+    let claude_dir = match dirs::home_dir() {
+        Some(home) => home.join(".claude"),
+        None => return Ok(()),
+    };
+    if !claude_dir.is_dir() {
+        return Ok(());
+    }
+    delete_memory_file_in(&claude_dir, &relative_path)
 }
 
 /// Read a file from the user's ~/.claude/ directory.

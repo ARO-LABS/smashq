@@ -293,6 +293,7 @@ pub fn run() {
             session::file_reader::commands::list_skill_dirs,
             session::file_reader::commands::scan_claude_sessions,
             session::file_reader::commands::delete_claude_session,
+            session::file_reader::commands::delete_user_claude_memory_file,
             session::file_reader::commands::resolve_project_root,
             // Worktree scanning
             session::commands::commands::scan_worktrees,

@@ -67,6 +67,45 @@ pub fn delete_claude_session_in(
     Ok(())
 }
 
+/// Move a per-project memory file (`projects/<dir>/memory/<file>` under
+/// `~/.claude/`) to the OS trash.
+///
+/// The segment whitelist is the primary guard: exactly four `/`-separated
+/// segments in the shape `projects/<dir>/memory/<file>`. Nothing else under
+/// `~/.claude/` (settings.json, CLAUDE.md, skills, ...) is reachable through
+/// this function, no matter what the frontend sends. The canonicalize-based
+/// traversal guard runs on top as defense-in-depth, mirroring
+/// `delete_claude_session_in`.
+///
+/// **Idempotent**: returns `Ok(())` when the file is already gone, so the
+/// frontend can call this even if its list is stale.
+pub fn delete_memory_file_in(claude_root: &Path, relative_path: &str) -> Result<(), ADPError> {
+    let segments: Vec<&str> = relative_path.split('/').collect();
+    let shape_ok = segments.len() == 4
+        && segments[0] == "projects"
+        && segments[2] == "memory"
+        && segments
+            .iter()
+            .all(|s| !s.is_empty() && *s != "." && *s != ".." && !s.contains('\\'));
+    if !shape_ok {
+        return Err(ADPError::validation(format!(
+            "Invalid memory file path (must be projects/<dir>/memory/<file>): '{}'",
+            relative_path
+        )));
+    }
+
+    let target = safe_resolve_with_base(claude_root, relative_path)?;
+
+    if target.is_file() {
+        trash::delete(&target).map_err(|e| {
+            ADPError::file_io(format!("Failed to move memory file to trash: {}", e))
+        })?;
+    }
+
+    // Idempotent — file already gone
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::session_history::folder_to_project_dir_name;
@@ -200,5 +239,59 @@ mod tests {
             !session_dir.exists(),
             "session directory and its subagents/ subfolder must be gone"
         );
+    }
+
+    // --- delete_memory_file_in tests ---
+    //
+    // Same philosophy as above: negative paths never reach `trash::delete`,
+    // the positive path asserts only that the source file is gone.
+
+    #[test]
+    fn test_delete_memory_file_in_rejects_traversal() {
+        let tmp = setup_temp_dir();
+        let result = delete_memory_file_in(tmp.path(), "projects/../memory/x.md");
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .message
+            .contains("Invalid memory file path"));
+    }
+
+    #[test]
+    fn test_delete_memory_file_in_rejects_paths_outside_memory_dirs() {
+        let tmp = setup_temp_dir();
+        for bad in [
+            "settings.json",
+            "CLAUDE.md",
+            "projects/foo/other/file.md",
+            "projects/foo/memory",
+            "projects/foo/memory/sub/file.md",
+            "projects/foo/memory/",
+            "projects\\foo\\memory\\file.md",
+        ] {
+            let result = delete_memory_file_in(tmp.path(), bad);
+            assert!(result.is_err(), "path '{}' must be rejected", bad);
+        }
+    }
+
+    #[test]
+    fn test_delete_memory_file_in_is_idempotent_when_file_missing() {
+        let tmp = setup_temp_dir();
+        let result = delete_memory_file_in(tmp.path(), "projects/foo/memory/gone.md");
+        assert!(result.is_ok(), "missing file must be Ok (idempotent)");
+    }
+
+    #[test]
+    fn test_delete_memory_file_in_moves_file_to_trash() {
+        let tmp = setup_temp_dir();
+        let memory_dir = tmp.path().join("projects").join("proj").join("memory");
+        fs::create_dir_all(&memory_dir).expect("create memory dir");
+        let file = memory_dir.join("note.md");
+        fs::write(&file, "# note").expect("write memory file");
+
+        let result = delete_memory_file_in(tmp.path(), "projects/proj/memory/note.md");
+        assert!(result.is_ok(), "delete failed: {:?}", result);
+        assert!(!file.exists(), "memory file must be gone");
+        assert!(memory_dir.exists(), "memory dir itself must survive");
     }
 }
