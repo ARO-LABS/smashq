@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 import { ICONS } from "../../../utils/icons";
+import { Tooltip } from "../Tooltip";
 
 type NotesVariant = "header" | "sidebar" | "dock";
 
@@ -48,11 +49,23 @@ export function NotesToggleButton({
 
   const iconClass = variant === "sidebar" ? "w-5 h-5 shrink-0" : "w-4 h-4 shrink-0";
 
+  // Legacy-Sidebar-Variante ist w-full — der inline-flex-Wrapper des Tooltips
+  // wuerde die Breite kollabieren, dort bleibt das native title-Attribut.
+  if (variant === "sidebar") {
+    return (
+      <button onClick={onToggle} className={className} aria-label="Notizen" title="Notizen">
+        <ICONS.notes className={iconClass} aria-hidden="true" />
+      </button>
+    );
+  }
+
   return (
-    <button onClick={onToggle} className={className} aria-label="Notizen" title="Notizen">
-      <ICONS.notes className={iconClass} aria-hidden="true" />
-      {/* Label only in the header variant — narrow shells stay icon-only with tooltip. */}
-      {variant === "header" && <span className="text-xs hidden lg:inline">Notizen</span>}
-    </button>
+    <Tooltip content="Notizen">
+      <button onClick={onToggle} className={className} aria-label="Notizen">
+        <ICONS.notes className={iconClass} aria-hidden="true" />
+        {/* Label only in the header variant — narrow shells stay icon-only with tooltip. */}
+        {variant === "header" && <span className="text-xs hidden lg:inline">Notizen</span>}
+      </button>
+    </Tooltip>
   );
 }

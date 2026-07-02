@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useUIStore } from "../../store/uiStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import { NotesPanel } from "../shared/NotesPanel";
+import { Tooltip } from "../shared/Tooltip";
 import { useAutoUpdate, type UpdateStatus } from "../../hooks/useAutoUpdate";
 import { ICONS, ICON_SIZE } from "../../utils/icons";
 import { version } from "../../../package.json";
@@ -230,76 +231,81 @@ export function SessionPanelDock({ onNewSession, onAddFavorite }: SessionPanelDo
         {launchers.map((l) => {
           const Icon = l.icon;
           return (
-            <button
-              key={l.view}
-              onClick={() => openWindow(l.view, l.label)}
-              className={ICON_BTN}
-              aria-label={l.label}
-              title={`${l.label} (eigenes Fenster)`}
-            >
-              <Icon className={ICON_SIZE.nav} aria-hidden="true" />
-            </button>
+            <Tooltip key={l.view} content={`${l.label} (eigenes Fenster)`}>
+              <button
+                onClick={() => openWindow(l.view, l.label)}
+                className={ICON_BTN}
+                aria-label={l.label}
+              >
+                <Icon className={ICON_SIZE.nav} aria-hidden="true" />
+              </button>
+            </Tooltip>
           );
         })}
 
         <span className="w-px h-5 bg-neutral-700 mx-0.5" aria-hidden="true" />
 
-        <button
-          onClick={onAddFavorite}
-          className={ICON_BTN}
-          aria-label="Ordner als Favorit hinzufügen"
-          title="Favorit hinzufügen"
-        >
-          <AddFavoriteIcon className={ICON_SIZE.nav} aria-hidden="true" />
-        </button>
-        <button
-          onClick={onNewSession}
-          className={ICON_BTN}
-          aria-label="Neue Session starten"
-          title="Session starten"
-        >
-          <NewSessionIcon className={ICON_SIZE.nav} aria-hidden="true" />
-        </button>
+        <Tooltip content="Favorit hinzufügen">
+          <button
+            onClick={onAddFavorite}
+            className={ICON_BTN}
+            aria-label="Ordner als Favorit hinzufügen"
+          >
+            <AddFavoriteIcon className={ICON_SIZE.nav} aria-hidden="true" />
+          </button>
+        </Tooltip>
+        <Tooltip content="Session starten">
+          <button
+            onClick={onNewSession}
+            className={ICON_BTN}
+            aria-label="Neue Session starten"
+          >
+            <NewSessionIcon className={ICON_SIZE.nav} aria-hidden="true" />
+          </button>
+        </Tooltip>
       </div>
 
       {/* Row 2 — utilities (left) · version pill (right) */}
       <div className="flex items-center justify-between border-t border-neutral-800 pt-2">
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => setTheme({ mode: isDark ? "light" : "dark" })}
-            className={ICON_BTN}
-            aria-label={isDark ? "Light Mode aktivieren" : "Dark Mode aktivieren"}
-            title={isDark ? "Light Mode" : "Dark Mode"}
-          >
-            {isDark
-              ? <SunIcon className={ICON_SIZE.nav} aria-hidden="true" />
-              : <MoonIcon className={ICON_SIZE.nav} aria-hidden="true" />}
-          </button>
+          <Tooltip content={isDark ? "Light Mode" : "Dark Mode"}>
+            <button
+              onClick={() => setTheme({ mode: isDark ? "light" : "dark" })}
+              className={ICON_BTN}
+              aria-label={isDark ? "Light Mode aktivieren" : "Dark Mode aktivieren"}
+            >
+              {isDark
+                ? <SunIcon className={ICON_SIZE.nav} aria-hidden="true" />
+                : <MoonIcon className={ICON_SIZE.nav} aria-hidden="true" />}
+            </button>
+          </Tooltip>
           <NotesPanel variant="dock" />
-          <button
-            onClick={() => openWindow("settings", "Einstellungen")}
-            className={ICON_BTN}
-            aria-label="Einstellungen"
-            title="Einstellungen (eigenes Fenster)"
-          >
-            <SettingsIcon className={ICON_SIZE.nav} aria-hidden="true" />
-          </button>
+          <Tooltip content="Einstellungen (eigenes Fenster)">
+            <button
+              onClick={() => openWindow("settings", "Einstellungen")}
+              className={ICON_BTN}
+              aria-label="Einstellungen"
+            >
+              <SettingsIcon className={ICON_SIZE.nav} aria-hidden="true" />
+            </button>
+          </Tooltip>
         </div>
 
         {/* Version — discreet pill. Click = update-check; leading dot when an action is pending. */}
-        <button
-          onClick={handleVersionClick}
-          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-surface-raised text-[10px] font-medium tracking-tight text-neutral-500 hover:text-accent transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-          title={versionTooltip}
-        >
-          {showStatusDot && (
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${status === "ready" ? "bg-success" : "bg-accent"}`}
-              aria-label={status === "ready" ? "Update installationsbereit" : "Update verfügbar"}
-            />
-          )}
-          <span>v{version}</span>
-        </button>
+        <Tooltip content={versionTooltip}>
+          <button
+            onClick={handleVersionClick}
+            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-surface-raised text-[10px] font-medium tracking-tight text-neutral-500 hover:text-accent transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+          >
+            {showStatusDot && (
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${status === "ready" ? "bg-success" : "bg-accent"}`}
+                aria-label={status === "ready" ? "Update installationsbereit" : "Update verfügbar"}
+              />
+            )}
+            <span>v{version}</span>
+          </button>
+        </Tooltip>
       </div>
     </div>
   );

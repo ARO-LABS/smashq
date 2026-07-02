@@ -146,14 +146,30 @@ describe("SessionPanelDock", () => {
 
   // ── Updater (protected path — migrated 1:1 from SideNav) ────────────────
 
+  // Version-Pill ueber den Accessible Name greifen — das fruehere title-
+  // Attribut ist durch die Tooltip-Komponente ersetzt (Hover-Test unten).
+  const versionPill = () => screen.getByRole("button", { name: /v\d+\.\d+\.\d+/ });
+
   it("renders the version badge", () => {
     renderDock();
-    expect(screen.getByTitle(/Version/)).toBeTruthy();
+    expect(versionPill()).toBeTruthy();
+  });
+
+  it("zeigt beim Hover den Version-Tooltip mit Update-Wortlaut", async () => {
+    autoUpdate.status = "available";
+    autoUpdate.newVersion = "2.0.0";
+    renderDock();
+    fireEvent.mouseEnter(versionPill().parentElement!);
+    await waitFor(() => {
+      expect(screen.getByRole("tooltip").textContent).toMatch(
+        /Update v2\.0\.0 verfügbar — Klick: Installieren/,
+      );
+    });
   });
 
   it("triggers an update-check and shows a search toast on version click (idle)", () => {
     renderDock();
-    fireEvent.click(screen.getByTitle(/Version/));
+    fireEvent.click(versionPill());
     expect(autoUpdate.checkForUpdate).toHaveBeenCalledTimes(1);
     const titles = useUIStore.getState().toasts.map((t) => t.title);
     expect(titles).toContain("Suche nach Updates...");
@@ -186,7 +202,7 @@ describe("SessionPanelDock", () => {
     renderDock();
     // Clear the auto-fired transition toast, then click to re-show it.
     act(() => useUIStore.setState({ toasts: [] }));
-    fireEvent.click(screen.getByTitle(/Update v2.0.0/));
+    fireEvent.click(versionPill());
     const titles = useUIStore.getState().toasts.map((t) => t.title);
     expect(titles).toContain("Update v2.0.0 verfügbar");
     expect(autoUpdate.checkForUpdate).not.toHaveBeenCalled();
@@ -199,7 +215,7 @@ describe("SessionPanelDock", () => {
     renderDock();
     // Clear the auto-fired progress toast, then click the version pill.
     act(() => useUIStore.setState({ toasts: [] }));
-    fireEvent.click(screen.getByTitle(/Version/));
+    fireEvent.click(versionPill());
     // No stray concurrent re-check while the download runs.
     expect(autoUpdate.checkForUpdate).not.toHaveBeenCalled();
     const titles = useUIStore.getState().toasts.map((t) => t.title);
