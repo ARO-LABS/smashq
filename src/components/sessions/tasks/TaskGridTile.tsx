@@ -10,6 +10,7 @@
  *     header  — "AUFGABEN" uppercase + mono "N offen"
  *     list    — up to ~5 rows: StatusDot8 + truncated title + compact deadline chip
  *               next task row: bg-accent-a05 border-l-2 border-accent
+ *     add-row — quick-add input (Enter commits, scoped to the cell's projectKey)
  *     footer  — "In großer Ansicht öffnen" + ICONS.tasks.next
  *     empty   — "Keine offenen Aufgaben"
  *
@@ -21,7 +22,7 @@
  * test in isolation.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTasksStore, selectOpenTasksForProject, selectNextTask } from "../../../store/tasksStore";
 import { normalizeProjectKey } from "../../../store/settingsStore";
 import { StatusDot } from "../../shared/tasks/StatusDot";
@@ -38,6 +39,45 @@ export interface TaskGridTileProps {
   onOpenLarge: () => void;
 }
 
+// ── Quick-add row ──────────────────────────────────────────────────────
+// Same pattern as the AddTaskRow in TasksWindow, compacted for the popover.
+
+interface AddTaskRowProps {
+  onAdd: (title: string) => void;
+}
+
+function AddTaskRow({ onAdd }: AddTaskRowProps): JSX.Element {
+  const [value, setValue] = useState("");
+  const PlusIcon = ICONS.action.newSession;
+
+  const commit = (): void => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    onAdd(trimmed);
+    setValue("");
+  };
+
+  return (
+    <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-t border-neutral-800">
+      <PlusIcon className="w-3 h-3 text-accent shrink-0" aria-hidden="true" />
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+          }
+        }}
+        placeholder="Aufgabe hinzufügen — Enter"
+        className="flex-1 min-w-0 bg-transparent text-[11px] text-neutral-300 placeholder:text-neutral-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-inset rounded-sm"
+        aria-label="Aufgabe hinzufügen"
+      />
+    </div>
+  );
+}
+
 // ── Component ──────────────────────────────────────────────────────────
 
 export function TaskGridTile({
@@ -51,6 +91,7 @@ export function TaskGridTile({
 
   const openTasks = useTasksStore(selectOpenTasksForProject(projectKey));
   const nextTask = useTasksStore(selectNextTask(projectKey));
+  const addTask = useTasksStore((s) => s.addTask);
 
   // ── Click-outside + Escape close ─────────────────────────────────────
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -135,6 +176,14 @@ export function TaskGridTile({
           })}
         </div>
       )}
+
+      {/* Quick-add — same source semantics as TasksWindow: project-scoped
+          tasks count as "session", unscoped as "manual" */}
+      <AddTaskRow
+        onAdd={(title) =>
+          addTask({ title, projectKey, source: projectKey ? "session" : "manual" })
+        }
+      />
 
       {/* Footer */}
       <div className="px-2.5 py-1.5 border-t border-neutral-800">

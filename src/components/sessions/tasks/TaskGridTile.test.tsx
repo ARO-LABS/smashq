@@ -4,6 +4,8 @@
  * 1. Happy path — popover shows open tasks for the session's project key,
  *    highlights the "next" task with accent styling, and renders the footer.
  * 2. Edge case  — empty state message when no open tasks exist.
+ * 3. Quick-add — Enter in the add-row creates a task scoped to the cell's
+ *    projectKey; whitespace-only input is ignored.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -166,6 +168,73 @@ describe("TaskGridTile", () => {
     );
 
     expect(screen.queryByTestId("task-grid-tile")).toBeNull();
+  });
+
+  // ── Quick-add ──────────────────────────────────────────────────────
+
+  it("adds a task for the cell's project on Enter and clears the input", () => {
+    useTasksStore.setState({ tasks: [] });
+
+    render(
+      <TaskGridTile
+        sessionId="sess-1"
+        folder="C:/Projects/Demo"
+        open={true}
+        onClose={vi.fn()}
+        onOpenLarge={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByLabelText("Aufgabe hinzufügen") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "  Neue Grid-Aufgabe  " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    const tasks = useTasksStore.getState().tasks;
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]?.title).toBe("Neue Grid-Aufgabe");
+    expect(tasks[0]?.projectKey).toBe("c:/projects/demo");
+    expect(tasks[0]?.source).toBe("session");
+
+    // Input clears after commit; new task appears in the list reactively
+    expect(input.value).toBe("");
+    expect(screen.getByText("Neue Grid-Aufgabe")).toBeTruthy();
+  });
+
+  it("does not add a task for whitespace-only input", () => {
+    useTasksStore.setState({ tasks: [] });
+
+    render(
+      <TaskGridTile
+        sessionId="sess-1"
+        folder="C:/Projects/Demo"
+        open={true}
+        onClose={vi.fn()}
+        onOpenLarge={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByLabelText("Aufgabe hinzufügen");
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(useTasksStore.getState().tasks).toHaveLength(0);
+  });
+
+  it("shows the quick-add input in the empty state", () => {
+    useTasksStore.setState({ tasks: [] });
+
+    render(
+      <TaskGridTile
+        sessionId="sess-1"
+        folder="C:/Projects/Demo"
+        open={true}
+        onClose={vi.fn()}
+        onOpenLarge={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Keine offenen Aufgaben")).toBeTruthy();
+    expect(screen.getByLabelText("Aufgabe hinzufügen")).toBeTruthy();
   });
 
   it("does not show done tasks in the list", () => {
