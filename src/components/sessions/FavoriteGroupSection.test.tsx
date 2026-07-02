@@ -124,7 +124,7 @@ describe("FavoriteGroupSection", () => {
     expect(onRename).toHaveBeenCalledWith("grp-1", "Work");
   });
 
-  it("renders a dedicated drag-handle button at the left of the header", () => {
+  it("drags the group via its header row (no dedicated grip handle)", () => {
     render(
       <DndContext>
         <FavoriteGroupSection
@@ -137,7 +137,11 @@ describe("FavoriteGroupSection", () => {
         />
       </DndContext>
     );
-    expect(screen.getByLabelText("Gruppen-Drag-Handle")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Gruppen-Drag-Handle")).not.toBeInTheDocument();
+    // The header row (not the section root) carries the sortable attributes,
+    // so favorite-drags inside the body cannot bubble into the group sensor.
+    const header = screen.getByText("Arbeit").closest("[aria-roledescription='sortable']");
+    expect(header).not.toBeNull();
   });
 
   it("keeps the group delete button hidden until header hover", () => {

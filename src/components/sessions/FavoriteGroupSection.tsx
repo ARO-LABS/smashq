@@ -35,10 +35,11 @@ export function FavoriteGroupSection({
   const [draft, setDraft] = useState(group.label);
 
   // Header itself is sortable (drives group-reordering).
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
-    id: group.id,
-    data: { type: "group" },
-  });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({
+      id: group.id,
+      data: { type: "group" },
+    });
 
   // Body of the group is a droppable area (id used by the sidebar DnD hook).
   const { setNodeRef: setBodyRef } = useDroppable({
@@ -49,7 +50,6 @@ export function FavoriteGroupSection({
   // ICONS.groupCollapse = ChevronDown (added in T9).
   const Chevron = ICONS.groupCollapse;
   const CloseIcon = ICONS.action.close;
-  const DragHandle = ICONS.action.dragHandle;
 
   const sortedItems = [...items].sort((a, b) => a.sortIndex - b.sortIndex);
 
@@ -66,17 +66,16 @@ export function FavoriteGroupSection({
 
   return (
     <div ref={setNodeRef} style={style} className="mt-1 group">
-      <div className="flex items-center justify-between px-3 py-2 hover:bg-hover-overlay transition-colors">
+      {/* Header row = drag surface. Listeners live HERE (not on the section
+          root) so favorite drags inside the body don't bubble into the group
+          sensor. Chevron/delete/rename-input are spared by the
+          SmartPointerSensor interactive guard. */}
+      <div
+        className={`flex items-center justify-between px-3 py-2 hover:bg-hover-overlay transition-colors select-none ${isDragging ? "cursor-grabbing" : ""}`}
+        {...attributes}
+        {...listeners}
+      >
         <div className="flex items-center gap-1.5 flex-1">
-          <button
-            type="button"
-            aria-label="Gruppen-Drag-Handle"
-            className="opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity text-neutral-400 cursor-grab active:cursor-grabbing"
-            {...attributes}
-            {...listeners}
-          >
-            <DragHandle className={ICON_SIZE.inline} strokeWidth={2} />
-          </button>
           <button
             type="button"
             aria-label="Gruppe ein- oder ausklappen"
