@@ -173,7 +173,11 @@ function extractMessage(error: unknown): { message: string; stack?: string } {
     return { message: error };
   }
   try {
-    return { message: JSON.stringify(error) };
+    // JSON.stringify(undefined | Function | Symbol) returns the VALUE
+    // undefined (not a string, no throw) — fall through to String() then,
+    // otherwise the logger crashes exactly when it is needed (e.g.
+    // Promise.reject() without a reason).
+    return { message: JSON.stringify(error) ?? String(error) };
   } catch {
     return { message: String(error) };
   }

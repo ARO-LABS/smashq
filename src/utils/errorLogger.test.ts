@@ -95,6 +95,34 @@ describe("logError", () => {
     const entry = useLogViewerStore.getState().entries[0];
     expect(entry.message).toBe("[object Object]");
   });
+
+  // JSON.stringify(undefined | Function | Symbol) returns the VALUE undefined
+  // (no throw), so the catch-based String() fallback never fired — the logger
+  // crashed in the store's noise check exactly when it was needed (e.g.
+  // Promise.reject() without a reason via globalErrorHandler).
+  it("logError(undefined) produces a string message instead of crashing", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => logError("test", undefined)).not.toThrow();
+
+    const entries = useLogViewerStore.getState().entries;
+    expect(entries[entries.length - 1].message).toBe("undefined");
+  });
+
+  it("logError with a function value coerces to string", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => logError("test", () => {})).not.toThrow();
+
+    const entries = useLogViewerStore.getState().entries;
+    expect(typeof entries[entries.length - 1].message).toBe("string");
+  });
+
+  it("logError(Symbol()) coerces to string", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => logError("test", Symbol("boom"))).not.toThrow();
+
+    const entries = useLogViewerStore.getState().entries;
+    expect(entries[entries.length - 1].message).toBe("Symbol(boom)");
+  });
 });
 
 // ---------------------------------------------------------------------------

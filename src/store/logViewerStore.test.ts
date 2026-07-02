@@ -37,6 +37,29 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
+// Defensive input handling
+// ---------------------------------------------------------------------------
+
+describe("addEntries defensive input", () => {
+  it("survives a non-string message (malformed event payloads are a trust boundary)", () => {
+    const store = useLogViewerStore.getState();
+    expect(() =>
+      store.addEntries([
+        {
+          timestamp: "2026-07-02T10:00:00.000Z",
+          severity: "error",
+          source: "frontend",
+          message: undefined as unknown as string,
+        },
+      ]),
+    ).not.toThrow();
+
+    const last = useLogViewerStore.getState().entries.at(-1);
+    expect(typeof last?.message).toBe("string");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

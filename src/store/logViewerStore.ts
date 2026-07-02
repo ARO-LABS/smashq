@@ -76,12 +76,17 @@ export const useLogViewerStore = create<LogViewerState>((set) => ({
       if (fresh.length === 0) return state;
 
       const processed = fresh.map((e) => {
+        // Tauri event payloads are a trust boundary — a malformed entry with
+        // a non-string message must not crash the store (the noise check
+        // below calls toLowerCase).
+        const message = typeof e.message === "string" ? e.message : String(e.message);
         // Downgrade noisy log messages to debug severity
         const isNoise = NOISE_PATTERNS.some((p) =>
-          e.message.toLowerCase().includes(p),
+          message.toLowerCase().includes(p),
         );
         return {
           ...e,
+          message,
           severity: isNoise ? ("debug" as LogSeverity) : e.severity,
           id: ++entryCounter,
         };
