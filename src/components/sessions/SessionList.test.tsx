@@ -248,23 +248,32 @@ describe("SessionList DnD wiring", () => {
       gridSessionIds: [],
       focusedGridSessionId: null,
     });
-    useSettingsStore.setState({ favorites: [] });
+    // favoriteGroups auch leeren — Gruppen-Header sind ebenfalls sortable
+    // und wuerden die Row-Zaehlung unten verfaelschen.
+    useSettingsStore.setState({ favorites: [], favoriteGroups: [] });
   });
 
-  it("renders one drag-handle per session row", () => {
+  // Whole-tile drag: the sortable root carries dnd-kit's attributes; the
+  // dedicated grip button is gone.
+  function getSortableRows(container: HTMLElement): Element[] {
+    return Array.from(container.querySelectorAll("[aria-roledescription='sortable']"));
+  }
+
+  it("renders one whole-row drag surface per session (no grip button)", () => {
     useSessionStore.setState({
       sessions: [
         makeSession({ id: "s1", title: "Alpha" }),
         makeSession({ id: "s2", title: "Beta" }),
       ],
     });
-    render(<SessionList onNewSession={vi.fn()} onQuickStart={vi.fn()} />);
-    expect(screen.getAllByLabelText("Session-Drag-Handle")).toHaveLength(2);
+    const { container } = render(<SessionList onNewSession={vi.fn()} onQuickStart={vi.fn()} />);
+    expect(getSortableRows(container)).toHaveLength(2);
+    expect(screen.queryByLabelText("Session-Drag-Handle")).not.toBeInTheDocument();
   });
 
-  it("renders zero drag-handles when no sessions exist", () => {
-    render(<SessionList onNewSession={vi.fn()} onQuickStart={vi.fn()} />);
-    expect(screen.queryAllByLabelText("Session-Drag-Handle")).toHaveLength(0);
+  it("renders zero drag surfaces when no sessions exist", () => {
+    const { container } = render(<SessionList onNewSession={vi.fn()} onQuickStart={vi.fn()} />);
+    expect(getSortableRows(container)).toHaveLength(0);
   });
 
   it("renders sessions in store order (not by alphabetical)", () => {
@@ -275,9 +284,8 @@ describe("SessionList DnD wiring", () => {
         makeSession({ id: "s2", title: "Second", status: "running" }),
       ],
     });
-    render(<SessionList onNewSession={vi.fn()} onQuickStart={vi.fn()} />);
-    const handles = screen.getAllByLabelText("Session-Drag-Handle");
-    // All 3 handles present — store order is stable within same status+createdAt bucket
-    expect(handles).toHaveLength(3);
+    const { container } = render(<SessionList onNewSession={vi.fn()} onQuickStart={vi.fn()} />);
+    // All 3 rows present — store order is stable within same status+createdAt bucket
+    expect(getSortableRows(container)).toHaveLength(3);
   });
 });

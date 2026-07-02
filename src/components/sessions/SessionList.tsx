@@ -1,22 +1,15 @@
 import { useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useSettingsStore } from "../../store/settingsStore";
-import {
-  DndContext,
-  PointerSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
-} from "@dnd-kit/core";
+import { DndContext, closestCenter } from "@dnd-kit/core";
 import type { DragEndEvent } from "@dnd-kit/core";
 import {
   SortableContext,
-  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable";
+import { useSidebarSensors } from "./hooks/useSidebarDnd";
 import { CSS } from "@dnd-kit/utilities";
 import { invoke } from "@tauri-apps/api/core";
 import { useSessionStore } from "../../store/sessionStore";
@@ -27,7 +20,6 @@ import { SessionPanelDock } from "./SessionPanelDock";
 import { OpenMdPathInput } from "../shared/OpenMdPathInput";
 import { splitAbsolutePath } from "../../store/editorStore";
 import { logError } from "../../utils/errorLogger";
-import { ICONS, ICON_SIZE } from "../../utils/icons";
 import type { ClaudeSession } from "../../store/sessionStore";
 import type { FavoriteFolder } from "../../store/settingsStore";
 
@@ -73,29 +65,17 @@ function SortableSessionRow({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const DragHandle = ICONS.action.dragHandle;
-
   return (
+    // Whole row is the drag surface. The SmartPointerSensor spares the
+    // card's action buttons; the 6px activation distance spares plain
+    // clicks (activate session) and double-clicks (rename).
     <div
       ref={setNodeRef}
       style={style}
-      className="relative group"
+      className={`relative group select-none ${isDragging ? "cursor-grabbing" : ""}`}
+      {...attributes}
+      {...listeners}
     >
-      {/* Drag handle — visible only on row hover (Card-Action-Chrome pattern) */}
-      <button
-        {...attributes}
-        {...listeners}
-        aria-label="Session-Drag-Handle"
-        className="absolute top-1/2 left-0 -translate-y-1/2 z-10
-                   opacity-0 group-hover:opacity-60 hover:opacity-100
-                   cursor-grab active:cursor-grabbing
-                   text-neutral-400 hover:text-neutral-200
-                   p-0.5 focus-visible:outline-none"
-        tabIndex={0}
-      >
-        <DragHandle className={ICON_SIZE.inline} aria-hidden="true" />
-      </button>
-
       <SessionCard
         session={session}
         isActive={isActive}
@@ -129,10 +109,7 @@ export function SessionList({ onNewSession, onQuickStart }: SessionListProps): J
 
   const sorted = sortSessions(sessions);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
+  const sensors = useSidebarSensors();
 
   const handleDragEnd = useCallback(
     (e: DragEndEvent) => {
