@@ -16,6 +16,49 @@ export interface UseSidebarDndResult {
   handleDragEnd: (event: DragEndEvent) => void;
 }
 
+/**
+ * Elements that must win the pointer over drag activation. Pressing an
+ * action button, selecting text in the group-rename input, etc. must never
+ * lift a tile — the guard lives in ONE place (the sensor) instead of
+ * onPointerDown-stopPropagation scattered across every child.
+ * `[data-no-dnd]` is the opt-out hatch for future interactive children.
+ */
+const INTERACTIVE_SELECTOR = "button, a, input, textarea, select, [data-no-dnd]";
+
+export function isInteractiveTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(INTERACTIVE_SELECTOR) !== null;
+}
+
+/**
+ * PointerSensor whose activator ignores interactive elements, so the whole
+ * tile can carry the drag listeners without stealing pointer-downs from its
+ * children. Keeps the default guards (primary pointer, main button) — a
+ * right-click must keep opening the accent context menu, never start a drag.
+ */
+export class SmartPointerSensor extends PointerSensor {
+  static activators = [
+    {
+      eventName: "onPointerDown" as const,
+      handler: ({ nativeEvent: event }: React.PointerEvent): boolean => {
+        if (!event.isPrimary || event.button !== 0) return false;
+        return !isInteractiveTarget(event.target);
+      },
+    },
+  ];
+}
+
+/**
+ * Shared sensor set for both sidebar lists (favorites + sessions). The 6px
+ * activation distance is what separates a click from a drag on whole-tile
+ * drag surfaces — below it, the pointer-up still fires the click.
+ */
+export function useSidebarSensors(): SensorDescriptor<SensorOptions>[] {
+  return useSensors(
+    useSensor(SmartPointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+}
+
 export function useSidebarDnd(): UseSidebarDndResult {
   const moveFavorite = useSettingsStore((s) => s.moveFavorite);
   const reorderFavorites = useSettingsStore((s) => s.reorderFavorites);
@@ -23,10 +66,7 @@ export function useSidebarDnd(): UseSidebarDndResult {
   const favorites = useSettingsStore((s) => s.favorites);
   const groups = useSettingsStore((s) => s.favoriteGroups);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
+  const sensors = useSidebarSensors();
 
   const handleDragEnd = useMemo(
     () => (event: DragEndEvent) => {

@@ -17,7 +17,7 @@ vi.mock("@dnd-kit/core", async (importOriginal) => {
   };
 });
 
-import { useSidebarDnd } from "./useSidebarDnd";
+import { useSidebarDnd, isInteractiveTarget, SmartPointerSensor } from "./useSidebarDnd";
 import { useSettingsStore } from "../../../store/settingsStore";
 
 /**
@@ -261,5 +261,53 @@ describe("useSidebarDnd.handleDragEnd", () => {
     );
     expect(moveFavorite).not.toHaveBeenCalled();
     expect(reorderFavoriteGroups).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SmartPointerSensor — whole-tile drag activation guard
+// ---------------------------------------------------------------------------
+
+describe("SmartPointerSensor guard", () => {
+  function pointerEvent(target: Element, init?: { button?: number; isPrimary?: boolean }) {
+    const native = new MouseEvent("pointerdown", { button: init?.button ?? 0 });
+    Object.defineProperty(native, "isPrimary", { value: init?.isPrimary ?? true });
+    Object.defineProperty(native, "target", { value: target });
+    return { nativeEvent: native } as unknown as React.PointerEvent;
+  }
+
+  it("isInteractiveTarget matches buttons/inputs and their descendants", () => {
+    const btn = document.createElement("button");
+    const icon = document.createElement("span");
+    btn.appendChild(icon);
+    const input = document.createElement("input");
+    const div = document.createElement("div");
+    expect(isInteractiveTarget(btn)).toBe(true);
+    expect(isInteractiveTarget(icon)).toBe(true); // closest() greift auch fuer Icon im Button
+    expect(isInteractiveTarget(input)).toBe(true);
+    expect(isInteractiveTarget(div)).toBe(false);
+    expect(isInteractiveTarget(null)).toBe(false);
+  });
+
+  it("activator refuses interactive targets, accepts plain tile surface", () => {
+    const handler = SmartPointerSensor.activators[0].handler;
+    const btn = document.createElement("button");
+    const div = document.createElement("div");
+    expect(handler(pointerEvent(btn))).toBe(false);
+    expect(handler(pointerEvent(div))).toBe(true);
+  });
+
+  it("activator keeps the default guards: secondary button and non-primary pointer", () => {
+    const handler = SmartPointerSensor.activators[0].handler;
+    const div = document.createElement("div");
+    // Rechtsklick muss das Accent-Kontextmenue oeffnen, nie einen Drag starten.
+    expect(handler(pointerEvent(div, { button: 2 }))).toBe(false);
+    expect(handler(pointerEvent(div, { isPrimary: false }))).toBe(false);
+  });
+
+  it("data-no-dnd opts an element out of drag activation", () => {
+    const el = document.createElement("div");
+    el.setAttribute("data-no-dnd", "true");
+    expect(isInteractiveTarget(el)).toBe(true);
   });
 });
