@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { PreferencesView } from "./PreferencesView";
+import { useSettingsStore } from "../../store/settingsStore";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(() => Promise.resolve()),
@@ -46,5 +47,57 @@ describe("PreferencesView", () => {
     });
     // Old panel is gone — only one panel renders at a time.
     expect(screen.queryByRole("heading", { level: 3, name: /^Darstellung$/i })).toBeNull();
+  });
+
+  describe("SaveStatusIndicator", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("zeigt nach einer Settings-Aenderung 'Speichern…', dann 'Gespeichert', dann nichts", () => {
+      vi.useFakeTimers();
+      render(<PreferencesView />);
+
+      // Kein Status vor der ersten Aenderung.
+      expect(screen.queryByText(/Speichern…|Gespeichert/)).toBeNull();
+
+      act(() => {
+        useSettingsStore.setState({ defaultShell: "powershell" });
+      });
+      expect(screen.getByText("Speichern…")).toBeTruthy();
+
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      expect(screen.getByText("Gespeichert")).toBeTruthy();
+
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(screen.queryByText("Gespeichert")).toBeNull();
+    });
+
+    it("haelt bei schnellen Folge-Aenderungen 'Speichern…' und meldet erst danach", () => {
+      vi.useFakeTimers();
+      render(<PreferencesView />);
+
+      act(() => {
+        useSettingsStore.setState({ defaultShell: "cmd" });
+      });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      // Zweite Aenderung innerhalb des Fensters resettet den Timer.
+      act(() => {
+        useSettingsStore.setState({ defaultShell: "auto" });
+      });
+      expect(screen.getByText("Speichern…")).toBeTruthy();
+      expect(screen.queryByText("Gespeichert")).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      expect(screen.getByText("Gespeichert")).toBeTruthy();
+    });
   });
 });
