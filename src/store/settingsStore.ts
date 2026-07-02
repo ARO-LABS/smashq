@@ -92,6 +92,27 @@ export function sanitizeScrollbackLines(value: unknown): number {
   return Math.max(1_000, Math.min(100_000, Math.floor(value)));
 }
 
+/**
+ * Coerce persisted preferences into a clean AppPreferencesSettings. Strict
+ * `=== true` on the bool gates: a corrupt string "true" would render the UI
+ * toggle as on while the Rust bool-deserialization rejects it — logging
+ * looks active but the file stays empty (silent loss). Shared by migrate
+ * (schema bump) and onRehydrateStorage (same-version corruption recovery,
+ * Issue-#209 class).
+ */
+export function sanitizePreferences(raw: unknown): AppPreferencesSettings {
+  const p =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+  return {
+    frontendLogging: p.frontendLogging === true,
+    backendFileLogging: p.backendFileLogging === true,
+    performanceProfiler: p.performanceProfiler === true,
+    scrollbackLines: sanitizeScrollbackLines(p.scrollbackLines),
+  };
+}
+
 /** Floating-window size in CSS pixels. Used by NotesPanel via useDraggableWindow. */
 export interface WindowSize {
   w: number;
@@ -577,7 +598,7 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
     notifications: { ...defaults.notifications, ...(p.notifications && typeof p.notifications === "object" ? p.notifications : {}) },
     sound: { ...defaults.sound, ...(p.sound && typeof p.sound === "object" ? p.sound : {}) },
     pipeline: { ...defaults.pipeline, ...(p.pipeline && typeof p.pipeline === "object" ? p.pipeline : {}) },
-    preferences: { ...defaults.preferences, ...prefsWithoutLegacy },
+    preferences: sanitizePreferences(prefsWithoutLegacy),
     apiKeys: validateApiKeys(p.apiKeys),
     favorites: migratedFavorites,
     favoriteGroups: migratedGroups,
@@ -1248,6 +1269,15 @@ export const useSettingsStore = create<SettingsState>()(
           }
           if (JSON.stringify(validated.favoriteGroups) !== JSON.stringify(state.favoriteGroups)) {
             patches.favoriteGroups = validated.favoriteGroups;
+          }
+
+          // Same-version recovery für preferences: strikte bool-Koersion der
+          // Logging-Gates. Ein korrupter String "true" zeigt die Checkbox als
+          // an, waehrend Rusts bool-Deserialisierung ihn ablehnt — Logging
+          // wirkt aktiv, die Datei bleibt leer (Issue-#209-Klasse).
+          const cleanedPrefs = sanitizePreferences(state.preferences);
+          if (JSON.stringify(cleanedPrefs) !== JSON.stringify(state.preferences)) {
+            patches.preferences = cleanedPrefs;
           }
 
           // Same-version recovery für sessionAccents: unbekannte AccentNames droppen.

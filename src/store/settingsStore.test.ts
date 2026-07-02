@@ -5,6 +5,7 @@ import {
   normalizeProjectKey,
   validatePinnedPath,
   sanitizeScrollbackLines,
+  sanitizePreferences,
   SCROLLBACK_PRESETS,
   useSettingsStoreMigrateForTest,
   useSettingsStoreValidateForTest,
@@ -26,6 +27,51 @@ beforeEach(() => {
   useSettingsStore.getState().resetToDefaults();
   // Also clear favorites, apiKeys and pinnedDocs manually (resetToDefaults preserves them)
   useSettingsStore.setState({ favorites: [], apiKeys: [], pinnedDocs: {} });
+});
+
+// ============================================================================
+// sanitizePreferences — Same-Version-Corruption-Recovery (Issue-#209-Klasse)
+// ============================================================================
+
+describe("sanitizePreferences", () => {
+  it("coerces string bools to false (corrupt settings.json must not open gates)", () => {
+    const clean = sanitizePreferences({
+      frontendLogging: "true",
+      backendFileLogging: 1,
+      performanceProfiler: null,
+    });
+    expect(clean.frontendLogging).toBe(false);
+    expect(clean.backendFileLogging).toBe(false);
+    expect(clean.performanceProfiler).toBe(false);
+  });
+
+  it("keeps genuine booleans and clamps scrollbackLines", () => {
+    const clean = sanitizePreferences({
+      frontendLogging: true,
+      backendFileLogging: true,
+      performanceProfiler: false,
+      scrollbackLines: -5,
+    });
+    expect(clean.frontendLogging).toBe(true);
+    expect(clean.backendFileLogging).toBe(true);
+    expect(clean.performanceProfiler).toBe(false);
+    expect(clean.scrollbackLines).toBeGreaterThan(0);
+  });
+
+  it("collapses non-object input to defaults", () => {
+    expect(sanitizePreferences("garbage")).toEqual(sanitizePreferences({}));
+    expect(sanitizePreferences(null)).toEqual(sanitizePreferences({}));
+    expect(sanitizePreferences([1, 2])).toEqual(sanitizePreferences({}));
+  });
+
+  it("migrate runs persisted preferences through sanitizePreferences", () => {
+    const migrated = useSettingsStoreMigrateForTest(
+      { preferences: { frontendLogging: "true", backendFileLogging: "yes" } },
+      7,
+    ) as SettingsState;
+    expect(migrated.preferences.frontendLogging).toBe(false);
+    expect(migrated.preferences.backendFileLogging).toBe(false);
+  });
 });
 
 // ============================================================================
