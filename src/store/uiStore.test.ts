@@ -577,3 +577,35 @@ describe("favoriteGroupsCollapsed", () => {
     expect(getState().favoriteGroupsCollapsed).toEqual({});
   });
 });
+
+// ============================================================================
+// favoriteGroupsCollapsed — persisted across restarts (Bug: Gruppen klappten
+// beim App-Start immer wieder auf, weil der Record nicht in partialize stand)
+// ============================================================================
+
+describe("favoriteGroupsCollapsed persistence", () => {
+  beforeEach(() => {
+    useUIStore.setState({ favoriteGroupsCollapsed: {} });
+    localStorage.removeItem("agenticexplorer-ui");
+  });
+
+  it("writes collapsed state into the persisted blob", () => {
+    getState().toggleFavoriteGroupCollapsed("grp-persist");
+    const raw = localStorage.getItem("agenticexplorer-ui");
+    expect(raw).not.toBeNull();
+    const persisted = JSON.parse(raw!).state as Record<string, unknown>;
+    expect(persisted.favoriteGroupsCollapsed).toEqual({ "grp-persist": true });
+  });
+
+  it("keeps toggled-back-open groups in the blob without dropping siblings", () => {
+    getState().toggleFavoriteGroupCollapsed("grp-a");
+    getState().toggleFavoriteGroupCollapsed("grp-b");
+    getState().toggleFavoriteGroupCollapsed("grp-a");
+    const raw = localStorage.getItem("agenticexplorer-ui");
+    const persisted = JSON.parse(raw!).state as Record<string, unknown>;
+    expect(persisted.favoriteGroupsCollapsed).toEqual({
+      "grp-a": false,
+      "grp-b": true,
+    });
+  });
+});

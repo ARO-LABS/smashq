@@ -134,7 +134,7 @@ interface UIState {
   librarySectionOpen: Record<string, boolean>;
   setLibrarySectionOpen: (key: string, open: boolean) => void;
 
-  /** Ephemeral collapse state for favorite groups. Key: groupId. NOT persisted. */
+  /** Persistent collapse state for favorite groups. Key: groupId. */
   favoriteGroupsCollapsed: Record<string, boolean>;
   toggleFavoriteGroupCollapsed: (groupId: string) => void;
 }
@@ -211,6 +211,7 @@ export const useUIStore = create<UIState>()(
       partialize: (state) => ({
         libraryScopeOpen: state.libraryScopeOpen,
         librarySectionOpen: state.librarySectionOpen,
+        favoriteGroupsCollapsed: state.favoriteGroupsCollapsed,
       }),
       version: 1,
       // Schema-bump path: coerce both persisted records to clean bool-maps so a
@@ -220,6 +221,7 @@ export const useUIStore = create<UIState>()(
         return {
           libraryScopeOpen: sanitizeBoolRecord(p.libraryScopeOpen),
           librarySectionOpen: sanitizeBoolRecord(p.librarySectionOpen),
+          favoriteGroupsCollapsed: sanitizeBoolRecord(p.favoriteGroupsCollapsed),
         };
       },
       // Same-version corruption recovery: migrate only fires on a version change,
@@ -229,9 +231,11 @@ export const useUIStore = create<UIState>()(
         if (!state) return;
         const scope = sanitizeBoolRecord(state.libraryScopeOpen);
         const section = sanitizeBoolRecord(state.librarySectionOpen);
+        const favGroups = sanitizeBoolRecord(state.favoriteGroupsCollapsed);
         if (
           JSON.stringify(scope) !== JSON.stringify(state.libraryScopeOpen) ||
-          JSON.stringify(section) !== JSON.stringify(state.librarySectionOpen)
+          JSON.stringify(section) !== JSON.stringify(state.librarySectionOpen) ||
+          JSON.stringify(favGroups) !== JSON.stringify(state.favoriteGroupsCollapsed)
         ) {
           // Defer to a microtask. onRehydrateStorage can run SYNCHRONOUSLY
           // inside create(persist(...)) when storage.getItem returns a sync
@@ -245,6 +249,7 @@ export const useUIStore = create<UIState>()(
             useUIStore.setState({
               libraryScopeOpen: scope,
               librarySectionOpen: section,
+              favoriteGroupsCollapsed: favGroups,
             }),
           );
         }
