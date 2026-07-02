@@ -511,9 +511,9 @@ describe("SessionManagerView — Grid-Cell-Fokus", () => {
     // Beide Zellen tragen einen farbigen Border (Projekt-Farbe via --qr-frame).
     expect(wrapperA.getAttribute("style")).toContain("--qr-frame");
     expect(wrapperB.getAttribute("style")).toContain("--qr-frame");
-    // Fokussierte Zelle B → 2px, unfokussierte A → 1px.
-    expect(wrapperB.getAttribute("style")).toContain("border-width: 2px");
-    expect(wrapperA.getAttribute("style")).toContain("border-width: 1px");
+    // Fokussierte Zelle B → 3px, unfokussierte A → 2px.
+    expect(wrapperB.getAttribute("style")).toContain("border-width: 3px");
+    expect(wrapperA.getAttribute("style")).toContain("border-width: 2px");
   });
 
   it("faerbt jede Grid-Zelle mit ihrer Per-Session-Projektfarbe (--qr-frame)", () => {
@@ -527,12 +527,14 @@ describe("SessionManagerView — Grid-Cell-Fokus", () => {
 
     render(<SessionManagerView />);
 
-    // Farbe kommt aus accentColorFor (direktes oklch) — identisch zur Sidebar-Punktfarbe.
+    // Farbe kommt aus accentFrameColorFor: gleicher Hue wie der Sidebar-Punkt,
+    // aber L/C folgen den Theme-Stops (--accent-l/--accent-c) — im hellen
+    // Theme dunkler und damit sichtbar.
     const cellA = screen.getByTestId("grid-cell-A");
     const cellB = screen.getByTestId("grid-cell-B");
     expect(cellA.getAttribute("style")).toContain("--qr-frame");
-    expect(cellA.getAttribute("style")).toContain("oklch");
-    expect(cellB.getAttribute("style")).toContain("oklch");
+    expect(cellA.getAttribute("style")).toContain("oklch(var(--accent-l) var(--accent-c)");
+    expect(cellB.getAttribute("style")).toContain("oklch(var(--accent-l) var(--accent-c)");
   });
 
   it("rendert Grid-Cell-Chrome nur fuer Sessions im Grid, nicht fuer Ausserstehende", () => {

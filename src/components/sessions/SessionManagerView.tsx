@@ -14,7 +14,7 @@ import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useSessionCreation } from "./hooks/useSessionCreation";
 import { GRID_AREAS, getGridStyle, SINGLE_LAYOUT_STYLE } from "./sessionGridLayout";
 import { ICONS, ICON_SIZE } from "../../utils/icons";
-import { accentColorFor } from "../../utils/sessionAccent";
+import { accentFrameColorFor } from "../../utils/sessionAccent";
 import { useSettingsStore } from "../../store/settingsStore";
 
 export function SessionManagerView() {
@@ -166,14 +166,13 @@ export function SessionManagerView() {
                     const gridArea = resolveGridArea(session.id);
                     const isGridMember = isGrid && gridSessionIds.includes(session.id);
                     const isCellFocused = isGridMember && session.id === focusedGridSessionId;
-                    // Frame each grid cell in its session's color — SAME source as the
-                    // sidebar dot (accentColorFor, direct oklch), so the grid frame matches
-                    // the list dot exactly. (The --color-accent var chain did not recolor
-                    // the ring reliably, so we set the color directly via inset box-shadow.)
+                    // Frame each grid cell in its session's hue — same hue source as the
+                    // sidebar dot, but L/C follow the theme stops (accentFrameColorFor)
+                    // so the frame keeps contrast on the light surface too.
                     const cellOverride = session.claudeSessionId
                       ? (sessionAccents[session.claudeSessionId.trim()] ?? null)
                       : null;
-                    const cellColor = accentColorFor(session.folder, cellOverride);
+                    const cellColor = accentFrameColorFor(session.folder, cellOverride);
 
                     return (
                       <div
@@ -195,7 +194,7 @@ export function SessionManagerView() {
                                 ["--qr-frame"]: cellColor,
                                 borderColor: "var(--qr-frame)",
                                 borderStyle: "solid",
-                                borderWidth: isCellFocused ? "2px" : "1px",
+                                borderWidth: isCellFocused ? "3px" : "2px",
                               } as CSSProperties)
                             : {}),
                         }}

@@ -75,3 +75,15 @@ export function accentColorFor(folder: string, override?: string | null): string
   const name: AccentName = isAccentName(override) ? override : hashFolderToAccent(folder ?? "");
   return `oklch(${ACCENT_DOT_L} ${ACCENT_DOT_C} ${ACCENT_HUES[name]})`;
 }
+
+/**
+ * Theme-aware frame color for grid cells: same hue resolution as
+ * `accentColorFor`, but lightness/chroma follow the mode stops from index.css
+ * (--accent-l/--accent-c). In dark mode that is identical to the dot color;
+ * in light mode the frame drops to L=55% so it stays visible on the light
+ * surface — a fixed L=72% frame washes out there.
+ */
+export function accentFrameColorFor(folder: string, override?: string | null): string {
+  const name: AccentName = isAccentName(override) ? override : hashFolderToAccent(folder ?? "");
+  return `oklch(var(--accent-l) var(--accent-c) ${ACCENT_HUES[name]})`;
+}

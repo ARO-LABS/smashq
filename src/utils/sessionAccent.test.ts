@@ -7,6 +7,7 @@ import {
   resolveSessionAccent,
   accentCssVars,
   accentColorFor,
+  accentFrameColorFor,
 } from "./sessionAccent";
 
 describe("sessionAccent", () => {
@@ -68,5 +69,16 @@ describe("sessionAccent", () => {
 
   it("accentColorFor: unknown override falls back to the folder hash color", () => {
     expect(accentColorFor("C:/Projects/zovel", "bogus")).toBe(accentColorFor("C:/Projects/zovel"));
+  });
+
+  it("accentFrameColorFor: theme-aware L/C vars with the same hue as the dot", () => {
+    const frame = accentFrameColorFor("C:/Projects/zovel", "violet");
+    expect(frame).toBe(`oklch(var(--accent-l) var(--accent-c) ${ACCENT_HUES.violet})`);
+  });
+
+  it("accentFrameColorFor: unknown override falls back to the folder hash hue", () => {
+    expect(accentFrameColorFor("C:/Projects/zovel", "bogus")).toBe(
+      accentFrameColorFor("C:/Projects/zovel"),
+    );
   });
 });
