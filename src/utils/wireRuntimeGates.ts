@@ -1,6 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useSettingsStore, type AppPreferencesSettings } from "../store/settingsStore";
-import { wireLoggingGate, wirePersistenceGate, flushFrontendLogs, logError } from "./errorLogger";
+import {
+  wireLoggingGate,
+  wirePersistenceGate,
+  flushFrontendLogs,
+  listenForLogSnapshotRequests,
+  logError,
+} from "./errorLogger";
 import { setPerfEnabled } from "./perfLogger";
 import { listenForPreferencesChanges, type BroadcastPartial } from "./preferencesBroadcast";
 import { useTasksStore, sanitizeTasks, type TaskItem } from "../store/tasksStore";
@@ -138,6 +144,20 @@ export function wireRuntimeGates(options?: WireRuntimeGatesOptions): () => void 
     })
     .catch((err) => logError("wireRuntimeGates.tasksListen", err));
 
+  // Answer log-snapshot requests from a freshly mounted Protokolle window
+  // with this window's in-memory log entries (each webview has its own
+  // logViewerStore instance — the file alone misses the default config).
+  let unlistenSnapshot: (() => void) | null = null;
+  void listenForLogSnapshotRequests()
+    .then((unlisten) => {
+      if (disposed) {
+        unlisten();
+        return;
+      }
+      unlistenSnapshot = unlisten;
+    })
+    .catch((err) => logError("wireRuntimeGates.logSnapshot", err));
+
   // Flush buffered frontend logs (and any caller-supplied additional work,
   // e.g. App.tsx's settings/notes/tasks flush) when THIS window closes. Use
   // Tauri's close-requested event (async-aware) — NOT `beforeunload`, which
@@ -182,6 +202,7 @@ export function wireRuntimeGates(options?: WireRuntimeGatesOptions): () => void 
     unsubscribeTasks();
     unlistenCrossWindow?.();
     unlistenTasks?.();
+    unlistenSnapshot?.();
     unlistenClose?.();
     // Final flush on React unmount (covers HMR + detached-view teardown).
     void flushFrontendLogs();

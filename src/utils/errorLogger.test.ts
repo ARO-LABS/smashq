@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mockIPC, clearMocks } from "@tauri-apps/api/mocks";
+import { mockIPC, mockWindows, clearMocks } from "@tauri-apps/api/mocks";
 import {
   logError,
   logWarn,
@@ -11,6 +11,7 @@ import {
   resetPersistenceGateForTest,
   flushFrontendLogs,
   flushBeforeGateClose,
+  listenForLogSnapshotRequests,
 } from "./errorLogger";
 import { useLogViewerStore } from "../store/logViewerStore";
 
@@ -473,6 +474,101 @@ describe("frontend log persistence flush", () => {
     for (let i = 0; i < 1100; i++) logError("test", new Error(`e${i}`));
     await flushFrontendLogs();
     expect(lastBatchLen).toBeLessThanOrEqual(1000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// cross-window log sync (Split-Brain: jede Webview hat eigene Store-Instanz)
+// ---------------------------------------------------------------------------
+
+// Hinweis: das globale Unit-Setup (src/test/setup.ts) mockt
+// @tauri-apps/api/event mit vi.fn()s — die Tests asserten deshalb direkt
+// gegen die gemockten listen/emit und feuern Handler manuell. mockIPC dient
+// hier nur dazu, __TAURI_INTERNALS__ zu erzeugen (isTauriEnv-Check);
+// mockWindows liefert das Fenster-Label fuer getCurrentWindow().
+describe("cross-window log sync", () => {
+  beforeEach(() => {
+    clearMocks();
+    mockIPC(() => undefined);
+    mockWindows("test-window");
+  });
+  afterEach(() => {
+    clearMocks();
+  });
+
+  it("broadcasts ring-buffer entries to other windows via frontend-log-entry", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { emit } = await import("@tauri-apps/api/event");
+    wireLoggingGate(() => true);
+
+    logError("bcast", new Error("cross-window"));
+
+    await vi.waitFor(() => {
+      const call = vi
+        .mocked(emit)
+        .mock.calls.find(
+          (c) =>
+            c[0] === "frontend-log-entry" &&
+            (c[1] as { entry: { message: string } }).entry.message === "cross-window",
+        );
+      expect(call).toBeDefined();
+      expect((call![1] as { sourceWindow: string }).sourceWindow).toBe("test-window");
+    });
+  });
+
+  it("answers a log-snapshot-request with the local store entries", async () => {
+    const { listen, emit } = await import("@tauri-apps/api/event");
+    useLogViewerStore.getState().addEntries([
+      {
+        timestamp: "2026-07-02T10:00:00.000Z",
+        severity: "error",
+        source: "frontend",
+        message: "history",
+      },
+    ]);
+
+    await listenForLogSnapshotRequests();
+    const call = vi.mocked(listen).mock.calls.find((c) => c[0] === "log-snapshot-request");
+    expect(call).toBeDefined();
+    const handler = call![1] as (e: {
+      event: string;
+      payload: { sourceWindow: string };
+    }) => void;
+
+    handler({ event: "log-snapshot-request", payload: { sourceWindow: "other-window" } });
+
+    await vi.waitFor(() => {
+      const resp = vi.mocked(emit).mock.calls.find((c) => c[0] === "log-snapshot-response");
+      expect(resp).toBeDefined();
+      const payload = resp![1] as { entries: { message: string }[]; sourceWindow: string };
+      expect(payload.entries.map((e) => e.message)).toContain("history");
+      expect(payload.sourceWindow).toBe("test-window");
+    });
+  });
+
+  it("ignores snapshot requests from the own window (echo filter)", async () => {
+    const { listen, emit } = await import("@tauri-apps/api/event");
+    useLogViewerStore.getState().addEntries([
+      {
+        timestamp: "2026-07-02T10:00:00.000Z",
+        severity: "info",
+        source: "frontend",
+        message: "self",
+      },
+    ]);
+
+    await listenForLogSnapshotRequests();
+    const call = vi.mocked(listen).mock.calls.find((c) => c[0] === "log-snapshot-request");
+    const handler = call![1] as (e: {
+      event: string;
+      payload: { sourceWindow: string };
+    }) => void;
+
+    handler({ event: "log-snapshot-request", payload: { sourceWindow: "test-window" } }); // eigenes Label
+
+    await new Promise((r) => setTimeout(r, 20));
+    const resp = vi.mocked(emit).mock.calls.find((c) => c[0] === "log-snapshot-response");
+    expect(resp).toBeUndefined();
   });
 });
 

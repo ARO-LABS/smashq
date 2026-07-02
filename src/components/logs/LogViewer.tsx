@@ -10,7 +10,11 @@ import {
   type LogSource,
   type StructuredEntry,
 } from "../../store/logViewerStore";
-import { logError } from "../../utils/errorLogger";
+import {
+  logError,
+  type LogEntryBroadcast,
+  type LogSnapshotResponse,
+} from "../../utils/errorLogger";
 import { ICONS, ICON_SIZE } from "../../utils/icons";
 import { LogEntryRow, LOG_ROW_HEIGHT } from "./LogEntry";
 
@@ -104,6 +108,47 @@ export function LogViewer() {
       unlisten?.();
     };
   }, [liveTail, addEntries]);
+
+  // Cross-window sync: each webview holds its own logViewerStore instance, so
+  // main-window frontend entries never reach this (detached) window on their
+  // own. Subscribe to live entry broadcasts, then request a mount-time
+  // snapshot from every other window; the store dedup (timestamp+source+
+  // message) and MAX_ENTRIES cap bound the merge. sourceWindow filters the
+  // echo of this window's own broadcasts.
+  useEffect(() => {
+    let unlistenEntry: (() => void) | undefined;
+    let unlistenSnapshot: (() => void) | undefined;
+    let cancelled = false;
+    void (async () => {
+      const [{ listen, emit }, { getCurrentWindow }] = await Promise.all([
+        import("@tauri-apps/api/event"),
+        import("@tauri-apps/api/window"),
+      ]);
+      const myLabel = getCurrentWindow().label;
+      const uEntry = await listen<LogEntryBroadcast>("frontend-log-entry", (e) => {
+        if (!e.payload || e.payload.sourceWindow === myLabel) return;
+        addEntries([structuredToUnified(e.payload.entry)]);
+      });
+      const uSnap = await listen<LogSnapshotResponse>("log-snapshot-response", (e) => {
+        if (!e.payload || e.payload.sourceWindow === myLabel) return;
+        addEntries(e.payload.entries ?? []);
+      });
+      if (cancelled) {
+        uEntry();
+        uSnap();
+        return;
+      }
+      unlistenEntry = uEntry;
+      unlistenSnapshot = uSnap;
+      // Listener stehen — jetzt die Historie aller Fenster anfordern.
+      await emit("log-snapshot-request", { sourceWindow: myLabel });
+    })().catch((err) => logError("LogViewer.crossWindowLogs", err));
+    return () => {
+      cancelled = true;
+      unlistenEntry?.();
+      unlistenSnapshot?.();
+    };
+  }, [addEntries]);
 
   // Filter entries, then group consecutive identical ones
   const grouped = useMemo(() => {

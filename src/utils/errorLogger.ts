@@ -14,9 +14,15 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { useLogViewerStore } from "../store/logViewerStore";
-import type { LogSeverity, StructuredEntry } from "../store/logViewerStore";
+import type { LogSeverity, StructuredEntry, UnifiedLogEntry } from "../store/logViewerStore";
 
 export type { LogSeverity };
+
+// Per-call check (not a module-level const): the Tauri globals may appear
+// after this module is evaluated (test setup, SSR-like early imports).
+function isTauriEnv(): boolean {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
 
 export interface LogEntry {
   timestamp: string;
@@ -143,6 +149,78 @@ export async function flushBeforeGateClose(syncGate: () => Promise<void>): Promi
   await syncGate();
 }
 
+// ---------------------------------------------------------------------------
+// Cross-window log sync. Each Tauri webview holds its OWN logViewerStore
+// instance — without an explicit channel, the detached Protokolle window
+// never sees main-window frontend entries (the NDJSON file only exists when
+// backendFileLogging is on, and `log-line` events cover backend logs only).
+// Mirrors the preferencesBroadcast pattern: payloads carry `sourceWindow`,
+// receivers filter their own echo.
+// ---------------------------------------------------------------------------
+
+const LOG_ENTRY_EVENT = "frontend-log-entry";
+const SNAPSHOT_REQUEST_EVENT = "log-snapshot-request";
+const SNAPSHOT_RESPONSE_EVENT = "log-snapshot-response";
+
+let cachedWindowLabel: string | null = null;
+async function getWindowLabel(): Promise<string> {
+  if (cachedWindowLabel !== null) return cachedWindowLabel;
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  cachedWindowLabel = getCurrentWindow().label;
+  return cachedWindowLabel;
+}
+
+export interface LogEntryBroadcast {
+  entry: StructuredEntry;
+  sourceWindow: string;
+}
+
+export interface LogSnapshotResponse {
+  entries: Omit<UnifiedLogEntry, "id">[];
+  sourceWindow: string;
+}
+
+/**
+ * Fire-and-forget: mirror a ring-buffer entry to every other window. Errors
+ * are swallowed — a failed broadcast must not break the local log call.
+ */
+async function broadcastLogEntry(entry: StructuredEntry): Promise<void> {
+  if (!isTauriEnv()) return;
+  try {
+    const [{ emit }, sourceWindow] = await Promise.all([
+      import("@tauri-apps/api/event"),
+      getWindowLabel(),
+    ]);
+    await emit(LOG_ENTRY_EVENT, { entry, sourceWindow } satisfies LogEntryBroadcast);
+  } catch {
+    // best-effort
+  }
+}
+
+/**
+ * Answer snapshot requests from a freshly mounted LogViewer in another window
+ * with this window's in-memory entries (mount-time history). Wired per window
+ * by wireRuntimeGates; the LogViewer merges + dedupes all responses.
+ */
+export async function listenForLogSnapshotRequests(): Promise<() => void> {
+  if (!isTauriEnv()) return () => {};
+  const [{ listen, emit }, myLabel] = await Promise.all([
+    import("@tauri-apps/api/event"),
+    getWindowLabel(),
+  ]);
+  return listen<{ sourceWindow: string }>(SNAPSHOT_REQUEST_EVENT, (event) => {
+    if (!event.payload || event.payload.sourceWindow === myLabel) return;
+    const entries = useLogViewerStore.getState().entries;
+    if (entries.length === 0) return;
+    void emit(SNAPSHOT_RESPONSE_EVENT, {
+      entries: entries.map(({ id: _id, ...rest }) => rest),
+      sourceWindow: myLabel,
+    } satisfies LogSnapshotResponse).catch(() => {
+      // best-effort — the requesting window still has file + live channels
+    });
+  });
+}
+
 function formatEntry(entry: LogEntry): string {
   return `[${entry.timestamp}] [${entry.severity.toUpperCase()}] [${entry.source}] ${entry.message}`;
 }
@@ -164,6 +242,16 @@ function addEntry(entry: LogEntry): void {
         stack: entry.stack,
       },
     ]);
+
+    // Mirror to other windows (Protokolle-Fenster hat eigene Store-Instanz).
+    void broadcastLogEntry({
+      ts: entry.timestamp,
+      level: entry.severity,
+      source: "frontend",
+      module: entry.source,
+      message: entry.message,
+      stack: entry.stack,
+    });
 
     // Mirror to console (intentional — DevTools is the dev's debugging surface).
     const formatted = formatEntry(entry);

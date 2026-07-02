@@ -455,6 +455,36 @@ describe("LogViewer — backend log loading", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Cross-window sync (Split-Brain: Protokoll-Fenster hat eigene Store-Instanz)
+// ---------------------------------------------------------------------------
+
+describe("LogViewer — cross-window sync", () => {
+  it("requests a log snapshot from other windows on mount", async () => {
+    listenMock.mockImplementation(() => Promise.resolve(vi.fn()));
+
+    render(<LogViewer />);
+
+    await vi.waitFor(() =>
+      expect(emitMock).toHaveBeenCalledWith("log-snapshot-request", {
+        sourceWindow: "test-window",
+      }),
+    );
+  });
+
+  it("subscribes to frontend-log-entry broadcasts from other windows", async () => {
+    listenMock.mockImplementation(() => Promise.resolve(vi.fn()));
+
+    render(<LogViewer />);
+
+    await vi.waitFor(() => {
+      const events = listenMock.mock.calls.map((c) => c[0]);
+      expect(events).toContain("frontend-log-entry");
+      expect(events).toContain("log-snapshot-response");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Listener lifecycle (StrictMode/HMR race)
 // ---------------------------------------------------------------------------
 

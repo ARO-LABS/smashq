@@ -37,6 +37,7 @@ vi.mock("./errorLogger", () => ({
   wireLoggingGate: vi.fn(),
   wirePersistenceGate: vi.fn(),
   flushFrontendLogs: flushFrontendLogsMock,
+  listenForLogSnapshotRequests: vi.fn(() => Promise.resolve(() => {})),
   logError: vi.fn(),
 }));
 
