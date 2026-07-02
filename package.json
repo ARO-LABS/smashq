@@ -1,7 +1,7 @@
 {
   "name": "smashq",
   "private": false,
-  "version": "1.0.2",
+  "version": "1.0.21",
   "type": "module",
   "description": "Desktop app for managing and monitoring multiple Claude CLI sessions",
   "author": "ARO-LABS",

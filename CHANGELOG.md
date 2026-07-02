@@ -6,8 +6,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [1.0.21] — 2026-07-02
+
 Härtung der Logging-Pipeline (Review-Sweep), Drag & Drop am ganzen Element statt
 am Grip-Symbol, Library-Detailansichten und besser sichtbare Session-Farben.
+Farbe pro Projekt per Rechtsklick — auf Sessions und Favoriten.
 
 ### Hinzugefügt
 - Library: Hook-Karten öffnen per Klick eine Detailansicht mit vollständigem Befehl (Event, Matcher, Quelle, Geltungsbereich).
@@ -26,8 +29,12 @@ am Grip-Symbol, Library-Detailansichten und besser sichtbare Session-Farben.
 - Favoriten: der Ordnername in Klammern entfällt, wenn er mit der Beschriftung identisch ist.
 - Sessions-Grid: Rahmen um die Grid-Zellen sind dicker und im hellen Theme sichtbar — die Rahmenfarbe folgt jetzt dem Theme statt fest dem Dark-Mode-Wert.
 - Konfigurations-Panel: aktive Tabs und Icons übernehmen die Projekt-/Session-Farbe statt des globalen Cyan; die Markierung aktiver Tabs ist deutlicher.
+- Session-Farbe per Rechtsklick: das Farbmenü öffnete nur bei Sessions mit bereits erkannter Claude-Session-ID (aktive/laufende), sonst passierte nichts. Die Farbe wird jetzt pro Projektordner gespeichert und lässt sich bei jeder Session ändern.
+- Favoriten: Rechtsklick zeigte das native Browser-Kontextmenü (Zurück/Aktualisieren/Drucken) und bot keine Farbwahl. Favoriten haben jetzt dasselbe Farbmenü wie Sessions.
+- Natives WebView-Kontextmenü wird app-weit unterdrückt — außer in Textfeldern, wo Kopieren/Einfügen erhalten bleibt.
 
 ### Geändert
+- Akzentfarbe ist jetzt eine geteilte Projektfarbe: Favorit und alle Sessions desselben Ordners tragen dieselbe Farbe; einmal setzen wirkt überall (Sidebar-Punkt, Grid-Rahmen, Panel-Kopf).
 - Drag & Drop: Favoriten, Favoriten-Gruppen und Session-Zeilen lassen sich am gesamten Element ziehen; das Grip-Symbol entfällt. Buttons, Eingabefelder und Links bleiben normal bedienbar, Rechtsklick startet keinen Drag.
 - Library: Projekte ohne Konfiguration werden ausgeblendet; eine Fußnote nennt die Anzahl. Der globale Bereich bleibt immer sichtbar.
 

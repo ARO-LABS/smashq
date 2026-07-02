@@ -7,6 +7,14 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-07-02 — `todo.md` behauptete `folderAccents` sei „implementiert + gepusht", der Code hatte es aber nie
+
+**Kontext:** Bugfix-Auftrag (Rechtsklick-Farbe auf Sessions/Favoriten). Die „Aktuelle Phase" in `todo.md` listete `folderAccents` bereits als fertig+gepusht. Der tatsaechliche Code (`SessionCard` keyte per `claudeSessionId`, `FavoriteCard` hatte gar kein Kontextmenü) und `git log` widersprachen dem — das Feature existierte nicht.
+
+**Fehler:** Phasen-Notiz als Ground-Truth genommen zu haben waere der Fehler gewesen (haette zu „ist doch schon da"-Fehlschluss gefuehrt). Vermeidbar nur durch Lesen des echten Codes.
+
+**Regel:** Task-/Phasen-Dokumente sind Absichtserklaerungen, kein Ist-Zustand — vor Aussagen ueber „X ist implementiert" IMMER den Code + `git log` pruefen, nie die `todo.md`-Notiz. Drift beim Finden sofort in derselben Notiz korrigieren (hier: „war Doc-Drift, real hier umgesetzt"). Verwandt: Projektregel „Nicht behaupten, verifizieren".
+
 ### 2026-07-02 — Session-Farb-Tint fuer Grid-Pille/Popover: zwei Anlaeufe, dann auf User-Wunsch komplett REVERTIERT (nur Opacity-Fix blieb)
 
 **Kontext:** User wollte die schwebende Pille + das Aufgaben-Popover der Grid-Zelle in der Session-Farbe (wie Zellrahmen/Sidebar-Punkt). Nach zwei Iterationen wirkte das Ergebnis nicht wie gewuenscht ("Farbenthematik scheint nicht zu funktionieren") → alles zurueckgedreht via gezieltem `git restore`; einzig die Pillen-Deckkraft 60%→90% blieb (`GridCell.tsx`).
