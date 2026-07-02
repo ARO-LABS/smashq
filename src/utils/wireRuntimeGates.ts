@@ -67,6 +67,25 @@ function applyRemoteTasks(tasks: TaskItem[]): void {
   }
 }
 
+/**
+ * Elements where the native WebView context menu (copy/paste/select-all) is
+ * still useful — text-entry surfaces. Everywhere else the native menu only
+ * offers navigation junk (Zurück/Aktualisieren/Drucken), which is meaningless
+ * in a desktop app, so we suppress it.
+ */
+const EDITABLE_MENU_SELECTOR =
+  'input, textarea, select, [contenteditable=""], [contenteditable="true"]';
+
+/**
+ * True when the right-click target sits inside an editable field and should
+ * keep the native context menu. `closest()` walks ancestors, so a child node
+ * inside a contenteditable region counts as editable too.
+ */
+export function shouldKeepNativeMenu(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return target.closest(EDITABLE_MENU_SELECTOR) !== null;
+}
+
 export interface WireRuntimeGatesOptions {
   /**
    * Extra async work to await before this window is allowed to close (e.g.
@@ -86,6 +105,15 @@ export interface WireRuntimeGatesOptions {
  * AND the cross-window preferences listener. Pass it to a useEffect cleanup.
  */
 export function wireRuntimeGates(options?: WireRuntimeGatesOptions): () => void {
+  // Suppress the native WebView context menu app-wide (every window calls this),
+  // except inside editable fields where copy/paste is still wanted. Keyboard
+  // shortcuts (Ctrl+C/V) are unaffected. The terminal keeps its own handler.
+  const suppressNativeMenu = (e: MouseEvent) => {
+    if (shouldKeepNativeMenu(e.target)) return;
+    e.preventDefault();
+  };
+  document.addEventListener("contextmenu", suppressNativeMenu);
+
   // Frontend gate is a function reference re-read on every log call —
   // no subscription needed, just inject the closure once.
   wireLoggingGate(() => useSettingsStore.getState().preferences.frontendLogging);
@@ -198,6 +226,7 @@ export function wireRuntimeGates(options?: WireRuntimeGatesOptions): () => void 
 
   return () => {
     disposed = true;
+    document.removeEventListener("contextmenu", suppressNativeMenu);
     unsubscribePerf();
     unsubscribeTasks();
     unlistenCrossWindow?.();

@@ -76,7 +76,7 @@ vi.mock("../store/tasksStorage", () => ({
   setSuppressTasksPersist: vi.fn(),
 }));
 
-import { wireRuntimeGates } from "./wireRuntimeGates";
+import { wireRuntimeGates, shouldKeepNativeMenu } from "./wireRuntimeGates";
 
 // wireRuntimeGates registers the close listener behind a dynamic
 // `import("@tauri-apps/api/window")`, which resolves on a real event-loop
@@ -141,5 +141,51 @@ describe("wireRuntimeGates — consolidated close-flush", () => {
     await expect(capturedHandler!()).resolves.toBeUndefined();
 
     cleanup();
+  });
+});
+
+describe("shouldKeepNativeMenu", () => {
+  it("keeps the native menu only on editable targets, suppresses everywhere else", () => {
+    const input = document.createElement("input");
+    const textarea = document.createElement("textarea");
+    const editable = document.createElement("div");
+    editable.setAttribute("contenteditable", "true");
+    const childOfEditable = document.createElement("span");
+    editable.appendChild(childOfEditable);
+    const plainDiv = document.createElement("div");
+
+    expect(shouldKeepNativeMenu(input)).toBe(true);
+    expect(shouldKeepNativeMenu(textarea)).toBe(true);
+    expect(shouldKeepNativeMenu(editable)).toBe(true);
+    // closest() walks up: a child inside a contenteditable is still editable.
+    expect(shouldKeepNativeMenu(childOfEditable)).toBe(true);
+    expect(shouldKeepNativeMenu(plainDiv)).toBe(false);
+    expect(shouldKeepNativeMenu(null)).toBe(false);
+  });
+});
+
+describe("wireRuntimeGates — native context-menu guard", () => {
+  it("preventDefaults contextmenu on non-editable targets, keeps it on inputs, and stops after cleanup", () => {
+    const cleanup = wireRuntimeGates();
+
+    const div = document.createElement("div");
+    document.body.appendChild(div);
+    const onDiv = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    div.dispatchEvent(onDiv);
+    expect(onDiv.defaultPrevented).toBe(true);
+
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    const onInput = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    input.dispatchEvent(onInput);
+    expect(onInput.defaultPrevented).toBe(false);
+
+    cleanup();
+    const afterCleanup = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    div.dispatchEvent(afterCleanup);
+    expect(afterCleanup.defaultPrevented).toBe(false);
+
+    div.remove();
+    input.remove();
   });
 });

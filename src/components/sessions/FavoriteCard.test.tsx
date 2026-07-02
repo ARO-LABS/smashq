@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { FavoriteCard } from "./FavoriteCard";
 import { useUIStore } from "../../store/uiStore";
 import { useSessionStore } from "../../store/sessionStore";
+import { useSettingsStore } from "../../store/settingsStore";
 import { invoke } from "@tauri-apps/api/core";
 import type { FavoriteFolder } from "../../store/settingsStore";
 
@@ -125,5 +126,32 @@ describe("FavoriteCard", () => {
     useSessionStore.getState().updateStatus("s2", "done");
     renderCard({ label: "zovel", path: "C:/Projects/zovel" });
     expect(screen.getByTestId("fav-dot").className).not.toContain("animate-pulse");
+  });
+
+  describe("accent context menu (per-project color)", () => {
+    beforeEach(() => {
+      useSettingsStore.setState({ folderAccents: {} });
+    });
+
+    it("opens the accent menu on right-click", () => {
+      renderCard({ label: "zovel", path: "C:/Projects/zovel" });
+      fireEvent.contextMenu(screen.getByText("zovel"));
+      expect(screen.getByRole("menu", { name: "Akzentfarbe wählen" })).toBeInTheDocument();
+    });
+
+    it("suppresses the native menu via preventDefault", () => {
+      renderCard({ label: "zovel", path: "C:/Projects/zovel" });
+      const evt = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+      const spy = vi.spyOn(evt, "preventDefault");
+      screen.getByText("zovel").dispatchEvent(evt);
+      expect(spy).toHaveBeenCalled();
+    });
+
+    it("writes a per-folder accent override keyed by the favorite path", () => {
+      renderCard({ label: "zovel", path: "C:/Projects/zovel" });
+      fireEvent.contextMenu(screen.getByText("zovel"));
+      fireEvent.click(screen.getByRole("button", { name: "rose" }));
+      expect(useSettingsStore.getState().folderAccents["C:/Projects/zovel"]).toBe("rose");
+    });
   });
 });

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { SessionCard } from "./SessionCard";
 import { useSessionStore } from "../../store/sessionStore";
+import { useSettingsStore } from "../../store/settingsStore";
 import type { ClaudeSession } from "../../store/sessionStore";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -508,6 +509,41 @@ describe("SessionCard", () => {
       const input = screen.getByLabelText("Session umbenennen");
       fireEvent.click(input);
       expect(onClick).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Accent context menu (per-project color) ──────────────────────────
+  describe("accent context menu", () => {
+    beforeEach(() => {
+      useSettingsStore.setState({ folderAccents: {}, sessionAccents: {} });
+    });
+
+    it("opens the accent menu on right-click even without a claudeSessionId", () => {
+      // Pre-discovery sessions have no claudeSessionId — the menu must still open
+      // (regression: it previously bailed and silently showed nothing).
+      const session = makeSession({ claudeSessionId: undefined, folder: "C:/Projects/demo" });
+      renderCard(session);
+
+      fireEvent.contextMenu(screen.getByText("Test Session"));
+      expect(screen.getByRole("menu", { name: "Akzentfarbe wählen" })).toBeInTheDocument();
+    });
+
+    it("suppresses the native menu via preventDefault on right-click", () => {
+      renderCard(makeSession({ claudeSessionId: undefined }));
+      const evt = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+      const spy = vi.spyOn(evt, "preventDefault");
+      screen.getByText("Test Session").dispatchEvent(evt);
+      expect(spy).toHaveBeenCalled();
+    });
+
+    it("writes a per-folder accent override when a swatch is picked", () => {
+      const session = makeSession({ claudeSessionId: undefined, folder: "C:/Projects/demo" });
+      renderCard(session);
+
+      fireEvent.contextMenu(screen.getByText("Test Session"));
+      fireEvent.click(screen.getByRole("button", { name: "amber" }));
+
+      expect(useSettingsStore.getState().folderAccents["C:/Projects/demo"]).toBe("amber");
     });
   });
 });

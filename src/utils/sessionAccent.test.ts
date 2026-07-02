@@ -52,6 +52,29 @@ describe("sessionAccent", () => {
     expect(resolveSessionAccent(session, {})).toBe(hashFolderToAccent("C:/Projects/zovel"));
   });
 
+  it("resolveSessionAccent: folder override beats a per-session override and the hash", () => {
+    const session = { folder: "C:/Projects/zovel", claudeSessionId: "uuid-1" };
+    expect(
+      resolveSessionAccent(session, { "uuid-1": "violet" }, { "C:/Projects/zovel": "amber" }),
+    ).toBe("amber");
+  });
+
+  it("resolveSessionAccent: folder override applies even without a claudeSessionId", () => {
+    const folder = "C:/Projects/zovel";
+    const session = { folder, claudeSessionId: null };
+    // Pick an override that is guaranteed NOT to equal the folder hash, so a
+    // pass cannot be a coincidence of the fallback returning the same color.
+    const override = ACCENT_NAMES.find((n) => n !== hashFolderToAccent(folder))!;
+    expect(resolveSessionAccent(session, {}, { [folder]: override })).toBe(override);
+  });
+
+  it("resolveSessionAccent: invalid folder override falls through to the per-session override", () => {
+    const session = { folder: "C:/Projects/zovel", claudeSessionId: "uuid-1" };
+    expect(
+      resolveSessionAccent(session, { "uuid-1": "emerald" }, { "C:/Projects/zovel": "bogus" }),
+    ).toBe("emerald");
+  });
+
   it("accentCssVars sets the --accent-h custom property", () => {
     expect(accentCssVars("violet")).toEqual({ "--accent-h": "285" });
   });

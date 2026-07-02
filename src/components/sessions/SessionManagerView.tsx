@@ -39,6 +39,7 @@ export function SessionManagerView() {
   const previewFolder = useUIStore((s) => s.previewFolder);
   const closePreview = useUIStore((s) => s.closePreview);
   const sessionAccents = useSettingsStore((s) => s.sessionAccents);
+  const folderAccents = useSettingsStore((s) => s.folderAccents);
 
   const { containerRef, handleResizeStart } = useResizeHandle();
   useSessionEvents();
@@ -168,11 +169,10 @@ export function SessionManagerView() {
                     const isCellFocused = isGridMember && session.id === focusedGridSessionId;
                     // Frame each grid cell in its session's hue — same hue source as the
                     // sidebar dot, but L/C follow the theme stops (accentFrameColorFor)
-                    // so the frame keeps contrast on the light surface too.
-                    const cellOverride = session.claudeSessionId
-                      ? (sessionAccents[session.claudeSessionId.trim()] ?? null)
-                      : null;
-                    const cellColor = accentFrameColorFor(session.folder, cellOverride);
+                    // so the frame keeps contrast on the light surface too. Resolve via
+                    // the shared precedence so a per-folder project color wins here too.
+                    const cellAccent = resolveSessionAccent(session, sessionAccents, folderAccents);
+                    const cellColor = accentFrameColorFor(session.folder, cellAccent);
 
                     return (
                       <div
@@ -235,7 +235,7 @@ export function SessionManagerView() {
                     // zeigen dieselbe Farbe wie Kachel-Rahmen und Sidebar-Punkt.
                     accent={
                       activeSession
-                        ? resolveSessionAccent(activeSession, sessionAccents)
+                        ? resolveSessionAccent(activeSession, sessionAccents, folderAccents)
                         : undefined
                     }
                     onResumeSession={handleResumeSession}

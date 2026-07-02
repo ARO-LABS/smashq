@@ -255,6 +255,12 @@ export interface SettingsState {
   sessionTitleOverrides: Record<string, string>;
   /** Per-Session-Akzentfarbe (key: claudeSessionId, value: AccentName). */
   sessionAccents: Record<string, string>;
+  /**
+   * Per-Projekt-Akzentfarbe (key: folder path, value: AccentName). Geteilt
+   * zwischen Favorit UND allen Sessions desselben Ordners — "färbe das Projekt".
+   * Schlägt in der Auflösung den Legacy-Per-Session-Override und den Hash.
+   */
+  folderAccents: Record<string, string>;
   /** Persisted size of the floating notes window. */
   notesWindowSize: WindowSize;
   /** Persisted size of the floating tasks window. */
@@ -277,6 +283,8 @@ export interface SettingsState {
   clearSessionTitleOverride: (sessionId: string) => void;
   setSessionAccent: (claudeSessionId: string, name: string) => void;
   clearSessionAccent: (claudeSessionId: string) => void;
+  setFolderAccent: (folder: string, name: string) => void;
+  clearFolderAccent: (folder: string) => void;
   /**
    * Remove all restore-state tied to a Claude session UUID — invoked AFTER
    * the session has been moved to the OS trash so persisted UI state does
@@ -498,6 +506,7 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
     sessionRestore: defaultSessionRestore,
     sessionTitleOverrides: {} as Record<string, string>,
     sessionAccents: {} as Record<string, string>,
+    folderAccents: {} as Record<string, string>,
     notesWindowSize: DEFAULT_NOTES_WINDOW_SIZE,
     tasksWindowSize: DEFAULT_TASKS_WINDOW_SIZE,
   };
@@ -625,6 +634,13 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
         ),
       )
       : defaults.sessionAccents,
+    folderAccents: p.folderAccents && typeof p.folderAccents === "object" && !Array.isArray(p.folderAccents)
+      ? Object.fromEntries(
+        Object.entries(p.folderAccents as Record<string, unknown>).filter(
+          ([k, v]) => typeof k === "string" && !!k.trim() && isAccentName(v),
+        ),
+      )
+      : defaults.folderAccents,
     notesWindowSize: sanitizeNotesWindowSize(p.notesWindowSize),
     tasksWindowSize: sanitizeTasksWindowSize(p.tasksWindowSize),
   } as unknown as SettingsState; // Actions are added by Zustand during merge
@@ -702,6 +718,7 @@ export const useSettingsStore = create<SettingsState>()(
       sessionRestore: defaultSessionRestore,
       sessionTitleOverrides: {},
       sessionAccents: {},
+      folderAccents: {},
       notesWindowSize: DEFAULT_NOTES_WINDOW_SIZE,
       tasksWindowSize: DEFAULT_TASKS_WINDOW_SIZE,
 
@@ -751,6 +768,23 @@ export const useSettingsStore = create<SettingsState>()(
           const next = { ...state.sessionAccents };
           delete next[key];
           return { sessionAccents: next };
+        }),
+
+      setFolderAccent: (folder, name) =>
+        set((state) => {
+          const key = folder.trim();
+          if (!key || !isAccentName(name)) return state;
+          if (state.folderAccents[key] === name) return state;
+          return { folderAccents: { ...state.folderAccents, [key]: name } };
+        }),
+
+      clearFolderAccent: (folder) =>
+        set((state) => {
+          const key = folder.trim();
+          if (!key || !(key in state.folderAccents)) return state;
+          const next = { ...state.folderAccents };
+          delete next[key];
+          return { folderAccents: next };
         }),
 
       removeRestorableSessionByClaudeId: (claudeSessionId) =>
@@ -1134,7 +1168,7 @@ export const useSettingsStore = create<SettingsState>()(
           locale: "de",
           defaultShell: "auto",
           defaultProjectPath: "",
-          // apiKeys, favorites, globalNotes, projectNotes, sessionRestore, sessionTitleOverrides and sessionAccents are intentionally NOT reset
+          // apiKeys, favorites, globalNotes, projectNotes, sessionRestore, sessionTitleOverrides, sessionAccents and folderAccents are intentionally NOT reset
           apiKeys: state.apiKeys,
           favorites: state.favorites,
           globalNotes: state.globalNotes,
@@ -1142,6 +1176,7 @@ export const useSettingsStore = create<SettingsState>()(
           sessionRestore: state.sessionRestore,
           sessionTitleOverrides: state.sessionTitleOverrides,
           sessionAccents: state.sessionAccents,
+          folderAccents: state.folderAccents,
         })),
     }),
     {
@@ -1175,6 +1210,7 @@ export const useSettingsStore = create<SettingsState>()(
         sessionRestore: state.sessionRestore,
         sessionTitleOverrides: state.sessionTitleOverrides,
         sessionAccents: state.sessionAccents,
+        folderAccents: state.folderAccents,
         notesWindowSize: state.notesWindowSize,
         tasksWindowSize: state.tasksWindowSize,
       }),
@@ -1288,6 +1324,16 @@ export const useSettingsStore = create<SettingsState>()(
           );
           if (JSON.stringify(cleanedAccents) !== JSON.stringify(state.sessionAccents ?? {})) {
             patches.sessionAccents = cleanedAccents;
+          }
+
+          // Same-version recovery für folderAccents: unbekannte AccentNames droppen.
+          const cleanedFolderAccents = Object.fromEntries(
+            Object.entries(state.folderAccents ?? {}).filter(
+              ([k, v]) => !!k.trim() && isAccentName(v),
+            ),
+          );
+          if (JSON.stringify(cleanedFolderAccents) !== JSON.stringify(state.folderAccents ?? {})) {
+            patches.folderAccents = cleanedFolderAccents;
           }
         }
 

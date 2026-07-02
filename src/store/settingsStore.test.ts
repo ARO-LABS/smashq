@@ -793,6 +793,58 @@ describe("favorites persistence", () => {
 });
 
 // ============================================================================
+// folderAccents (per-project shared accent color)
+// ============================================================================
+
+describe("folderAccents", () => {
+  const folder = "C:/Projects/zovel";
+
+  // resetToDefaults deliberately PRESERVES folderAccents (project colors must
+  // survive a settings reset), so the shared beforeEach does not clear them —
+  // this block clears them itself to keep each case isolated.
+  beforeEach(() => {
+    useSettingsStore.setState({ folderAccents: {} });
+  });
+
+  it("setFolderAccent stores a valid accent name keyed by folder path", () => {
+    getState().setFolderAccent(folder, "amber");
+    expect(getState().folderAccents[folder]).toBe("amber");
+  });
+
+  it("setFolderAccent ignores an unknown accent name (no entry written)", () => {
+    getState().setFolderAccent(folder, "magenta");
+    expect(folder in getState().folderAccents).toBe(false);
+  });
+
+  it("setFolderAccent ignores an empty folder key", () => {
+    getState().setFolderAccent("   ", "amber");
+    expect("   " in getState().folderAccents).toBe(false);
+  });
+
+  it("clearFolderAccent removes the entry", () => {
+    getState().setFolderAccent(folder, "rose");
+    getState().clearFolderAccent(folder);
+    expect(folder in getState().folderAccents).toBe(false);
+  });
+
+  it("does NOT reset folderAccents on resetToDefaults", () => {
+    getState().setFolderAccent(folder, "emerald");
+    getState().resetToDefaults();
+    expect(getState().folderAccents[folder]).toBe("emerald");
+  });
+
+  it("migrate drops folderAccents entries with unknown names", () => {
+    const migrated = useSettingsStoreMigrateForTest(
+      { folderAccents: { "C:/a": "violet", "C:/b": "bogus", "": "amber" } },
+      9,
+    ) as SettingsState;
+    expect(migrated.folderAccents["C:/a"]).toBe("violet");
+    expect("C:/b" in migrated.folderAccents).toBe(false);
+    expect("" in migrated.folderAccents).toBe(false);
+  });
+});
+
+// ============================================================================
 // Pinned Docs — Path Validation
 // ============================================================================
 

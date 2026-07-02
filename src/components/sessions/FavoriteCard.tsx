@@ -1,12 +1,15 @@
+import { useState } from "react";
 import { Play, X, FolderOpen, Terminal } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { motion } from "framer-motion";
 import type { FavoriteFolder } from "../../store/settingsStore";
 import { useUIStore } from "../../store/uiStore";
 import { useSessionStore } from "../../store/sessionStore";
+import { useSettingsStore } from "../../store/settingsStore";
 import { logError } from "../../utils/errorLogger";
 import { DiffActionButton } from "../diff/DiffActionButton";
-import { accentColorFor } from "../../utils/sessionAccent";
+import { accentColorFor, hashFolderToAccent, isAccentName, type AccentName } from "../../utils/sessionAccent";
+import { SessionAccentMenu } from "./SessionAccentMenu";
 
 /**
  * Returns the most recently created live session in this favorite's folder,
@@ -50,7 +53,17 @@ export function FavoriteCard({ favorite, onStart, onRemove }: FavoriteCardProps)
   const openPreview = useUIStore((s) => s.openPreview);
   const liveSessionId = useFavoriteLiveSessionId(favorite.path);
   const stats = useFavoriteSessionStats(favorite.path);
-  const dotColor = accentColorFor(favorite.path);
+
+  // Per-project accent color, shared with the folder's session cards (#right-click-color).
+  const folderAccents = useSettingsStore((s) => s.folderAccents);
+  const setFolderAccent = useSettingsStore((s) => s.setFolderAccent);
+  const clearFolderAccent = useSettingsStore((s) => s.clearFolderAccent);
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+
+  const override = folderAccents[favorite.path];
+  const currentAccent: AccentName = isAccentName(override) ? override : hashFolderToAccent(favorite.path);
+  const hasOverride = favorite.path in folderAccents;
+  const dotColor = accentColorFor(favorite.path, override ?? null);
 
   return (
     <motion.div
@@ -60,6 +73,10 @@ export function FavoriteCard({ favorite, onStart, onRemove }: FavoriteCardProps)
       transition={{ duration: 0.15 }}
       className="relative group flex items-center gap-2 h-7 pl-3 pr-2 cursor-pointer rounded-md hover:bg-hover-overlay transition-colors"
       onClick={() => openPreview(favorite.path)}
+      onContextMenu={(e) => {
+        e.preventDefault(); // natives WebView-Menü unterdrücken
+        setMenuPos({ x: e.clientX, y: e.clientY });
+      }}
       title={favorite.path}
     >
       {/* Project color dot — pulses when the folder has a live session */}
@@ -124,6 +141,23 @@ export function FavoriteCard({ favorite, onStart, onRemove }: FavoriteCardProps)
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
+      {menuPos && (
+        <SessionAccentMenu
+          x={menuPos.x}
+          y={menuPos.y}
+          current={currentAccent}
+          hasOverride={hasOverride}
+          onSelect={(name) => {
+            setFolderAccent(favorite.path, name);
+            setMenuPos(null);
+          }}
+          onReset={() => {
+            clearFolderAccent(favorite.path);
+            setMenuPos(null);
+          }}
+          onClose={() => setMenuPos(null)}
+        />
+      )}
     </motion.div>
   );
 }

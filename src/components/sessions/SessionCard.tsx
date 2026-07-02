@@ -23,14 +23,17 @@ const SessionCardInner = ({ session, isActive, isInGrid, onClick, onClose }: Ses
   const renameSession = useSessionStore((s) => s.renameSession);
 
   const sessionAccents = useSettingsStore((s) => s.sessionAccents);
-  const setSessionAccent = useSettingsStore((s) => s.setSessionAccent);
-  const clearSessionAccent = useSettingsStore((s) => s.clearSessionAccent);
+  const folderAccents = useSettingsStore((s) => s.folderAccents);
+  const setFolderAccent = useSettingsStore((s) => s.setFolderAccent);
+  const clearFolderAccent = useSettingsStore((s) => s.clearFolderAccent);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
 
-  const accent: AccentName = resolveSessionAccent(session, sessionAccents);
-  const claudeId = session.claudeSessionId?.trim() ?? "";
-  const hasOverride = claudeId !== "" && claudeId in sessionAccents;
-  const dotColor = accentColorFor(session.folder, sessionAccents[claudeId] ?? null);
+  const accent: AccentName = resolveSessionAccent(session, sessionAccents, folderAccents);
+  // Color is now keyed by folder path (shared "project color") — always present,
+  // unlike claudeSessionId which is undefined pre-discovery.
+  const folder = session.folder ?? "";
+  const hasOverride = folder in folderAccents;
+  const dotColor = accentColorFor(folder, accent);
   const projectName = folderLabel(session.folder);
 
   // Dot encodes session health on top of project identity:
@@ -92,7 +95,8 @@ const SessionCardInner = ({ session, isActive, isInGrid, onClick, onClose }: Ses
       onClick={() => onClick(session.id)}
       onContextMenu={(e) => {
         e.preventDefault(); // natives WebView-Menü auf allen Karten unterdrücken
-        if (!claudeId) return; // ohne persistenten Key kein eigenes Menü
+        // Folder path is always present → menu always opens (fixes the
+        // "only the active session reacts" bug where claudeSessionId was missing).
         setMenuPos({ x: e.clientX, y: e.clientY });
       }}
       style={accentCssVars(accent)}
@@ -189,18 +193,18 @@ const SessionCardInner = ({ session, isActive, isInGrid, onClick, onClose }: Ses
           title="Im Grid"
         />
       )}
-      {menuPos && claudeId && (
+      {menuPos && (
         <SessionAccentMenu
           x={menuPos.x}
           y={menuPos.y}
           current={accent}
           hasOverride={hasOverride}
           onSelect={(name) => {
-            setSessionAccent(claudeId, name);
+            setFolderAccent(folder, name);
             setMenuPos(null);
           }}
           onReset={() => {
-            clearSessionAccent(claudeId);
+            clearFolderAccent(folder);
             setMenuPos(null);
           }}
           onClose={() => setMenuPos(null)}

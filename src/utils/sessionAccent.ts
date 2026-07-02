@@ -45,19 +45,30 @@ export function hashFolderToAccent(folder: string): AccentName {
 }
 
 /**
- * Auflösung: persistenter Per-Session-Override (keyed by claudeSessionId)
- * schlägt den Ordner-Hash-Default. Unbekannte Override-Namen werden ignoriert.
+ * Auflösung der Akzentfarbe einer Session, Priorität von stark nach schwach:
+ *   1. Per-Ordner-Override (keyed by folder path) — die geteilte "Projektfarbe",
+ *      die Favorit UND alle Sessions desselben Ordners einfärbt.
+ *   2. Legacy Per-Session-Override (keyed by claudeSessionId) — bleibt erhalten,
+ *      damit früher gesetzte Einzelfarben nicht verloren gehen; ein Ordner-Pick
+ *      schlägt ihn aber, damit Umfärben immer sichtbar greift.
+ *   3. Ordner-Hash-Default.
+ * Unbekannte Override-Namen werden auf jeder Ebene übersprungen.
  */
 export function resolveSessionAccent(
   session: { folder: string; claudeSessionId?: string | null },
   overrides: Record<string, string>,
+  folderAccents: Record<string, string> = {},
 ): AccentName {
+  const folder = session.folder ?? "";
+  const folderOverride = folderAccents[folder];
+  if (isAccentName(folderOverride)) return folderOverride;
+
   const key = session.claudeSessionId?.trim();
   if (key) {
     const override = overrides[key];
     if (isAccentName(override)) return override;
   }
-  return hashFolderToAccent(session.folder ?? "");
+  return hashFolderToAccent(folder);
 }
 
 /** Inline-Style, der NUR den Hue überschreibt — L/C/Alpha erben aus index.css. */
