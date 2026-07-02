@@ -143,33 +143,6 @@ export function groupConsecutiveEntries(
   return result;
 }
 
-/** Parse a Rust backend log line into a UnifiedLogEntry (without id) */
-export function parseBackendLogLine(
-  line: string,
-): Omit<UnifiedLogEntry, "id"> | null {
-  const match = line.match(
-    /^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})\] \[(\w+)\] \[([^\]]+)\] (.*)$/,
-  );
-  if (!match) return null;
-
-  const [, timestamp, level, module, message] = match;
-  const severityMap: Record<string, LogSeverity> = {
-    ERROR: "error",
-    WARN: "warn",
-    INFO: "info",
-    DEBUG: "debug",
-    TRACE: "trace",
-  };
-
-  return {
-    timestamp: timestamp.replace(" ", "T") + "Z",
-    severity: severityMap[level] ?? "info",
-    source: "backend",
-    module,
-    message,
-  };
-}
-
 /** Shape returned by the Rust `read_structured_log` command / `log-line` event. */
 export interface StructuredEntry {
   ts: string;

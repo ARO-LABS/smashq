@@ -390,17 +390,6 @@ describe("LogViewer — toolbar interactions", () => {
     expect(mockInvoke).toHaveBeenCalledWith("read_structured_log", { maxLines: 500 });
   });
 
-  it("invokes open_log_window when the external-window button is clicked", async () => {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const mockInvoke = vi.mocked(invoke);
-
-    render(<LogViewer />);
-    mockInvoke.mockClear();
-
-    fireEvent.click(screen.getByTitle("In eigenem Fenster öffnen"));
-
-    expect(mockInvoke).toHaveBeenCalledWith("open_log_window");
-  });
 });
 
 // ---------------------------------------------------------------------------

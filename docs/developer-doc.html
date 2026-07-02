@@ -356,7 +356,7 @@
           <div class="note">
             <strong>Multi-Window:</strong> Neben dem Hauptfenster (<code>main</code>) öffnet die App
             separate Tauri-Fenster — Log-Viewer, Session-Diff und abgekoppelte Config-Viewer
-            (Commands <code>open_log_window</code>, <code>open_session_diff_window</code>,
+            (Commands <code>open_session_diff_window</code>,
             <code>open_detached_window</code>). Beim Schliessen des <code>main</code>-Fensters
             werden alle laufenden Sessions sauber beendet. Wird eine einzelne Session
             geschlossen, emittiert das Backend den Kanal <code>session-deleted/{id}</code> —
@@ -659,7 +659,7 @@ flowchart LR
           <p>Alle in <code>lib.rs</code> via <code>tauri::generate_handler!</code> registriert. Das Frontend ruft sie über <code>invoke("&lt;name&gt;", args)</code>.</p>
           <table>
             <tr><th>Gruppe</th><th>Commands</th></tr>
-            <tr><td>Fenster</td><td><code>open_log_window</code>, <code>open_detached_window</code>, <code>set_file_logging_enabled</code></td></tr>
+            <tr><td>Fenster</td><td><code>open_detached_window</code>, <code>set_file_logging_enabled</code></td></tr>
             <tr><td>Session</td><td><code>create_session</code>, <code>write_session</code>, <code>resize_session</code>, <code>close_session</code></td></tr>
             <tr><td>Folder</td><td><code>open_folder_in_explorer</code>, <code>open_terminal_in_folder</code></td></tr>
             <tr><td>File-Reader</td><td><code>read_project_file</code>, <code>write_project_file</code>, <code>list_project_dir</code>, <code>read_user_claude_file</code>, <code>list_user_claude_dir</code>, <code>list_skill_dirs</code>, <code>scan_claude_sessions</code>, <code>delete_claude_session</code>, <code>resolve_project_root</code></td></tr>
@@ -705,7 +705,6 @@ flowchart LR
             <tr><td>Library</td><td>Verknüpfen / Trennen / Löschen</td><td><code>attach_library_item</code> · <code>detach_library_item</code> · <code>delete_library_item</code></td><td>7.1</td></tr>
             <tr><td>Editor</td><td>Öffnen / Speichern (Ctrl+S)</td><td><code>read_project_file</code> · <code>write_project_file</code></td><td>6.3 · 6.6</td></tr>
             <tr><td>Logs</td><td>Refresh (Backend-Logs lesen)</td><td><code>read_backend_log</code></td><td>7.1</td></tr>
-            <tr><td>Logs</td><td>Log-Fenster öffnen</td><td><code>open_log_window</code></td><td>2.2</td></tr>
             <tr><td>Diff-Fenster</td><td>Laden / Refresh (auf Fokus)</td><td><code>get_session_diff</code></td><td>6.7</td></tr>
             <tr><td>Diff-Fenster</td><td>(Rückkanal) Session beendet</td><td><code>emit session-deleted/&lt;id&gt;</code></td><td>6.7</td></tr>
             <tr><td>Shell &amp; Settings</td><td>Tab-Rechtsklick → „In eigenem Fenster“</td><td><code>open_detached_window</code></td><td>2.2</td></tr>

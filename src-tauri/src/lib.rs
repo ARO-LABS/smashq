@@ -203,29 +203,6 @@ mod commands {
     }
 
     #[tauri::command]
-    pub async fn open_log_window(app: tauri::AppHandle) -> Result<(), ADPError> {
-        use tauri::{Manager, WebviewWindowBuilder};
-
-        if let Some(win) = app.get_webview_window("log-viewer") {
-            let _ = win.set_focus();
-            return Ok(());
-        }
-
-        WebviewWindowBuilder::new(
-            &app,
-            "log-viewer",
-            tauri::WebviewUrl::App("index.html?view=logs".into()),
-        )
-        .title("Smashq — Logs")
-        .inner_size(900.0, 600.0)
-        .resizable(true)
-        .build()
-        .map_err(|e| ADPError::internal(format!("Failed to create log window: {}", e)))?;
-
-        Ok(())
-    }
-
-    #[tauri::command]
     pub async fn open_detached_window(
         app: tauri::AppHandle,
         view: String,
@@ -295,7 +272,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::open_log_window,
             commands::open_detached_window,
             commands::open_md_in_editor,
             commands::take_pending_editor_open,

@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   useLogViewerStore,
-  parseBackendLogLine,
   groupConsecutiveEntries,
   structuredToUnified,
   formatTime,
@@ -333,104 +332,6 @@ describe("groupConsecutiveEntries", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// parseBackendLogLine
-// ---------------------------------------------------------------------------
-
-describe("parseBackendLogLine", () => {
-  it('parses valid Rust log format', () => {
-    const result = parseBackendLogLine(
-      "[2025-01-15 10:30:45.123] [ERROR] [auth] Login failed for user"
-    );
-
-    expect(result).not.toBeNull();
-    expect(result!.timestamp).toBe("2025-01-15T10:30:45.123Z");
-    expect(result!.severity).toBe("error");
-    expect(result!.source).toBe("backend");
-    expect(result!.module).toBe("auth");
-    expect(result!.message).toBe("Login failed for user");
-  });
-
-  it("returns null for non-matching lines", () => {
-    expect(parseBackendLogLine("just a random line")).toBeNull();
-    expect(parseBackendLogLine("")).toBeNull();
-    expect(parseBackendLogLine("[incomplete")).toBeNull();
-  });
-
-  it('maps DEBUG/TRACE to their own severity levels', () => {
-    const debug = parseBackendLogLine(
-      "[2025-01-15 10:30:45.123] [DEBUG] [db] Query executed"
-    );
-    expect(debug).not.toBeNull();
-    expect(debug!.severity).toBe("debug");
-
-    const trace = parseBackendLogLine(
-      "[2025-01-15 10:30:45.123] [TRACE] [net] Packet received"
-    );
-    expect(trace).not.toBeNull();
-    expect(trace!.severity).toBe("trace");
-  });
-
-  it("maps WARN/INFO to their respective severities", () => {
-    const warn = parseBackendLogLine(
-      "[2025-01-15 10:30:45.123] [WARN] [pty] Slow shell"
-    );
-    expect(warn!.severity).toBe("warn");
-    const info = parseBackendLogLine(
-      "[2025-01-15 10:30:45.123] [INFO] [boot] App started"
-    );
-    expect(info!.severity).toBe("info");
-  });
-
-  it("falls back to 'info' for an unknown level token", () => {
-    const result = parseBackendLogLine(
-      "[2025-01-15 10:30:45.123] [FATAL] [core] Meltdown"
-    );
-    expect(result).not.toBeNull();
-    expect(result!.severity).toBe("info");
-  });
-
-  it("converts the timestamp to ISO form with T separator and Z suffix", () => {
-    const result = parseBackendLogLine(
-      "[2025-12-31 23:59:59.999] [INFO] [m] msg"
-    );
-    expect(result!.timestamp).toBe("2025-12-31T23:59:59.999Z");
-  });
-
-  it("always sets source to 'backend'", () => {
-    const result = parseBackendLogLine(
-      "[2025-01-15 10:30:45.123] [INFO] [m] msg"
-    );
-    expect(result!.source).toBe("backend");
-  });
-
-  it("preserves an empty message after the module bracket", () => {
-    const result = parseBackendLogLine(
-      "[2025-01-15 10:30:45.123] [INFO] [m] "
-    );
-    expect(result).not.toBeNull();
-    expect(result!.message).toBe("");
-  });
-
-  it("captures messages containing bracket characters", () => {
-    const result = parseBackendLogLine(
-      "[2025-01-15 10:30:45.123] [ERROR] [http] GET /x [500] failed"
-    );
-    expect(result!.message).toBe("GET /x [500] failed");
-  });
-
-  it("returns null when the millisecond fragment is missing", () => {
-    expect(
-      parseBackendLogLine("[2025-01-15 10:30:45] [INFO] [m] msg")
-    ).toBeNull();
-  });
-
-  it("returns null when the module bracket is empty", () => {
-    expect(
-      parseBackendLogLine("[2025-01-15 10:30:45.123] [INFO] [] msg")
-    ).toBeNull();
-  });
-});
 
 // ---------------------------------------------------------------------------
 // addEntries — dedup
@@ -694,22 +595,6 @@ describe("logViewerStore 5-level severity", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// parseBackendLogLine level mapping (Task 2)
-// ---------------------------------------------------------------------------
-
-describe("parseBackendLogLine level mapping", () => {
-  it("maps DEBUG and TRACE to their own levels (not info)", () => {
-    const debug = parseBackendLogLine(
-      "[2026-06-02 10:00:00.000] [DEBUG] [mod::a] hello",
-    );
-    const trace = parseBackendLogLine(
-      "[2026-06-02 10:00:00.001] [TRACE] [mod::b] world",
-    );
-    expect(debug?.severity).toBe("debug");
-    expect(trace?.severity).toBe("trace");
-  });
-});
 
 describe("noise downgrade target", () => {
   beforeEach(() => useLogViewerStore.getState().clearEntries());

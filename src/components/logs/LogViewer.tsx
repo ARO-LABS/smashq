@@ -22,7 +22,6 @@ const SearchIcon = ICONS.action.search;
 const ArrowDownToLineIcon = ICONS.action.scrollToBottom;
 const RefreshIcon = ICONS.action.refresh;
 const TrashIcon = ICONS.action.trash;
-const ExternalLinkIcon = ICONS.action.externalLink;
 
 const SEVERITY_OPTIONS: { key: LogSeverity; label: string; color: string }[] = [
   { key: "error", label: "Error", color: "bg-red-400/20 text-red-400 border-red-400/40" },
@@ -281,14 +280,6 @@ export function LogViewer() {
             title="Logs leeren"
           >
             <TrashIcon className={ICON_SIZE.card} />
-          </button>
-
-          <button
-            onClick={() => invoke("open_log_window").catch((err: unknown) => logError("LogViewer.openLogWindow", err))}
-            className="flex items-center gap-1 px-2 py-1 text-[11px] text-neutral-400 hover:text-neutral-200 rounded transition-all"
-            title="In eigenem Fenster öffnen"
-          >
-            <ExternalLinkIcon className={ICON_SIZE.card} />
           </button>
         </div>
       </div>
