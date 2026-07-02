@@ -41,13 +41,32 @@ export function wireLoggingGate(gate: LoggingGate): void {
 
 /**
  * Persistence gate — when ON, frontend entries are batched and flushed to the
- * Rust NDJSON sink via `append_frontend_logs`. Follows the same master disk
- * toggle (backendFileLogging) so both log sources persist to one file.
- * Independent of the in-memory logging gate above.
+ * Rust NDJSON sink via `append_frontend_logs`. Driven by backendFileLogging,
+ * INDEPENDENT of the in-memory master gate above: the file is the post-mortem
+ * artifact and must receive frontend entries even when the ring buffer is off.
+ *
+ * `null` = not wired yet (early startup): entries are buffered so startup
+ * errors — the main reason the file exists — are not lost, then flushed or
+ * dropped once wireRuntimeGates delivers the real gate.
  */
-let isPersistenceEnabled: LoggingGate = () => false;
+let persistenceGate: LoggingGate | null = null;
 export function wirePersistenceGate(gate: LoggingGate): void {
-  isPersistenceEnabled = gate;
+  persistenceGate = gate;
+  if (gate()) {
+    // Flush immediately (not via the 2s timer): pre-wiring startup errors
+    // should reach the disk artifact promptly.
+    if (pending.length > 0) void flushFrontendLogs();
+  } else {
+    // User has file logging off — the buffered pre-wiring entries stay
+    // in-memory only (ring buffer), never on disk.
+    pending = [];
+  }
+}
+
+/** Test-only: revert to the unwired state with an empty buffer. */
+export function resetPersistenceGateForTest(): void {
+  persistenceGate = null;
+  pending = [];
 }
 
 const FLUSH_INTERVAL_MS = 2000;
@@ -114,26 +133,46 @@ function formatEntry(entry: LogEntry): string {
 }
 
 function addEntry(entry: LogEntry): void {
-  // Master gate — when disabled, drop everything (no buffer, no console
-  // mirror). Toasts via globalErrorHandler are independent and remain
-  // visible even with the gate closed.
-  if (!isLoggingEnabled()) return;
+  // Master gate — gates the ring buffer + console mirror ONLY. Persistence
+  // below is independent (backendFileLogging), so the NDJSON post-mortem file
+  // receives frontend entries even when the in-memory view is disabled.
+  // Toasts via globalErrorHandler are independent and remain visible.
+  if (isLoggingEnabled()) {
+    // Push into the unified log store — one source of truth.
+    useLogViewerStore.getState().addEntries([
+      {
+        timestamp: entry.timestamp,
+        severity: entry.severity,
+        source: "frontend",
+        module: entry.source,
+        message: entry.message,
+        stack: entry.stack,
+      },
+    ]);
 
-  // Push into the unified log store — one source of truth.
-  useLogViewerStore.getState().addEntries([
-    {
-      timestamp: entry.timestamp,
-      severity: entry.severity,
-      source: "frontend",
-      module: entry.source,
-      message: entry.message,
-      stack: entry.stack,
-    },
-  ]);
+    // Mirror to console (intentional — DevTools is the dev's debugging surface).
+    const formatted = formatEntry(entry);
+    switch (entry.severity) {
+      case "error":
+        console.error(formatted, entry.stack ?? ""); // eslint-disable-line no-console
+        break;
+      case "warn":
+        console.warn(formatted); // eslint-disable-line no-console
+        break;
+      case "info":
+        console.info(formatted); // eslint-disable-line no-console
+        break;
+      case "debug":
+      case "trace":
+        console.debug(formatted); // eslint-disable-line no-console
+        break;
+    }
+  }
 
-  // Persist to the NDJSON sink when the disk-logging toggle is on. Batched by
-  // count (threshold) and time (interval) to avoid an IPC call per log line.
-  if (isPersistenceEnabled()) {
+  // Persist to the NDJSON sink when the disk-logging toggle is on — or buffer
+  // while the gate is not wired yet (early startup). Batched by count
+  // (threshold) and time (interval) to avoid an IPC call per log line.
+  if (persistenceGate === null || persistenceGate()) {
     pending.push({
       ts: entry.timestamp,
       level: entry.severity,
@@ -142,26 +181,15 @@ function addEntry(entry: LogEntry): void {
       message: entry.message,
       stack: entry.stack,
     });
-    if (pending.length >= FLUSH_THRESHOLD) void flushFrontendLogs();
-    else scheduleFlush();
-  }
-
-  // Mirror to console (intentional — DevTools is the dev's debugging surface).
-  const formatted = formatEntry(entry);
-  switch (entry.severity) {
-    case "error":
-      console.error(formatted, entry.stack ?? ""); // eslint-disable-line no-console
-      break;
-    case "warn":
-      console.warn(formatted); // eslint-disable-line no-console
-      break;
-    case "info":
-      console.info(formatted); // eslint-disable-line no-console
-      break;
-    case "debug":
-    case "trace":
-      console.debug(formatted); // eslint-disable-line no-console
-      break;
+    if (pending.length > MAX_PENDING_ENTRIES) {
+      pending = pending.slice(pending.length - MAX_PENDING_ENTRIES);
+    }
+    // Only actively flush once the gate is wired ON; pre-wiring entries wait
+    // for wirePersistenceGate to decide (flush or drop).
+    if (persistenceGate?.()) {
+      if (pending.length >= FLUSH_THRESHOLD) void flushFrontendLogs();
+      else scheduleFlush();
+    }
   }
 }
 

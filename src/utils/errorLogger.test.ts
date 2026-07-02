@@ -8,6 +8,7 @@ import {
   logTrace,
   wireLoggingGate,
   wirePersistenceGate,
+  resetPersistenceGateForTest,
   flushFrontendLogs,
 } from "./errorLogger";
 import { useLogViewerStore } from "../store/logViewerStore";
@@ -28,6 +29,9 @@ beforeEach(() => {
   });
   // Open the gate so prior tests' wireLoggingGate-off doesn't bleed in.
   wireLoggingGate(() => true);
+  // Unwired persistence gate + empty pending buffer per test — the unwired
+  // state buffers entries, which would otherwise bleed across tests.
+  resetPersistenceGateForTest();
   vi.restoreAllMocks();
 });
 
@@ -468,5 +472,62 @@ describe("frontend log persistence flush", () => {
     for (let i = 0; i < 1100; i++) logError("test", new Error(`e${i}`));
     await flushFrontendLogs();
     expect(lastBatchLen).toBeLessThanOrEqual(1000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// persistence gate decoupling + pre-wiring buffer
+// ---------------------------------------------------------------------------
+
+describe("persistence gate decoupling", () => {
+  beforeEach(() => {
+    clearMocks();
+  });
+  afterEach(() => {
+    wirePersistenceGate(() => false);
+    clearMocks();
+  });
+
+  it("persists entries when frontendLogging=off but backendFileLogging=on (UI-allowed combo)", async () => {
+    wireLoggingGate(() => false); // Master aus
+    wirePersistenceGate(() => true); // Datei an
+    const sent: { entries: unknown[] }[] = [];
+    mockIPC((cmd, args) => {
+      if (cmd === "append_frontend_logs") sent.push(args as never);
+      return undefined;
+    });
+    logError("combo", new Error("file-only"));
+    await flushFrontendLogs();
+    expect(sent.length).toBe(1);
+    // UND: nichts im Ringbuffer — der Master-Gate war aus.
+    expect(useLogViewerStore.getState().entries).toHaveLength(0);
+  });
+
+  it("buffers pre-wiring entries and flushes them once the gate is wired ON", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const sent: { entries: { message: string }[] }[] = [];
+    mockIPC((cmd, args) => {
+      if (cmd === "append_frontend_logs") sent.push(args as never);
+      return undefined;
+    });
+    logError("early", new Error("startup failure")); // Gate noch unverdrahtet
+    expect(sent).toHaveLength(0);
+    wirePersistenceGate(() => true);
+    await vi.waitFor(() =>
+      expect(sent.flatMap((b) => b.entries.map((e) => e.message))).toContain("startup failure"),
+    );
+  });
+
+  it("drops the pre-wiring buffer when the gate is wired OFF", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const sent: unknown[] = [];
+    mockIPC((cmd) => {
+      if (cmd === "append_frontend_logs") sent.push(1);
+      return undefined;
+    });
+    logError("early", new Error("dropme"));
+    wirePersistenceGate(() => false); // User hat Datei-Logging aus → verwerfen
+    await flushFrontendLogs();
+    expect(sent).toHaveLength(0);
   });
 });
