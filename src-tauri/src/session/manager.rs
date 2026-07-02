@@ -91,10 +91,11 @@ impl SessionManager {
 
     /// Spawnt eine neue Claude-Session in einem PTY.
     ///
-    /// Bestimmt den Shell-Befehl anhand des `shell`-Parameters:
-    /// - "powershell" → `powershell.exe -NoExit -Command claude --dangerously-skip-permissions`
-    /// - "cmd" → `cmd.exe /K claude --dangerously-skip-permissions`
-    /// - "gitbash" → `bash.exe -c "claude --dangerously-skip-permissions"`
+    /// `shell` ist eine Preference ("auto" | "powershell" | "cmd" | "gitbash" |
+    /// "bash" | "zsh") und wird via [`resolve_shell_pref`] plattformbewusst auf
+    /// eine konkrete Shell aufgeloest — Windows: `powershell.exe -NoExit
+    /// -Command claude …`, macOS/Linux: Login-Shell wie `zsh -l -c "claude …"`.
+    /// Die aufgeloeste Shell (nie "auto") landet in `SessionInfo.shell`.
     #[allow(clippy::too_many_arguments)]
     pub fn create_session(
         &self,
@@ -113,6 +114,13 @@ impl SessionManager {
         let cols = initial_cols.filter(|c| *c > 0).unwrap_or(120);
         let rows = initial_rows.filter(|r| *r > 0).unwrap_or(40);
 
+        // Resolve the user preference ("auto", legacy values, platform-foreign
+        // shells) into a concrete shell for THIS platform before anything else
+        // — every downstream consumer (exe lookup, args, SessionInfo) sees
+        // only concrete values.
+        let platform = ShellPlatform::current();
+        let shell = resolve_shell_pref(&shell, platform).to_string();
+
         log::info!(
             "Creating session id={}, shell={}, folder={}, size={}x{}",
             id,
@@ -123,7 +131,7 @@ impl SessionManager {
         );
 
         // Validate the shell executable exists
-        let shell_exe = Self::shell_executable(&shell);
+        let shell_exe = shell_executable(&shell, platform);
         if which_executable(shell_exe).is_none() {
             let msg = format!(
                 "Failed to create session {}: shell executable '{}' not found in PATH",
@@ -151,7 +159,7 @@ impl SessionManager {
             })?;
 
         let mut cmd = CommandBuilder::new(shell_exe);
-        for arg in Self::shell_args(&shell, resume_session_id.as_deref()) {
+        for arg in shell_args(&shell, platform, resume_session_id.as_deref()) {
             cmd.arg(arg);
         }
         cmd.cwd(&folder);
@@ -575,44 +583,6 @@ impl SessionManager {
         }
     }
 
-    fn shell_executable(shell: &str) -> &'static str {
-        match shell {
-            "powershell" => "powershell.exe",
-            "cmd" => "cmd.exe",
-            "gitbash" => "bash.exe",
-            _ => "powershell.exe",
-        }
-    }
-
-    fn shell_args(shell: &str, resume_session_id: Option<&str>) -> Vec<String> {
-        // Defense-in-depth: only honour a resume ID with the expected charset.
-        // Primary validation happens at the Tauri command boundary (commands.rs);
-        // if a malformed ID still reaches here (e.g. a direct/test caller) fall
-        // back to a fresh session rather than aborting the process with a panic.
-        let valid_resume = resume_session_id.filter(|id| {
-            !id.is_empty()
-                && id
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-        });
-        if valid_resume.is_none() && resume_session_id.is_some() {
-            log::error!(
-                "shell_args: ignoring resume_session_id with invalid characters: '{}'",
-                resume_session_id.unwrap_or_default()
-            );
-        }
-        let claude_cmd = match valid_resume {
-            Some(id) => format!("claude --dangerously-skip-permissions --resume {}", id),
-            None => "claude --dangerously-skip-permissions".to_string(),
-        };
-        match shell {
-            "powershell" => vec!["-NoExit".to_string(), "-Command".to_string(), claude_cmd],
-            "cmd" => vec!["/K".to_string(), claude_cmd],
-            "gitbash" => vec!["-c".to_string(), claude_cmd],
-            _ => vec!["-NoExit".to_string(), "-Command".to_string(), claude_cmd],
-        }
-    }
-
     /// Strips ANSI escape sequences (CSI sequences like \x1b[...m).
     fn strip_ansi(s: &str) -> String {
         let mut result = String::with_capacity(s.len());
@@ -712,6 +682,158 @@ impl Drop for SessionManager {
         }
         sessions.clear(); // Drop aller SessionHandles → PTY Master geschlossen.
     }
+}
+
+/// Zielplattform fuer die Shell-Aufloesung. Als Parameter modelliert (statt
+/// `cfg!` in den Funktionen), damit macOS/Linux-Verhalten auf jeder
+/// CI-Plattform unit-testbar bleibt.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ShellPlatform {
+    Windows,
+    MacOs,
+    Linux,
+}
+
+impl ShellPlatform {
+    pub fn current() -> Self {
+        if cfg!(windows) {
+            Self::Windows
+        } else if cfg!(target_os = "macos") {
+            Self::MacOs
+        } else {
+            Self::Linux
+        }
+    }
+
+    /// Plattform-Default, auf den "auto" und plattformfremde Werte aufloesen.
+    fn default_shell(self) -> &'static str {
+        match self {
+            Self::Windows => "powershell",
+            Self::MacOs => "zsh",
+            Self::Linux => "bash",
+        }
+    }
+}
+
+/// Loest eine Shell-Preference ("auto", Settings-Wert, Legacy-Favorit) auf
+/// eine konkrete, auf dieser Plattform sinnvolle Shell auf. Gibt nie "auto"
+/// zurueck; plattformfremde Werte (z.B. "cmd" auf macOS) fallen auf den
+/// Plattform-Default zurueck statt den Spawn scheitern zu lassen.
+fn resolve_shell_pref(pref: &str, platform: ShellPlatform) -> &'static str {
+    match (pref, platform) {
+        ("powershell", _) => "powershell",
+        ("cmd", ShellPlatform::Windows) => "cmd",
+        ("gitbash", ShellPlatform::Windows) => "gitbash",
+        // Auf Unix ist Git Bash schlicht bash — Legacy-Favoriten aus einer
+        // Windows-Installation bleiben damit nutzbar.
+        ("gitbash", _) => "bash",
+        ("bash", _) => "bash",
+        ("zsh", _) => "zsh",
+        _ => platform.default_shell(), // "auto", unbekannt, plattformfremd
+    }
+}
+
+/// Executable-Name fuer eine bereits aufgeloeste Shell. Windows behaelt die
+/// expliziten `.exe`-Namen (bash.exe = Git Bash); Unix nutzt PATH-Namen,
+/// PowerShell heisst dort `pwsh`.
+fn shell_executable(shell: &str, platform: ShellPlatform) -> &'static str {
+    match platform {
+        ShellPlatform::Windows => match shell {
+            "powershell" => "powershell.exe",
+            "cmd" => "cmd.exe",
+            "gitbash" | "bash" => "bash.exe",
+            "zsh" => "zsh.exe",
+            _ => "powershell.exe",
+        },
+        _ => match shell {
+            "powershell" => "pwsh",
+            "zsh" => "zsh",
+            _ => "bash",
+        },
+    }
+}
+
+fn shell_args(
+    shell: &str,
+    platform: ShellPlatform,
+    resume_session_id: Option<&str>,
+) -> Vec<String> {
+    // Defense-in-depth: only honour a resume ID with the expected charset.
+    // Primary validation happens at the Tauri command boundary (commands.rs);
+    // if a malformed ID still reaches here (e.g. a direct/test caller) fall
+    // back to a fresh session rather than aborting the process with a panic.
+    let valid_resume = resume_session_id.filter(|id| {
+        !id.is_empty()
+            && id
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    });
+    if valid_resume.is_none() && resume_session_id.is_some() {
+        log::error!(
+            "shell_args: ignoring resume_session_id with invalid characters: '{}'",
+            resume_session_id.unwrap_or_default()
+        );
+    }
+    let claude_cmd = match valid_resume {
+        Some(id) => format!("claude --dangerously-skip-permissions --resume {}", id),
+        None => "claude --dangerously-skip-permissions".to_string(),
+    };
+    match (shell, platform) {
+        ("cmd", _) => vec!["/K".to_string(), claude_cmd],
+        // Git Bash auf Windows: non-login wie bisher (Profil-Sourcing dort
+        // langsam und fuer PATH unnoetig).
+        ("gitbash" | "bash" | "zsh", ShellPlatform::Windows) => {
+            vec!["-c".to_string(), claude_cmd]
+        }
+        // Unix: Login-Shell (-l) ist Pflicht — GUI-Apps erben auf macOS nicht
+        // den User-PATH, erst .zprofile/.bash_profile bringen homebrew- und
+        // npm-global-Pfade rein, ohne die `claude` nicht gefunden wird.
+        ("gitbash" | "bash" | "zsh", _) => {
+            vec!["-l".to_string(), "-c".to_string(), claude_cmd]
+        }
+        // "powershell" und alles Unbekannte: PowerShell-Form (pwsh nutzt
+        // dieselben Flags).
+        _ => vec!["-NoExit".to_string(), "-Command".to_string(), claude_cmd],
+    }
+}
+
+/// Eintrag fuer die Shell-Auswahl in den Settings — nur real installierte
+/// Shells (PATH-Probe) landen hier; "auto" ergaenzt das Frontend selbst.
+#[derive(Clone, serde::Serialize)]
+pub struct ShellOption {
+    pub id: String,
+    pub label: String,
+}
+
+/// Probt, welche der plattformueblichen Shells tatsaechlich installiert sind.
+pub fn detect_available_shells() -> Vec<ShellOption> {
+    let platform = ShellPlatform::current();
+    let candidates: &[(&str, &str)] = match platform {
+        ShellPlatform::Windows => &[
+            ("powershell", "PowerShell"),
+            ("cmd", "CMD"),
+            ("bash", "Git Bash"),
+            ("zsh", "Zsh"),
+        ],
+        ShellPlatform::MacOs => &[
+            ("zsh", "Zsh"),
+            ("bash", "Bash"),
+            ("powershell", "PowerShell (pwsh)"),
+        ],
+        ShellPlatform::Linux => &[
+            ("bash", "Bash"),
+            ("zsh", "Zsh"),
+            ("powershell", "PowerShell (pwsh)"),
+        ],
+    };
+    candidates
+        .iter()
+        .filter(|(id, _)| which_executable(shell_executable(id, platform)).is_some())
+        .map(|(id, label)| ShellOption {
+            id: (*id).to_string(),
+            label: (*label).to_string(),
+        })
+        .collect()
 }
 
 /// Check if an executable exists on PATH (simple cross-platform check).
@@ -1043,37 +1165,82 @@ mod tests {
         assert_eq!(SessionManager::strip_ansi("text\x1b[999"), "text");
     }
 
-    // --- shell_executable ---
+    // --- resolve_shell_pref ---
 
     #[test]
-    fn shell_executable_powershell() {
+    fn resolve_auto_picks_platform_default() {
         assert_eq!(
-            SessionManager::shell_executable("powershell"),
-            "powershell.exe"
+            resolve_shell_pref("auto", ShellPlatform::Windows),
+            "powershell"
+        );
+        assert_eq!(resolve_shell_pref("auto", ShellPlatform::MacOs), "zsh");
+        assert_eq!(resolve_shell_pref("auto", ShellPlatform::Linux), "bash");
+    }
+
+    #[test]
+    fn resolve_concrete_prefs_pass_through() {
+        assert_eq!(
+            resolve_shell_pref("powershell", ShellPlatform::Windows),
+            "powershell"
+        );
+        assert_eq!(resolve_shell_pref("cmd", ShellPlatform::Windows), "cmd");
+        assert_eq!(resolve_shell_pref("zsh", ShellPlatform::MacOs), "zsh");
+        assert_eq!(resolve_shell_pref("bash", ShellPlatform::Linux), "bash");
+    }
+
+    #[test]
+    fn resolve_platform_foreign_prefs_fall_back_to_default() {
+        // Windows-only Shells auf Unix duerfen den Spawn nicht scheitern lassen.
+        assert_eq!(resolve_shell_pref("cmd", ShellPlatform::MacOs), "zsh");
+        assert_eq!(resolve_shell_pref("cmd", ShellPlatform::Linux), "bash");
+        // Legacy-Favoriten mit "gitbash" laufen auf Unix als bash weiter.
+        assert_eq!(resolve_shell_pref("gitbash", ShellPlatform::MacOs), "bash");
+        assert_eq!(
+            resolve_shell_pref("gitbash", ShellPlatform::Windows),
+            "gitbash"
         );
     }
 
     #[test]
-    fn shell_executable_cmd() {
-        assert_eq!(SessionManager::shell_executable("cmd"), "cmd.exe");
+    fn resolve_unknown_pref_falls_back_to_default() {
+        assert_eq!(
+            resolve_shell_pref("fish", ShellPlatform::Windows),
+            "powershell"
+        );
+        assert_eq!(resolve_shell_pref("", ShellPlatform::MacOs), "zsh");
+    }
+
+    // --- shell_executable ---
+
+    #[test]
+    fn shell_executable_windows_keeps_exe_names() {
+        assert_eq!(
+            shell_executable("powershell", ShellPlatform::Windows),
+            "powershell.exe"
+        );
+        assert_eq!(shell_executable("cmd", ShellPlatform::Windows), "cmd.exe");
+        assert_eq!(
+            shell_executable("gitbash", ShellPlatform::Windows),
+            "bash.exe"
+        );
+        assert_eq!(shell_executable("bash", ShellPlatform::Windows), "bash.exe");
+        assert_eq!(shell_executable("zsh", ShellPlatform::Windows), "zsh.exe");
     }
 
     #[test]
-    fn shell_executable_gitbash() {
-        assert_eq!(SessionManager::shell_executable("gitbash"), "bash.exe");
-    }
-
-    #[test]
-    fn shell_executable_unknown_falls_back_to_powershell() {
-        assert_eq!(SessionManager::shell_executable("zsh"), "powershell.exe");
-        assert_eq!(SessionManager::shell_executable(""), "powershell.exe");
+    fn shell_executable_unix_uses_path_names() {
+        // Der Mac-Bug: vorher wurde hier powershell.exe/bash.exe gesucht.
+        assert_eq!(shell_executable("zsh", ShellPlatform::MacOs), "zsh");
+        assert_eq!(shell_executable("bash", ShellPlatform::MacOs), "bash");
+        assert_eq!(shell_executable("powershell", ShellPlatform::MacOs), "pwsh");
+        assert_eq!(shell_executable("bash", ShellPlatform::Linux), "bash");
     }
 
     // --- shell_args ---
 
     #[test]
     fn shell_args_powershell_no_resume() {
-        let args = SessionManager::shell_args("powershell", None);
+        let args = shell_args("powershell", ShellPlatform::Windows, None);
         assert_eq!(
             args,
             vec![
@@ -1086,7 +1253,7 @@ mod tests {
 
     #[test]
     fn shell_args_cmd_no_resume() {
-        let args = SessionManager::shell_args("cmd", None);
+        let args = shell_args("cmd", ShellPlatform::Windows, None);
         assert_eq!(
             args,
             vec![
@@ -1097,8 +1264,8 @@ mod tests {
     }
 
     #[test]
-    fn shell_args_gitbash_no_resume() {
-        let args = SessionManager::shell_args("gitbash", None);
+    fn shell_args_gitbash_windows_stays_non_login() {
+        let args = shell_args("gitbash", ShellPlatform::Windows, None);
         assert_eq!(
             args,
             vec![
@@ -1109,15 +1276,32 @@ mod tests {
     }
 
     #[test]
+    fn shell_args_unix_shells_are_login_shells() {
+        // -l ist der zweite Mac-Fix: ohne Login-Shell fehlt GUI-Apps der
+        // User-PATH (homebrew/npm-global) und `claude` wird nicht gefunden.
+        for shell in ["zsh", "bash"] {
+            let args = shell_args(shell, ShellPlatform::MacOs, None);
+            assert_eq!(
+                args,
+                vec![
+                    "-l".to_string(),
+                    "-c".to_string(),
+                    "claude --dangerously-skip-permissions".to_string(),
+                ]
+            );
+        }
+    }
+
+    #[test]
     fn shell_args_unknown_shell_falls_back_to_powershell_form() {
-        let args = SessionManager::shell_args("fish", None);
+        let args = shell_args("fish", ShellPlatform::Windows, None);
         assert_eq!(args[0], "-NoExit");
         assert_eq!(args[1], "-Command");
     }
 
     #[test]
     fn shell_args_valid_resume_id_appended() {
-        let args = SessionManager::shell_args("powershell", Some("abc-123_XY"));
+        let args = shell_args("powershell", ShellPlatform::Windows, Some("abc-123_XY"));
         assert_eq!(
             args[2],
             "claude --dangerously-skip-permissions --resume abc-123_XY"
@@ -1126,34 +1310,35 @@ mod tests {
 
     #[test]
     fn shell_args_empty_resume_id_ignored() {
-        let args = SessionManager::shell_args("powershell", Some(""));
+        let args = shell_args("powershell", ShellPlatform::Windows, Some(""));
         assert_eq!(args[2], "claude --dangerously-skip-permissions");
     }
 
     #[test]
     fn shell_args_invalid_resume_id_with_space_ignored() {
-        let args = SessionManager::shell_args("cmd", Some("bad id"));
+        let args = shell_args("cmd", ShellPlatform::Windows, Some("bad id"));
         assert_eq!(args[1], "claude --dangerously-skip-permissions");
     }
 
     #[test]
     fn shell_args_invalid_resume_id_with_shell_metachar_ignored() {
         // Semicolon would be a command-injection vector — must be rejected.
-        let args = SessionManager::shell_args("gitbash", Some("id;rm -rf"));
-        assert_eq!(args[1], "claude --dangerously-skip-permissions");
+        // Auf Unix steckt das Kommando in args[2] (nach -l -c).
+        let args = shell_args("zsh", ShellPlatform::MacOs, Some("id;rm -rf"));
+        assert_eq!(args[2], "claude --dangerously-skip-permissions");
     }
 
     #[test]
     fn shell_args_resume_id_with_dot_rejected() {
         // '.' is not in the allowed charset (alphanumeric, '-', '_').
-        let args = SessionManager::shell_args("powershell", Some("a.b"));
+        let args = shell_args("powershell", ShellPlatform::Windows, Some("a.b"));
         assert_eq!(args[2], "claude --dangerously-skip-permissions");
     }
 
     #[test]
     fn shell_args_uuid_style_resume_id_accepted() {
         let uuid = "550e8400-e29b-41d4-a716-446655440000";
-        let args = SessionManager::shell_args("powershell", Some(uuid));
+        let args = shell_args("powershell", ShellPlatform::Windows, Some(uuid));
         assert_eq!(
             args[2],
             format!("claude --dangerously-skip-permissions --resume {uuid}")

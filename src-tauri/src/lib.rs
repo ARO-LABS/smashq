@@ -278,6 +278,7 @@ pub fn run() {
             commands::set_file_logging_enabled,
             // Session-Commands
             session::commands::commands::create_session,
+            session::commands::commands::detect_shells,
             session::commands::commands::write_session,
             session::commands::commands::resize_session,
             session::commands::commands::close_session,

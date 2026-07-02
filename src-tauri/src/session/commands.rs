@@ -53,7 +53,9 @@ pub mod commands {
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| "Session".to_string())
         });
-        let shell = shell.unwrap_or_else(|| "powershell".to_string());
+        // "auto" laesst den Manager den Plattform-Default waehlen
+        // (Windows: powershell, macOS: zsh, Linux: bash).
+        let shell = shell.unwrap_or_else(|| "auto".to_string());
 
         manager.create_session(
             app,
@@ -65,6 +67,15 @@ pub mod commands {
             initial_cols,
             initial_rows,
         )
+    }
+
+    /// Probt, welche Shells auf diesem Geraet installiert sind (PATH-Lookup).
+    /// Die Settings-UI zeigt nur diese Optionen an, statt blind alle Shells
+    /// anzubieten, die es auf der Plattform geben koennte.
+    #[tauri::command]
+    pub async fn detect_shells() -> Result<Vec<super::super::manager::ShellOption>, ADPError> {
+        log::debug!("detect_shells called");
+        Ok(super::super::manager::detect_available_shells())
     }
 
     #[tauri::command]
