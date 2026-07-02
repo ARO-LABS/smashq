@@ -2,7 +2,6 @@ import type { CSSProperties } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { FavoriteCard } from "./FavoriteCard";
-import { ICONS, ICON_SIZE } from "../../utils/icons";
 import type { FavoriteFolder } from "../../store/settingsStore";
 
 interface Props {
@@ -24,20 +23,18 @@ export function SortableFavoriteCard({ favorite, onStart, onRemove }: Props) {
     opacity: isDragging ? 0.4 : 1,
   };
 
-  const Drag = ICONS.action.dragHandle;
-
   return (
-    <div ref={setNodeRef} style={style} className="group relative">
+    // Whole card is the drag surface. The SmartPointerSensor spares the
+    // action buttons; the 6px activation distance spares plain clicks
+    // (preview). select-none prevents accidental text selection on grab.
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`group relative select-none ${isDragging ? "cursor-grabbing" : ""}`}
+      {...attributes}
+      {...listeners}
+    >
       <FavoriteCard favorite={favorite} onStart={onStart} onRemove={onRemove} />
-      <button
-        type="button"
-        aria-label="Drag-Handle"
-        className="absolute left-0 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity text-neutral-400 cursor-grab active:cursor-grabbing"
-        {...attributes}
-        {...listeners}
-      >
-        <Drag className={ICON_SIZE.inline} strokeWidth={2} />
-      </button>
     </div>
   );
 }

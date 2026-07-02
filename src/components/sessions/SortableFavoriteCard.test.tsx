@@ -32,8 +32,8 @@ describe("SortableFavoriteCard", () => {
     expect(screen.getByText("F1")).toBeInTheDocument();
   });
 
-  it("exposes a drag handle with the German aria-label", () => {
-    render(
+  it("makes the whole card the drag surface (no dedicated grip handle)", () => {
+    const { container } = render(
       <DndContext>
         <SortableContext items={["f1"]}>
           <SortableFavoriteCard
@@ -44,7 +44,10 @@ describe("SortableFavoriteCard", () => {
         </SortableContext>
       </DndContext>
     );
-    expect(screen.getByLabelText("Drag-Handle")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Drag-Handle")).not.toBeInTheDocument();
+    // dnd-kit attributes now live on the sortable root itself
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.getAttribute("aria-roledescription")).toBe("sortable");
   });
 
   it("forwards onStart and onRemove callbacks to FavoriteCard", () => {
