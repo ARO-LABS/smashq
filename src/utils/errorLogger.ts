@@ -77,11 +77,14 @@ const FLUSH_THRESHOLD = 25;
 const MAX_PENDING_ENTRIES = 1000;
 let pending: StructuredEntry[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
-// Re-entrancy guard. flushFrontendLogs is async; the threshold path, the timer,
-// and the close/unmount paths can all trigger it concurrently. Without this,
-// two in-flight flushes that both fail would re-queue out of chronological
-// order. Only one flush drains at a time; concurrent callers reschedule.
-let flushing = false;
+// Serialization handle. flushFrontendLogs is async; the threshold path, the
+// timer, and the close/unmount paths can all trigger it concurrently. Callers
+// AWAIT the in-flight drain and then drain what accumulated since — an
+// early-return here (the previous `flushing` flag) let the close-requested
+// flush resolve while a batch was still in the air; Tauri destroys the window
+// the moment the close handler resolves, so the rescheduled timer never fired
+// and those entries were lost.
+let inFlight: Promise<void> | null = null;
 
 function scheduleFlush(): void {
   if (flushTimer !== null) return;
@@ -97,15 +100,13 @@ export async function flushFrontendLogs(): Promise<void> {
     clearTimeout(flushTimer);
     flushTimer = null;
   }
-  if (flushing) {
-    // A flush is already draining; let it finish and reschedule so entries
-    // buffered since are picked up next tick. Keeps sends strictly serialized.
-    scheduleFlush();
-    return;
+  // while, not if: after awaiting, another caller may have started a new
+  // drain in the microtask gap. Sends stay strictly serialized.
+  while (inFlight) {
+    await inFlight;
   }
   if (pending.length === 0) return;
-  flushing = true;
-  try {
+  const work = (async () => {
     const batch = pending;
     pending = [];
     try {
@@ -123,9 +124,23 @@ export async function flushFrontendLogs(): Promise<void> {
       scheduleFlush();
       console.debug("[errorLogger] frontend log flush failed, re-queued", e); // eslint-disable-line no-console
     }
+  })();
+  inFlight = work;
+  try {
+    await work;
   } finally {
-    flushing = false;
+    inFlight = null;
   }
+}
+
+/**
+ * Drain pending entries, THEN run the gate sync. Used by settingsStore when
+ * backendFileLogging turns OFF — flipping the Rust gate first would reject
+ * the final batch (entries logged while the toggle was still on).
+ */
+export async function flushBeforeGateClose(syncGate: () => Promise<void>): Promise<void> {
+  await flushFrontendLogs();
+  await syncGate();
 }
 
 function formatEntry(entry: LogEntry): string {

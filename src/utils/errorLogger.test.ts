@@ -10,6 +10,7 @@ import {
   wirePersistenceGate,
   resetPersistenceGateForTest,
   flushFrontendLogs,
+  flushBeforeGateClose,
 } from "./errorLogger";
 import { useLogViewerStore } from "../store/logViewerStore";
 
@@ -472,6 +473,58 @@ describe("frontend log persistence flush", () => {
     for (let i = 0; i < 1100; i++) logError("test", new Error(`e${i}`));
     await flushFrontendLogs();
     expect(lastBatchLen).toBeLessThanOrEqual(1000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// flush serialization (close-flush must not lose in-flight batches)
+// ---------------------------------------------------------------------------
+
+describe("flush serialization", () => {
+  beforeEach(() => {
+    clearMocks();
+  });
+  afterEach(() => {
+    wirePersistenceGate(() => false);
+    clearMocks();
+  });
+
+  it("a close-flush awaits an in-flight flush AND drains entries buffered since", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    wirePersistenceGate(() => true);
+    const sent: { entries: { message: string }[] }[] = [];
+    let releaseFirst!: () => void;
+    const firstBlocked = new Promise<void>((r) => (releaseFirst = r));
+    mockIPC(async (cmd, args) => {
+      if (cmd !== "append_frontend_logs") return undefined;
+      sent.push(args as never);
+      if (sent.length === 1) await firstBlocked; // erster Flush haengt in-flight
+      return undefined;
+    });
+    logError("t", new Error("batch1"));
+    const first = flushFrontendLogs(); // detacht batch1, haengt im invoke
+    logError("t", new Error("batch2")); // gebuffert WAEHREND in-flight
+    const closeFlush = flushFrontendLogs(); // Close-Pfad
+    releaseFirst();
+    await Promise.all([first, closeFlush]);
+    const messages = sent.flatMap((b) => b.entries.map((e) => e.message));
+    expect(messages).toContain("batch1");
+    expect(messages).toContain("batch2"); // alter flushing-Early-Return verlor batch2
+  });
+
+  it("flushBeforeGateClose drains pending BEFORE running the gate sync", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    wirePersistenceGate(() => true);
+    const order: string[] = [];
+    mockIPC((cmd) => {
+      if (cmd === "append_frontend_logs") order.push("flush");
+      return undefined;
+    });
+    logError("t", new Error("last words"));
+    await flushBeforeGateClose(async () => {
+      order.push("gate");
+    });
+    expect(order).toEqual(["flush", "gate"]);
   });
 });
 

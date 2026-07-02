@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { tauriStorage, getLoadedFavorites, getLoadedFavoriteGroups, getLoadedNotes, registerNoteFlush } from "./tauriStorage";
 import { useUIStore } from "./uiStore";
-import { logError } from "../utils/errorLogger";
+import { logError, flushBeforeGateClose } from "../utils/errorLogger";
 import { broadcastPreferencesChange } from "../utils/preferencesBroadcast";
 import { isAccentName } from "../utils/sessionAccent";
 
@@ -803,18 +803,27 @@ export const useSettingsStore = create<SettingsState>()(
             partial.backendFileLogging !== state.preferences.backendFileLogging
           ) {
             const wantedValue = partial.backendFileLogging;
-            invoke("set_file_logging_enabled", { enabled: wantedValue }).catch((err) => {
-              logError("settingsStore.setBackendFileLogging", err);
-              // Lazy import of uiStore to avoid a hard dep at module init.
-              import("./uiStore").then(({ useUIStore }) => {
-                useUIStore.getState().addToast({
-                  type: "error",
-                  title: "Backend-Logging-Toggle fehlgeschlagen",
-                  message: `Datei-Logging konnte nicht auf ${wantedValue ? "an" : "aus"} gesetzt werden. Bitte App neu starten.`,
-                  duration: 10000,
-                });
-              }).catch(() => { /* uiStore unreachable — already logged */ });
-            });
+            const syncGate = () =>
+              invoke("set_file_logging_enabled", { enabled: wantedValue }).catch((err) => {
+                logError("settingsStore.setBackendFileLogging", err);
+                // Lazy import of uiStore to avoid a hard dep at module init.
+                import("./uiStore").then(({ useUIStore }) => {
+                  useUIStore.getState().addToast({
+                    type: "error",
+                    title: "Backend-Logging-Toggle fehlgeschlagen",
+                    message: `Datei-Logging konnte nicht auf ${wantedValue ? "an" : "aus"} gesetzt werden. Bitte App neu starten.`,
+                    duration: 10000,
+                  });
+                }).catch(() => { /* uiStore unreachable — already logged */ });
+              });
+            if (wantedValue) {
+              void syncGate();
+            } else {
+              // Drain buffered frontend entries while the Rust gate is still
+              // open — flipping first would reject the final batch (entries
+              // logged while the toggle was on).
+              void flushBeforeGateClose(() => syncGate().then(() => undefined));
+            }
           }
           didChange = Object.keys(partial).some(
             (k) => state.preferences[k as keyof AppPreferencesSettings] !== next[k as keyof AppPreferencesSettings],
