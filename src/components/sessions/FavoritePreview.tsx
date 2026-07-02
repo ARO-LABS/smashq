@@ -2,6 +2,7 @@ import { X, FolderOpen } from "lucide-react";
 import { useUIStore } from "../../store/uiStore";
 import { ConfigPanelContent } from "./configPanelShared";
 import { ConfigPanelTabList } from "./ConfigPanelTabList";
+import { accentCssVars, hashFolderToAccent } from "../../utils/sessionAccent";
 
 interface FavoritePreviewProps {
   folder: string;
@@ -15,7 +16,9 @@ export function FavoritePreview({ folder, onClose, onResumeSession }: FavoritePr
   const projectName = folder.split(/[/\\]/).filter(Boolean).pop() ?? folder;
 
   return (
-    <div className="flex flex-col h-full">
+    // --accent-h-Override: Header-Icon + aktive Tabs erben die Projekt-Farbe
+    // (gleiche Hue-Quelle wie Sidebar-Punkt und Grid-Rahmen).
+    <div className="flex flex-col h-full" style={accentCssVars(hashFolderToAccent(folder))}>
       {/* Header */}
       <div className="flex items-center h-10 px-4 border-b border-neutral-800 shrink-0 bg-surface-base">
         <FolderOpen className="w-3.5 h-3.5 text-accent mr-2 shrink-0" />

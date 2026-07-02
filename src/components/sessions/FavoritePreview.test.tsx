@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { FavoritePreview } from "./FavoritePreview";
 import { useUIStore } from "../../store/uiStore";
+import { ACCENT_HUES, hashFolderToAccent } from "../../utils/sessionAccent";
 
 vi.mock("./configPanelShared", () => ({
   ConfigPanelContent: ({ folder, activeTab }: { folder: string; activeTab: string }) => (
@@ -25,6 +26,15 @@ describe("FavoritePreview", () => {
       <FavoritePreview folder="C:/Projects/my-app" onClose={vi.fn()} />,
     );
     expect(screen.getByText("my-app")).toBeTruthy();
+  });
+
+  it("tints the preview with the folder-hash accent hue", () => {
+    const { container } = render(
+      <FavoritePreview folder="C:/Projects/my-app" onClose={vi.fn()} />,
+    );
+    const root = container.firstChild as HTMLElement;
+    const expectedHue = String(ACCENT_HUES[hashFolderToAccent("C:/Projects/my-app")]);
+    expect(root.style.getPropertyValue("--accent-h")).toBe(expectedHue);
   });
 
   it("displays the full folder path in the header", () => {

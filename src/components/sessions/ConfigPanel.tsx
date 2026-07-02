@@ -2,22 +2,31 @@ import { X } from "lucide-react";
 import { useUIStore } from "../../store/uiStore";
 import { ConfigPanelContent } from "./configPanelShared";
 import { ConfigPanelTabList } from "./ConfigPanelTabList";
+import {
+  accentCssVars,
+  hashFolderToAccent,
+  type AccentName,
+} from "../../utils/sessionAccent";
 
 interface ConfigPanelProps {
   folder: string;
   width?: number;
+  /** Session-Akzent (z.B. mit Per-Session-Override aufgeloest). Default: Ordner-Hash. */
+  accent?: AccentName;
   onResumeSession?: (sessionId: string, cwd: string, title?: string) => void;
   onClose?: () => void;
 }
 
-export function ConfigPanel({ folder, width, onResumeSession, onClose }: ConfigPanelProps) {
+export function ConfigPanel({ folder, width, accent, onResumeSession, onClose }: ConfigPanelProps) {
   const configSubTab = useUIStore((s) => s.configSubTab);
   const setConfigPanelOpen = useUIStore((s) => s.setConfigPanelOpen);
 
   return (
     <div
       className="flex flex-col min-h-0 shrink-0 m-2 rounded-md shadow-hairline overflow-hidden bg-surface-base"
-      style={{ width: width ?? 400 }}
+      // --accent-h-Override: alle text-accent/bg-accent-a*-Klassen im Panel
+      // (aktive Tabs, Icons) erben die Session-Farbe statt des globalen Cyan.
+      style={{ width: width ?? 400, ...accentCssVars(accent ?? hashFolderToAccent(folder)) }}
     >
       {/* Tab header */}
       <div className="flex items-center h-9 bg-surface-base border-b border-neutral-800 shrink-0">

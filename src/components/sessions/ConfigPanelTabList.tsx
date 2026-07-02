@@ -232,7 +232,7 @@ export function ConfigPanelTabList({ folder, size = "md", isPrimary = true }: Co
               onClick={() => setConfigSubTab(tab.id)}
               className={`flex items-center gap-1 ${buttonPadding} ${textSize} font-medium rounded-sm whitespace-nowrap transition-colors ${
                 isActive
-                  ? "text-accent bg-accent-a10"
+                  ? "text-accent bg-accent-a30"
                   : "text-neutral-400 hover:text-neutral-200 hover:bg-hover-overlay"
               }`}
               title={tab.label}
@@ -257,7 +257,7 @@ export function ConfigPanelTabList({ folder, size = "md", isPrimary = true }: Co
             key={pin.id}
             className={`group flex items-center gap-0.5 rounded-sm whitespace-nowrap transition-colors ${
               isActive
-                ? "text-accent bg-accent-a10"
+                ? "text-accent bg-accent-a30"
                 : "text-neutral-400 hover:text-neutral-200 hover:bg-hover-overlay"
             }`}
           >

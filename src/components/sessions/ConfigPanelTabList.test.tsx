@@ -199,7 +199,8 @@ describe("ConfigPanelTabList", () => {
 
     const claudeTab = screen.getByTitle("CLAUDE.md");
     expect(claudeTab.className).toContain("text-accent");
-    expect(claudeTab.className).toContain("bg-accent-a10");
+    // a30 statt a10 — die aktive Markierung muss deckend genug sein (#Grid-Farben)
+    expect(claudeTab.className).toContain("bg-accent-a30");
   });
 
   it("renders non-active tabs with neutral color", () => {

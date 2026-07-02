@@ -14,7 +14,7 @@ import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useSessionCreation } from "./hooks/useSessionCreation";
 import { GRID_AREAS, getGridStyle, SINGLE_LAYOUT_STYLE } from "./sessionGridLayout";
 import { ICONS, ICON_SIZE } from "../../utils/icons";
-import { accentFrameColorFor } from "../../utils/sessionAccent";
+import { accentFrameColorFor, resolveSessionAccent } from "../../utils/sessionAccent";
 import { useSettingsStore } from "../../store/settingsStore";
 
 export function SessionManagerView() {
@@ -231,6 +231,13 @@ export function SessionManagerView() {
                   <ConfigPanel
                     folder={activeSession?.folder ?? ""}
                     width={configPanelWidth}
+                    // Session-Akzent inkl. Per-Session-Override — Panel-Tabs
+                    // zeigen dieselbe Farbe wie Kachel-Rahmen und Sidebar-Punkt.
+                    accent={
+                      activeSession
+                        ? resolveSessionAccent(activeSession, sessionAccents)
+                        : undefined
+                    }
                     onResumeSession={handleResumeSession}
                   />
                 </>

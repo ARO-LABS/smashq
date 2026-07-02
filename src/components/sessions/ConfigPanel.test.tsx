@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ConfigPanel } from "./ConfigPanel";
 import { useUIStore } from "../../store/uiStore";
+import { ACCENT_HUES, hashFolderToAccent } from "../../utils/sessionAccent";
 
 // Mock lazy-loaded child components to avoid async loading in tests
 vi.mock("./configPanelShared", () => ({
@@ -46,5 +47,22 @@ describe("ConfigPanel", () => {
     const { container } = render(<ConfigPanel folder="/test/project" />);
     const panel = container.firstChild as HTMLElement;
     expect(panel.style.width).toBe("400px");
+  });
+
+  it("tints the panel with the folder-hash accent hue by default", () => {
+    const { container } = render(<ConfigPanel folder="/test/project" />);
+    const panel = container.firstChild as HTMLElement;
+    const expectedHue = String(ACCENT_HUES[hashFolderToAccent("/test/project")]);
+    expect(panel.style.getPropertyValue("--accent-h")).toBe(expectedHue);
+  });
+
+  it("an explicit accent prop overrides the folder hash", () => {
+    const { container } = render(
+      <ConfigPanel folder="/test/project" accent="violet" />,
+    );
+    const panel = container.firstChild as HTMLElement;
+    expect(panel.style.getPropertyValue("--accent-h")).toBe(
+      String(ACCENT_HUES.violet),
+    );
   });
 });
