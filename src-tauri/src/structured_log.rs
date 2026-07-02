@@ -6,6 +6,7 @@
 use crate::error::ADPError;
 use crate::LOGGING_ENABLED;
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -182,14 +183,43 @@ fn sanitize_entry(mut e: StructuredEntry) -> StructuredEntry {
     e
 }
 
-/// Read the last `max` entries, skipping malformed lines.
-fn read_from(path: &Path, max: usize) -> Vec<StructuredEntry> {
+/// Last `max` lines of one file with bounded memory (no full-file Vec).
+/// Byte-based split + lossy UTF-8: a crash mid-write can leave a truncated
+/// multibyte sequence, which `lines()` reports as an Err — and would either
+/// hide every entry after it (map_while) or risk an infinite Err loop
+/// (filter_map, clippy::lines_filter_map_ok). Lossy conversion makes the
+/// corrupt line harmless (filtered as malformed JSON later) while map_while
+/// still stops on genuine read errors.
+fn tail_lines(path: &Path, max: usize) -> VecDeque<String> {
     let Ok(file) = File::open(path) else {
-        return Vec::new();
+        return VecDeque::new();
     };
-    let lines: Vec<String> = BufReader::new(file).lines().map_while(Result::ok).collect();
-    let start = lines.len().saturating_sub(max);
-    lines[start..]
+    let mut buf: VecDeque<String> = VecDeque::new();
+    for chunk in BufReader::new(file).split(b'\n').map_while(Result::ok) {
+        if buf.len() == max {
+            buf.pop_front();
+        }
+        buf.push_back(String::from_utf8_lossy(&chunk).into_owned());
+    }
+    buf
+}
+
+/// Read the last `max` entries, skipping malformed lines. When the primary
+/// file holds fewer than `max` lines (fresh after rotation), backfill from
+/// `.1` → `.3` so the documented "last N entries" contract survives the
+/// rotation boundary instead of showing a near-empty viewer.
+fn read_from(path: &Path, max: usize) -> Vec<StructuredEntry> {
+    let mut lines: Vec<String> = tail_lines(path, max).into();
+    for n in 1..=KEEP_ROTATED {
+        if lines.len() >= max {
+            break;
+        }
+        let rotated = path.with_extension(format!("ndjson.{n}"));
+        let mut older: Vec<String> = tail_lines(&rotated, max - lines.len()).into();
+        older.append(&mut lines);
+        lines = older;
+    }
+    lines
         .iter()
         .filter_map(|l| serde_json::from_str::<StructuredEntry>(l).ok())
         .collect()
@@ -217,10 +247,18 @@ pub mod commands {
         }
     }
 
-    /// Returns the last `max_lines` (default 500) structured entries.
+    /// Returns the last `max_lines` (default 500, capped) structured entries,
+    /// backfilling across the rotation boundary. `async` keeps the file scan
+    /// (up to ~5 MB) off the main thread — a non-async command would stall
+    /// the event loop on every viewer mount/refresh.
     #[tauri::command]
-    pub fn read_structured_log(max_lines: Option<usize>) -> Result<Vec<StructuredEntry>, ADPError> {
-        Ok(read_from(&ndjson_path(), max_lines.unwrap_or(500)))
+    pub async fn read_structured_log(
+        max_lines: Option<usize>,
+    ) -> Result<Vec<StructuredEntry>, ADPError> {
+        Ok(read_from(
+            &ndjson_path(),
+            max_lines.unwrap_or(500).min(5000),
+        ))
     }
 }
 
@@ -334,6 +372,61 @@ mod tests {
         assert_eq!(parsed.message, "serialize failed");
         assert!(!parsed.ts.is_empty());
         assert!(!parsed.source.is_empty());
+    }
+
+    #[test]
+    fn read_skips_invalid_utf8_line_and_keeps_newer_entries() {
+        let dir = std::env::temp_dir().join("smashq-log-test-utf8");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("app-log.ndjson");
+        let good = |m: &str| {
+            format!(
+                "{{\"ts\":\"t\",\"level\":\"info\",\"source\":\"backend\",\"message\":\"{m}\"}}"
+            )
+        };
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(good("before").as_bytes());
+        bytes.extend_from_slice(b"\n\xC3\x28corrupt\n"); // abgeschnittene Multibyte-Sequenz
+        bytes.extend_from_slice(good("after").as_bytes());
+        bytes.push(b'\n');
+        std::fs::write(&path, bytes).unwrap();
+
+        let read = read_from(&path, 500);
+        assert_eq!(read.len(), 2, "entries after a corrupt line must survive");
+        assert_eq!(read[1].message, "after");
+    }
+
+    #[test]
+    fn read_backfills_from_rotated_file_after_rotation() {
+        let dir = std::env::temp_dir().join("smashq-log-test-backfill");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("app-log.ndjson");
+        let line = |m: &str| {
+            format!(
+                "{{\"ts\":\"t\",\"level\":\"info\",\"source\":\"backend\",\"message\":\"{m}\"}}\n"
+            )
+        };
+        std::fs::write(
+            path.with_extension("ndjson.1"),
+            format!("{}{}", line("old1"), line("old2")),
+        )
+        .unwrap();
+        std::fs::write(&path, line("new1")).unwrap();
+
+        let read = read_from(&path, 500);
+        assert_eq!(
+            read.iter().map(|e| e.message.as_str()).collect::<Vec<_>>(),
+            vec!["old1", "old2", "new1"]
+        );
+        // max wird respektiert — die JUENGSTEN Eintraege gewinnen.
+        let capped = read_from(&path, 2);
+        assert_eq!(
+            capped
+                .iter()
+                .map(|e| e.message.as_str())
+                .collect::<Vec<_>>(),
+            vec!["old2", "new1"]
+        );
     }
 
     #[test]
