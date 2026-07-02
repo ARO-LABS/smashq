@@ -122,7 +122,7 @@ Der Tauri-Auto-Updater ist der einzige Pfad, ueber den Bugfixes die installierte
 - Zustand-Persist-Validation: bei persistierten Stores Validation in BEIDE Hooks — `migrate` (Schema-Bump) UND `onRehydrateStorage` (same-version-Corruption-Recovery). Migrate alleine deckt Issue-#209-Klasse nicht ab.
 - Settings-Sanitize-Helpers: jedes numerische User-Setting bekommt `sanitizeXxx(value: unknown): number` mit Clamp-Range, geteilt zwischen Store-Default und UI. Kein `Math.max/min` inline in Components.
 - Styling: Tailwind bevorzugen, Custom CSS nur fuer Animationen in `index.css`
-- Rust: Tauri Commands in `lib.rs` im `mod commands {}` Block
+- Rust: Tauri Commands in Feature-Modulen definiert (z.B. `src-tauri/src/session/commands.rs`, `session/file_reader/commands.rs`, `github/`, `settings.rs`); nur app-globale Commands im `mod commands {}` Block von `lib.rs`. Registrierung zentral in `lib.rs` (`invoke_handler`).
 - Tauri v2: Imports aus `@tauri-apps/api` (v2-Syntax)
 
 ## Design System

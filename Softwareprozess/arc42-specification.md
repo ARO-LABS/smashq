@@ -336,7 +336,7 @@ graph TB
     subgraph Backend["Rust Backend (src-tauri/src/)"]
         Session["session/<br/>(PTY, Agent Detection)"]
         GitHubMod["github/<br/>(PRs, Issues)"]
-        Library["library/<br/>(Notes)"]
+        StructLog["structured_log.rs<br/>(NDJSON-Sink)"]
         Pipeline["pipeline/<br/>(ADP Events)"]
         SettingsMod["settings.rs<br/>(JSON Persistenz)"]
     end
@@ -404,11 +404,10 @@ graph LR
 
     lib --> session["session/<br/>manager.rs<br/>commands.rs<br/>agent_detector.rs<br/>file_reader.rs<br/>folder_actions.rs"]
     lib --> github["github/<br/>commands.rs"]
-    lib --> library["library/<br/>commands.rs"]
     lib --> pipeline["pipeline/mod.rs<br/>(ADP Processing)"]
     lib --> adp["adp/mod.rs<br/>(Protocol Schema)"]
     lib --> settings["settings.rs<br/>(JSON Persistenz)"]
-    lib --> logs["log_reader.rs"]
+    lib --> logs["structured_log.rs"]
 
     session -->|PTY| ext1["Claude CLI Process"]
     github -->|Shell| ext2["gh CLI"]
@@ -423,11 +422,11 @@ graph LR
 | Modul | Verantwortung |
 |-------|---------------|
 | **session::manager** | PTY-Lifecycle (spawn, write, resize, close); Event Emitting |
-| **session::file_reader** | Datei-I/O (CLAUDE.md, Skills, Hooks lesen); Path Safety |
+| **session::file_reader** | Datei-I/O (CLAUDE.md, Skills, Hooks, Memory lesen); Memory-Dateien in den Papierkorb verschieben (`delete_user_claude_memory_file`, Pfad-Whitelist `projects/<dir>/memory/<file>`); Path Safety |
 | **session::commands** | IPC Layer; Input Validation; Tauri Command Handlers |
 | **session::agent_detector** | Agent-Typ-Erkennung via Regex (36 Unit-Tests) |
 | **github::commands** | GitHub CLI Wrapper; Issue/PR Data; Kanban Sync |
-| **library::commands** | Lokale Snippet-DB; Read/Write/Index |
+| **structured_log** | NDJSON-Sink mit Rotation (5 MB, `.1`–`.3`); Frontend-Batches via `append_frontend_logs`; Reader backfillt rotierte Dateien und ueberspringt korrupte Zeilen |
 | **settings** | User Config Persistierung mit Backup-Rotation |
 | **pipeline** | ADP Event Processing |
 | **adp** | Protocol Schema Validation, Error Types |
@@ -745,7 +744,15 @@ graph TD
 | **DEBUG** | `log::debug!()` + File only | Detaillierter Flow (Development) |
 
 Frontend: `perfLogger.ts` mit 24 Instrumentierungspunkten (IPC/Event/Store/Render-Zeiten).
-Backend: strukturiertes NDJSON nach `%LOCALAPPDATA%/smashq/app-log.ndjson` (+ `.1`..`.3` rotiert), eine JSON-Zeile pro Eintrag; live via `log-line`-Event.
+Backend: strukturiertes NDJSON nach `%LOCALAPPDATA%/smashq/app-log.ndjson` (+ `.1`..`.3` rotiert, 5 MB pro Datei), eine JSON-Zeile pro Eintrag; live via `log-line`-Event.
+
+**NDJSON-Pipeline (Hardening-Sweep 2026-07):**
+
+- **Entkoppelte Gates** (`errorLogger.ts`): `frontendLogging` schaltet nur Ringbuffer + Console-Mirror; die NDJSON-Persistenz haengt allein an `backendFileLogging`. Der Persist-Gate ist dreiwertig — `null` = noch unverdrahtet: Eintraege vor `wireRuntimeGates` (fruehe Startup-Fehler) werden gepuffert und beim Wiring geflusht oder verworfen.
+- **Batching**: Flush alle 2 s oder ab 25 Eintraegen via `append_frontend_logs`; bei Sink-Fehler Re-Queue (max. 1000 Eintraege, aeltester Overflow faellt weg). Rust kappt Felder (16 KB), erzwingt `source: "frontend"` und propagiert Schreib-/Rotationsfehler statt still `Ok` zu liefern. Close-Flush awaitet in-flight Batches und draint den Rest; beim Deaktivieren des Toggles wird erst geflusht, dann das Rust-Gate geschlossen (`flushBeforeGateClose`).
+- **Reader** (`read_structured_log`, async off-main-thread): liefert die letzten max. 5000 Zeilen, backfillt ueber die Rotationsgrenze (`.1`..`.3`) und ueberspringt korrupte Zeilen statt zu scheitern.
+- **Cross-Window-Sync**: jede Webview haelt eine eigene `logViewerStore`-Instanz; `frontend-log-entry` spiegelt Ringbuffer-Eintraege live an alle Fenster, `log-snapshot-request`/`-response` liefert dem detachten Protokolle-Fenster beim Mount die In-Memory-Historie (Echo-Filter via `sourceWindow`, Dedup + 1000-Eintraege-Cap im Store).
+- **Persist-Validation**: `sanitizePreferences` validiert die Logging-Preferences in BEIDEN Hydration-Hooks — `migrate` (Schema-Bump) UND `onRehydrateStorage` (Same-Version-Corruption, Issue-#209-Klasse). Verhindert, dass ein korrupter Persist-Wert (z. B. String `"true"`) den Toggle aktiv zeigt, waehrend Rusts bool-Deserialisierung die Batches ablehnt.
 
 ### 8.5 UI/UX-Konsistenz
 

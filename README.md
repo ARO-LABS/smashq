@@ -8,7 +8,7 @@ A desktop app for managing and monitoring multiple [Claude CLI](https://docs.ant
 - **Project Context Tabs** — View CLAUDE.md, Skills, Hooks, and GitHub info for each session's project
 - **GitHub Integration** — See current branch, open PRs, and issues directly in the dashboard
 - **Markdown Editor** — Open and edit `.md` files by path — paste a path in the session panel, or let a Claude session open one automatically (see [below](#opening-markdown-files-by-path))
-- **Library System** — Detect and browse configurations across your favorite projects
+- **Library System** — Detect and manage Claude configurations across the global scope, the active session's project, and your favorite projects
 - **Worktree Viewer** — Monitor active git worktrees per project
 - **Favorites & Groups** — Pin projects, organize into groups, drag-and-drop reorder, with global or per-project notes
 - **Agents** — Browse declared sub-agents from each project's `.claude/agents/` directory

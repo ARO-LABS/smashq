@@ -6,6 +6,34 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+Härtung der Logging-Pipeline (Review-Sweep), Drag & Drop am ganzen Element statt
+am Grip-Symbol, Library-Detailansichten und besser sichtbare Session-Farben.
+
+### Hinzugefügt
+- Library: Hook-Karten öffnen per Klick eine Detailansicht mit vollständigem Befehl (Event, Matcher, Quelle, Geltungsbereich).
+- Library: Memory-Dateien lassen sich über ein Papierkorb-Symbol mit Inline-Bestätigung löschen. Die Datei wandert in den Papierkorb des Betriebssystems, wird also nicht endgültig gelöscht.
+
+### Behoben
+- Logging: Frontend-Einträge erreichten die Log-Datei nicht, wenn nur „Log-Datei (NDJSON)" aktiv war — der Anzeige-Schalter blockierte fälschlich auch die Datei. Fehler, die vor der Initialisierung auftreten (z. B. Startup-Crashes), werden jetzt gepuffert statt verworfen.
+- Logging: beim Schließen der App oder beim Deaktivieren der Datei-Protokollierung gingen noch nicht geschriebene Einträge verloren — der Abschluss-Flush wartet jetzt alle offenen Schreibvorgänge ab.
+- Logging: Schreibfehler (volle Platte, Datei-Sperre) und fehlgeschlagene Rotation werden gemeldet statt still verschluckt; überlange Einträge werden begrenzt, statt das Rotations-Budget zu sprengen.
+- Logging: Log-Aufrufe mit undefined-, Funktions- oder Symbol-Werten bringen die Pipeline nicht mehr zum Absturz.
+- Logging: korrupte Logging-Einstellungen werden beim Laden bereinigt — der Schalter konnte sonst „an" anzeigen, während die Log-Datei leer blieb.
+- Protokolle-Fenster: zeigt jetzt auch Frontend-Logs anderer Fenster (live und beim Öffnen); vorher blieb die Ansicht in der Standard-Konfiguration leer.
+- Protokolle-Ansicht: übersteht korrupte Zeilen in der Log-Datei, zeigt nach einer Datei-Rotation weiterhin die Historie (liest rotierte Dateien nach) und blockiert die App beim Laden großer Dateien nicht mehr.
+- Protokolle-Ansicht: Live-Modus lässt sich zuverlässig pausieren — ein Timing-Fehler konnte Updates trotz Pause weiterlaufen lassen.
+- Favoriten-Gruppen: Ein-/Ausklapp-Zustand bleibt über App-Neustarts erhalten.
+- Favoriten: der Ordnername in Klammern entfällt, wenn er mit der Beschriftung identisch ist.
+- Sessions-Grid: Rahmen um die Grid-Zellen sind dicker und im hellen Theme sichtbar — die Rahmenfarbe folgt jetzt dem Theme statt fest dem Dark-Mode-Wert.
+- Konfigurations-Panel: aktive Tabs und Icons übernehmen die Projekt-/Session-Farbe statt des globalen Cyan; die Markierung aktiver Tabs ist deutlicher.
+
+### Geändert
+- Drag & Drop: Favoriten, Favoriten-Gruppen und Session-Zeilen lassen sich am gesamten Element ziehen; das Grip-Symbol entfällt. Buttons, Eingabefelder und Links bleiben normal bedienbar, Rechtsklick startet keinen Drag.
+- Library: Projekte ohne Konfiguration werden ausgeblendet; eine Fußnote nennt die Anzahl. Der globale Bereich bleibt immer sichtbar.
+
+### Entfernt
+- Der Button im Protokolle-Fenster, der ein weiteres, nicht synchronisiertes Protokolle-Fenster öffnete.
+
 ## [1.0.2] — 2026-07-01
 
 Kanban-Overhaul Phase A+B — das Kanban-Board kann jetzt **Organisations-Boards** als
