@@ -88,6 +88,20 @@ export interface ScopeConfig {
   knowledge: DiscoveredKnowledge[];
 }
 
+/** True when the scope has at least one discovered artifact — panels for empty scopes are hidden. */
+export function hasScopeContent(config: ScopeConfig): boolean {
+  return (
+    config.skills.length > 0 ||
+    config.agents.length > 0 ||
+    config.hooks.length > 0 ||
+    config.settingsRaw.length > 0 ||
+    config.claudeMd.length > 0 ||
+    config.memoryFiles.length > 0 ||
+    config.rules.length > 0 ||
+    config.knowledge.length > 0
+  );
+}
+
 // ── Store ──────────────────────────────────────────────────────────────
 
 interface ConfigDiscoveryState {

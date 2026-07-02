@@ -4,6 +4,7 @@ import {
   selectSelectedDetail,
   selectOpenDetail,
   selectCloseDetail,
+  hasScopeContent,
   type DiscoveredSkill,
 } from "./configDiscoveryStore";
 
@@ -623,6 +624,32 @@ describe("discoverGlobal — error handling", () => {
     const skills = useConfigDiscoveryStore.getState().globalConfig!.skills;
     expect(skills).toHaveLength(1);
     expect(skills[0].description).toBe("from commands");
+  });
+});
+
+// ── hasScopeContent ───────────────────────────────────────────────────
+
+describe("hasScopeContent", () => {
+  it("returns false for an empty scope config", () => {
+    expect(hasScopeContent(emptyScopeForTest())).toBe(false);
+  });
+
+  it("returns true when a collection field is filled", () => {
+    const skill: DiscoveredSkill = {
+      name: "s",
+      dirName: "s",
+      description: "",
+      args: [],
+      hasReference: false,
+      scope: "global",
+      body: "",
+    };
+    expect(hasScopeContent({ ...emptyScopeForTest(), skills: [skill] })).toBe(true);
+  });
+
+  it("returns true when a raw string field is filled", () => {
+    expect(hasScopeContent({ ...emptyScopeForTest(), claudeMd: "# x" })).toBe(true);
+    expect(hasScopeContent({ ...emptyScopeForTest(), settingsRaw: "{}" })).toBe(true);
   });
 });
 

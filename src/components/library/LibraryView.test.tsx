@@ -258,6 +258,108 @@ describe("LibraryView", () => {
     expect(screen.queryByText(/Other App/)).toBeNull();
   });
 
+  it("hides a favorite project panel whose config is empty", () => {
+    mockUseSettingsStore.mockImplementation(
+      (sel: CallableFunction) =>
+        sel({
+          favorites: [
+            {
+              id: "fav-3",
+              path: "C:/Projects/empty-app",
+              label: "Empty App",
+              shell: "powershell",
+              addedAt: 1000,
+              lastUsedAt: 2000,
+            },
+          ],
+        }),
+    );
+
+    useConfigDiscoveryStore.setState({
+      globalConfig: makeConfig(),
+      favoriteConfigs: { "C:/Projects/empty-app": makeConfig() },
+      discoverFavorites: vi.fn(async () => {}),
+    });
+
+    render(<LibraryView />);
+    expect(screen.queryByText(/Empty App/)).toBeNull();
+    expect(
+      screen.getByText("1 Projekt ohne Konfiguration ausgeblendet"),
+    ).toBeTruthy();
+  });
+
+  it("counts multiple hidden projects in the footnote (plural)", () => {
+    mockUseSettingsStore.mockImplementation(
+      (sel: CallableFunction) =>
+        sel({
+          favorites: [
+            {
+              id: "fav-4",
+              path: "C:/Projects/empty-a",
+              label: "Empty A",
+              shell: "powershell",
+              addedAt: 1000,
+              lastUsedAt: 2000,
+            },
+            {
+              id: "fav-5",
+              path: "C:/Projects/empty-b",
+              label: "Empty B",
+              shell: "powershell",
+              addedAt: 1000,
+              lastUsedAt: 2000,
+            },
+          ],
+        }),
+    );
+
+    useConfigDiscoveryStore.setState({
+      globalConfig: makeConfig(),
+      favoriteConfigs: {
+        "C:/Projects/empty-a": makeConfig(),
+        "C:/Projects/empty-b": makeConfig(),
+      },
+      discoverFavorites: vi.fn(async () => {}),
+    });
+
+    render(<LibraryView />);
+    expect(screen.queryByText(/Empty A/)).toBeNull();
+    expect(screen.queryByText(/Empty B/)).toBeNull();
+    expect(
+      screen.getByText("2 Projekte ohne Konfiguration ausgeblendet"),
+    ).toBeTruthy();
+  });
+
+  it("shows no footnote when all favorite projects have content", () => {
+    mockUseSettingsStore.mockImplementation(
+      (sel: CallableFunction) =>
+        sel({
+          favorites: [
+            {
+              id: "fav-6",
+              path: "C:/Projects/full-app",
+              label: "Full App",
+              shell: "powershell",
+              addedAt: 1000,
+              lastUsedAt: 2000,
+            },
+          ],
+        }),
+    );
+
+    useConfigDiscoveryStore.setState({
+      globalConfig: makeConfig(),
+      favoriteConfigs: {
+        "C:/Projects/full-app": makeConfig({ claudeMd: "# Full" }),
+      },
+      discoverFavorites: vi.fn(async () => {}),
+    });
+
+    render(<LibraryView />);
+    expect(screen.getByText(/Full App/)).toBeTruthy();
+    expect(screen.queryByText(/ohne Konfiguration ausgeblendet/)).toBeNull();
+  });
+
   // ── Modal Integration Tests ──────────────────────────────────────────
 
   it("opens detail modal when skill card is clicked", () => {

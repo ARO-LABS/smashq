@@ -2,7 +2,7 @@ import { useEffect, useCallback, useMemo } from "react";
 import { BookOpen, RefreshCw, Globe, FolderOpen } from "lucide-react";
 import { useSessionStore, selectEffectiveSession } from "../../store/sessionStore";
 import { useSettingsStore } from "../../store/settingsStore";
-import { useConfigDiscoveryStore } from "../../store/configDiscoveryStore";
+import { useConfigDiscoveryStore, hasScopeContent } from "../../store/configDiscoveryStore";
 import { LibraryDetailModal } from "./LibraryDetailModal";
 import { ScopePanel } from "./ScopePanel";
 
@@ -45,6 +45,17 @@ export function LibraryView(): JSX.Element {
       discoverFavorites(favProjects.map((f) => f.path));
     }
   }, [favProjects, discoverFavorites]);
+
+  // Project panels without any discovered config are hidden entirely;
+  // the count feeds the footnote so hidden projects stay discoverable.
+  // Only scanned configs count — a favorite whose scan is still pending
+  // (no entry in favoriteConfigs yet) is neither shown nor counted.
+  const hiddenCount =
+    (projectConfig && folder && !hasScopeContent(projectConfig) ? 1 : 0) +
+    favProjects.filter((f) => {
+      const config = favoriteConfigs[f.path];
+      return config !== undefined && !hasScopeContent(config);
+    }).length;
 
   const handleRefresh = useCallback(() => {
     discoverGlobal();
@@ -103,7 +114,7 @@ export function LibraryView(): JSX.Element {
             )}
 
             {/* Active session project scope */}
-            {projectConfig && folder && (
+            {projectConfig && folder && hasScopeContent(projectConfig) && (
               <ScopePanel
                 scope="project"
                 config={projectConfig}
@@ -118,7 +129,7 @@ export function LibraryView(): JSX.Element {
             {favProjects
               .map((fav) => {
                 const config = favoriteConfigs[fav.path];
-                if (!config) return null;
+                if (!config || !hasScopeContent(config)) return null;
                 return (
                   <ScopePanel
                     key={fav.id}
@@ -131,6 +142,14 @@ export function LibraryView(): JSX.Element {
                   />
                 );
               })}
+
+            {hiddenCount > 0 && (
+              <div className="text-xs text-neutral-600 px-1">
+                {hiddenCount === 1
+                  ? "1 Projekt ohne Konfiguration ausgeblendet"
+                  : `${hiddenCount} Projekte ohne Konfiguration ausgeblendet`}
+              </div>
+            )}
 
             {!globalConfig && !projectConfig && Object.keys(favoriteConfigs).length === 0 && !loading && (
               <div className="flex flex-col items-center justify-center h-64 gap-3 text-neutral-500">

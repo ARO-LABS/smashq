@@ -11,9 +11,10 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useUIStore } from "../../store/uiStore";
-import type {
-  ScopeConfig,
-  ConfigScope,
+import {
+  hasScopeContent,
+  type ScopeConfig,
+  type ConfigScope,
 } from "../../store/configDiscoveryStore";
 import { Section } from "./Section";
 import { ContentPreview } from "./ContentPreview";
@@ -44,15 +45,7 @@ export function ScopePanel({
   const open = useUIStore((s) => s.libraryScopeOpen[scopeId] ?? false);
   const setLibraryScopeOpen = useUIStore((s) => s.setLibraryScopeOpen);
 
-  const hasContent =
-    config.skills.length > 0 ||
-    config.agents.length > 0 ||
-    config.hooks.length > 0 ||
-    config.settingsRaw.length > 0 ||
-    config.claudeMd.length > 0 ||
-    config.memoryFiles.length > 0 ||
-    config.rules.length > 0 ||
-    config.knowledge.length > 0;
+  const hasContent = hasScopeContent(config);
 
   // Include folder in key to avoid cache collisions across multiple project panels
   const settingsContentKey = `${scope}:${folder}:settings`;
