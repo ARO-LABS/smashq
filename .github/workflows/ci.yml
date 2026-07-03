@@ -47,6 +47,47 @@ jobs:
         working-directory: src-tauri
         run: cargo fmt --check
 
+  # macOS is a first-class target (users run the app there), but the ubuntu jobs
+  # can never see macOS-specific breakage: `#[cfg(target_os = "macos")]` blocks
+  # (hydrate_path_from_login_shell, the win_job not(windows) fallback, the macOS
+  # `open` branches) only compile here. This job is the pre-merge guard for the
+  # class of regression that let the macOS session-start bug ship. No apt step —
+  # macOS links the system WebKit, no extra Tauri system deps needed.
+  rust-macos:
+    name: Rust Checks (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95.0"
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # --all-targets compiles lib + bin + tests + benches, so every macOS cfg
+      # path is type-checked and linted even where no test exercises it.
+      - name: Cargo clippy (all targets)
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      # Run the suite on the real target OS. The four session_delete tests that
+      # call `trash::delete` need Finder / Apple Events, which are unavailable on
+      # a headless runner (they fail with -1743). Their logic is already covered
+      # by the ubuntu `test` job, where the freedesktop trash spec works
+      # headlessly — so skip exactly those four here, nothing more.
+      - name: Cargo test (skip Finder-dependent trash tests)
+        working-directory: src-tauri
+        run: |
+          cargo test -- \
+            --skip removes_directory_layout \
+            --skip removes_flat_layout \
+            --skip takes_subagents_with_dir \
+            --skip moves_file_to_trash
+
   test:
     name: Tests
     runs-on: ubuntu-latest

@@ -621,18 +621,30 @@ describe("SessionTerminal", () => {
     expect(terminalOptions).toMatchObject({ scrollOnUserInput: false });
   });
 
-  it("instantiates Terminal with windowsPty backend 'conpty' (regression guard for ea3a6df)", () => {
-    render(<SessionTerminal sessionId="sess-1" />);
+  it("sets windowsPty ConPTY option on Windows, omits it on macOS (regression guard for ea3a6df + macOS reflow)", () => {
+    const setUA = (ua: string) =>
+      Object.defineProperty(navigator, "userAgent", { value: ua, configurable: true });
+    const originalUA = navigator.userAgent;
 
+    // Windows: the ConPTY hint is load-bearing for xterm's reflow heuristics.
+    setUA("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+    render(<SessionTerminal sessionId="sess-win" />);
     expect(terminalOptions).toMatchObject({
       windowsPty: { backend: "conpty" },
     });
     // buildNumber must be present and numeric (value not constrained — different
-    // Windows baselines are acceptable, but the property itself is load-bearing
-    // for xterm's ConPTY reflow heuristics).
+    // Windows baselines are acceptable, but the property itself is load-bearing).
     expect(
       (terminalOptions.windowsPty as { buildNumber: unknown }).buildNumber,
     ).toEqual(expect.any(Number));
+
+    // macOS: the PTY is a Unix pty, not ConPTY — passing windowsPty there feeds
+    // xterm the wrong reflow heuristics, so the option must be absent.
+    setUA("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)");
+    render(<SessionTerminal sessionId="sess-mac" />);
+    expect(terminalOptions.windowsPty).toBeUndefined();
+
+    setUA(originalUA);
   });
 
   it("onData handler scrolls to bottom when viewport is at bottom (regression guard for ea3a6df)", async () => {
