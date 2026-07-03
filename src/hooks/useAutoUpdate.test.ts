@@ -246,4 +246,56 @@ describe("useAutoUpdate", () => {
       lastChecked: null,
     });
   });
+
+  // ── Error classification (isBenign) ─────────────────────────────────
+  // Regression guard for the macOS "Update-Check fehlgeschlagen" toast:
+  // latest.json only ships Windows targets, so on macOS the updater rejects
+  // with TargetsNotFound ("None of the fallback platforms `[...]` were found
+  // in the response `platforms` object"). That is "no build for my platform",
+  // not a failure — it must be swallowed silently, never toasted.
+  it("classifies missing-platform update errors as benign (stays idle, no error)", async () => {
+    (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
+    vi.resetModules();
+    mockGetVersion.mockResolvedValue("1.0.21");
+    mockCheck.mockRejectedValueOnce(
+      new Error(
+        'None of the fallback platforms `["darwin-aarch64"]` were found in the response `platforms` object'
+      )
+    );
+    try {
+      const { useAutoUpdate: freshUseAutoUpdate } = await import("./useAutoUpdate");
+      const { result } = renderHook(() => freshUseAutoUpdate());
+
+      await act(async () => {
+        await result.current.checkForUpdate();
+      });
+
+      expect(result.current.status).toBe("idle");
+      expect(result.current.error).toBeNull();
+    } finally {
+      delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
+      vi.resetModules();
+    }
+  });
+
+  it("still surfaces genuinely non-benign update errors as error status", async () => {
+    (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
+    vi.resetModules();
+    mockGetVersion.mockResolvedValue("1.0.21");
+    mockCheck.mockRejectedValueOnce(new Error("signature verification failed"));
+    try {
+      const { useAutoUpdate: freshUseAutoUpdate } = await import("./useAutoUpdate");
+      const { result } = renderHook(() => freshUseAutoUpdate());
+
+      await act(async () => {
+        await result.current.checkForUpdate();
+      });
+
+      expect(result.current.status).toBe("error");
+      expect(result.current.error).toBe("signature verification failed");
+    } finally {
+      delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
+      vi.resetModules();
+    }
+  });
 });

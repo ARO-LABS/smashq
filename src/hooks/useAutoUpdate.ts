@@ -96,8 +96,17 @@ export function useAutoUpdate(): UseAutoUpdateReturn {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      // Update-check hiccups that are NOT worth alarming the user about:
+      // transient network/DNS/HTTP failures, and — crucially on macOS — the
+      // updater reporting that latest.json ships no artifact for this platform.
+      // The release pipeline only publishes Windows targets, so on macOS the
+      // plugin rejects with TargetsNotFound ("None of the fallback platforms
+      // `[...]` were found in the response `platforms` object"). That is
+      // "nothing for me", not a failure — swallow it instead of firing an
+      // error toast. (The single-target `TargetNotFound` variant already
+      // matches via "not found".)
       const isBenign =
-        /network|fetch|404|not found|could not determine|dns|timeout|econnrefused/i.test(
+        /network|fetch|404|not found|could not determine|dns|timeout|econnrefused|none of the fallback platforms/i.test(
           msg
         );
       if (isBenign) {
