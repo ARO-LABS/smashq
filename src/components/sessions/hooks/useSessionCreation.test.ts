@@ -111,20 +111,26 @@ describe("useSessionCreation", () => {
       );
     });
 
-    it("uses fallback values if invoke returns partial data", async () => {
+    it("uses platform-aware fallback shell if invoke omits the echo (macOS → zsh, not powershell)", async () => {
+      // Regression: the "auto" fallback used to hardcode "powershell" on every
+      // platform, mislabeling macOS/Linux sessions. Now it resolves per-OS.
+      Object.defineProperty(navigator, "userAgent", {
+        value: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+        configurable: true,
+      });
       mockInvoke.mockResolvedValue({});
 
       const { result } = renderHook(() => useSessionCreation());
 
       await act(async () => {
-        await result.current.handleResumeSession("old-id", "C:/test");
+        await result.current.handleResumeSession("old-id", "/Users/me/test");
       });
 
       expect(mockAddSession).toHaveBeenCalledWith(
         expect.objectContaining({
           title: "Resume Session",
-          folder: "C:/test",
-          shell: "powershell",
+          folder: "/Users/me/test",
+          shell: "zsh",
           claudeSessionId: "old-id",
         }),
       );

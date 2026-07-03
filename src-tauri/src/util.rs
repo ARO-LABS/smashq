@@ -88,6 +88,74 @@ pub fn timed_output(mut cmd: Command, timeout: Duration) -> Result<Output, ADPEr
     }
 }
 
+/// Merge a freshly-detected PATH into the current one: detected entries first,
+/// then any current entries not already present, de-duplicated and preserving
+/// order. Empty segments are dropped. Pure so it stays unit-testable.
+fn merge_paths(current: &str, detected: &str) -> String {
+    let mut seen = std::collections::HashSet::new();
+    let mut out: Vec<&str> = Vec::new();
+    for p in detected.split(':').chain(current.split(':')) {
+        if !p.is_empty() && seen.insert(p) {
+            out.push(p);
+        }
+    }
+    out.join(":")
+}
+
+/// On macOS a GUI app launched from Finder/Dock/Spotlight inherits only the
+/// minimal launchd PATH (`/usr/bin:/bin:/usr/sbin:/sbin`), NOT the user's
+/// interactive shell PATH. Homebrew/npm binaries (`gh`, `git`, `node`,
+/// `claude`) then read as "not installed" to every [`silent_command`] we spawn
+/// — GitHub/Kanban features fail and shell-outs mis-resolve. Resolve the real
+/// login-shell PATH once at startup and merge it into this process's
+/// environment so all later child processes inherit it.
+///
+/// Uses a login shell (`-lc`, matching the session-spawn behavior) so
+/// `.zprofile` — where Homebrew's `shellenv` lives — is sourced. Bounded by a
+/// timeout and fully best-effort: on any failure the inherited PATH is kept.
+/// Must run at startup BEFORE any worker threads spawn, since `set_var` mutates
+/// process-global state. No-op on Windows/Linux, where GUI processes already
+/// inherit a usable PATH.
+#[cfg(target_os = "macos")]
+pub fn hydrate_path_from_login_shell() {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    // `command printf '%s'` dodges any alias/function shadowing; only $PATH
+    // reaches stdout (shell chatter, if any, goes to the drained stderr).
+    let mut cmd = silent_command(&shell);
+    cmd.args(["-lc", "command printf '%s' \"$PATH\""]);
+
+    match timed_output(cmd, Duration::from_secs(5)) {
+        Ok(out) if out.status.success() => {
+            let detected = String::from_utf8_lossy(&out.stdout);
+            let detected = detected.trim();
+            if detected.is_empty() {
+                log::warn!("Login-shell PATH probe returned empty output; keeping inherited PATH");
+                return;
+            }
+            let current = std::env::var("PATH").unwrap_or_default();
+            let merged = merge_paths(&current, detected);
+            std::env::set_var("PATH", &merged);
+            log::info!(
+                "Hydrated PATH from login shell '{}' ({} entries)",
+                shell,
+                merged.split(':').count()
+            );
+        }
+        Ok(out) => log::warn!(
+            "Login-shell PATH probe exited with status {:?}; keeping inherited PATH",
+            out.status.code()
+        ),
+        Err(e) => log::warn!(
+            "Login-shell PATH probe failed ({}); keeping inherited PATH",
+            e
+        ),
+    }
+}
+
+/// No-op on non-macOS: GUI processes on Windows/Linux inherit a usable PATH.
+#[cfg(not(target_os = "macos"))]
+pub fn hydrate_path_from_login_shell() {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -111,6 +179,29 @@ mod tests {
     #[test]
     fn default_timeout_is_thirty_seconds() {
         assert_eq!(DEFAULT_COMMAND_TIMEOUT, Duration::from_secs(30));
+    }
+
+    #[test]
+    fn merge_paths_puts_detected_first_and_dedups() {
+        // The login-shell PATH (with homebrew) wins ordering; the minimal
+        // launchd entries survive only where they add something new.
+        assert_eq!(
+            merge_paths("/usr/bin:/bin", "/opt/homebrew/bin:/usr/bin"),
+            "/opt/homebrew/bin:/usr/bin:/bin"
+        );
+    }
+
+    #[test]
+    fn merge_paths_drops_empty_segments() {
+        assert_eq!(
+            merge_paths("/bin:", ":/opt/homebrew/bin:"),
+            "/opt/homebrew/bin:/bin"
+        );
+    }
+
+    #[test]
+    fn merge_paths_keeps_current_when_detected_is_empty() {
+        assert_eq!(merge_paths("/usr/bin:/bin", ""), "/usr/bin:/bin");
     }
 
     #[test]
