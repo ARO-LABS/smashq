@@ -107,6 +107,29 @@ fn merge_paths(current: &str, detected: &str) -> String {
     out.join(":")
 }
 
+/// Sentinel markers wrapped around `$PATH` in the login-shell probe. Login
+/// shells routinely write to stdout (version-manager banners, MOTD, `echo` in
+/// `.zprofile`); without markers that chatter fuses with the first PATH entry
+/// (`merge_paths` splits only on ':'), silently dropping e.g. `/opt/homebrew/bin`
+/// and re-breaking the resolution this whole path exists to fix. Kept as shared
+/// consts so the emitted command and the parser can never drift apart.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+const PATH_PROBE_START: &str = "__SMASHQ_PATH_START__";
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+const PATH_PROBE_END: &str = "__SMASHQ_PATH_END__";
+
+/// Slice the PATH the probe printed strictly between its sentinel markers,
+/// discarding any login-shell chatter emitted before or after them. Returns
+/// `None` when the markers are absent (probe failed, or a shell too exotic to
+/// run the printf) so the caller keeps the inherited PATH rather than trusting
+/// raw stdout. Pure so it stays unit-testable on every platform.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn extract_probe_path(raw: &str) -> Option<&str> {
+    let after_start = raw.split_once(PATH_PROBE_START)?.1;
+    let inner = after_start.split_once(PATH_PROBE_END)?.0;
+    Some(inner)
+}
+
 /// On macOS a GUI app launched from Finder/Dock/Spotlight inherits only the
 /// minimal launchd PATH (`/usr/bin:/bin:/usr/sbin:/sbin`), NOT the user's
 /// interactive shell PATH. Homebrew/npm binaries (`gh`, `git`, `node`,
@@ -124,17 +147,28 @@ fn merge_paths(current: &str, detected: &str) -> String {
 #[cfg(target_os = "macos")]
 pub fn hydrate_path_from_login_shell() {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
-    // `command printf '%s'` dodges any alias/function shadowing; only $PATH
-    // reaches stdout (shell chatter, if any, goes to the drained stderr).
+    // Wrap $PATH in unique sentinel markers so login-shell chatter on stdout
+    // (version-manager banners, MOTD, `echo` in .zprofile) can't fuse with the
+    // real PATH — we slice strictly between the markers below. `command printf`
+    // dodges any alias/function shadowing of printf.
+    let probe = format!("command printf '{PATH_PROBE_START}%s{PATH_PROBE_END}' \"$PATH\"");
     let mut cmd = silent_command(&shell);
-    cmd.args(["-lc", "command printf '%s' \"$PATH\""]);
+    cmd.args(["-lc", &probe]);
 
     match timed_output(cmd, Duration::from_secs(5)) {
         Ok(out) if out.status.success() => {
-            let detected = String::from_utf8_lossy(&out.stdout);
-            let detected = detected.trim();
+            let raw = String::from_utf8_lossy(&out.stdout);
+            let detected = match extract_probe_path(&raw) {
+                Some(p) => p.trim(),
+                None => {
+                    log::warn!(
+                        "Login-shell PATH probe output missing sentinel markers; keeping inherited PATH"
+                    );
+                    return;
+                }
+            };
             if detected.is_empty() {
-                log::warn!("Login-shell PATH probe returned empty output; keeping inherited PATH");
+                log::warn!("Login-shell PATH probe returned empty PATH; keeping inherited PATH");
                 return;
             }
             let current = std::env::var("PATH").unwrap_or_default();
@@ -207,6 +241,32 @@ mod tests {
     #[test]
     fn merge_paths_keeps_current_when_detected_is_empty() {
         assert_eq!(merge_paths("/usr/bin:/bin", ""), "/usr/bin:/bin");
+    }
+
+    #[test]
+    fn extract_probe_path_strips_leading_and_trailing_chatter() {
+        // A chatty login profile echoes to stdout both before AND after the
+        // probe output — the exact case that used to corrupt /opt/homebrew/bin.
+        let raw =
+            "Loading nvm...\n__SMASHQ_PATH_START__/opt/homebrew/bin:/usr/bin__SMASHQ_PATH_END__\nrbenv ready\n";
+        assert_eq!(extract_probe_path(raw), Some("/opt/homebrew/bin:/usr/bin"));
+    }
+
+    #[test]
+    fn extract_probe_path_none_without_markers() {
+        // Probe never ran / shell too exotic to emit markers → the caller must
+        // keep the inherited PATH rather than trust raw stdout.
+        assert_eq!(extract_probe_path("/opt/homebrew/bin:/usr/bin"), None);
+    }
+
+    #[test]
+    fn extract_probe_path_empty_between_markers() {
+        // Empty $PATH: markers present, nothing between → Some("") so the caller
+        // sees "empty" and keeps the inherited PATH.
+        assert_eq!(
+            extract_probe_path("pre__SMASHQ_PATH_START____SMASHQ_PATH_END__post"),
+            Some("")
+        );
     }
 
     #[test]
