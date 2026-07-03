@@ -91,6 +91,11 @@ pub fn timed_output(mut cmd: Command, timeout: Duration) -> Result<Output, ADPEr
 /// Merge a freshly-detected PATH into the current one: detected entries first,
 /// then any current entries not already present, de-duplicated and preserving
 /// order. Empty segments are dropped. Pure so it stays unit-testable.
+///
+/// Only `hydrate_path_from_login_shell` (macOS-only) calls this, so off macOS it
+/// is unused in a non-test build — allow dead_code there rather than gate the
+/// whole helper away, so its unit tests keep running on every platform.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 fn merge_paths(current: &str, detected: &str) -> String {
     let mut seen = std::collections::HashSet::new();
     let mut out: Vec<&str> = Vec::new();
