@@ -39,6 +39,12 @@ interface LogViewerState {
   sourceFilter: Set<LogSource>;
   searchText: string;
   liveTail: boolean;
+  /** ISO timestamp of when this store instance was created — the session boundary. */
+  sessionStart: string;
+  /** Display sort direction: "desc" = newest first (default), "asc" = oldest first. */
+  sortOrder: "desc" | "asc";
+  /** "session" hides entries older than sessionStart; "all" shows the full history. */
+  scope: "session" | "all";
 
   addEntries: (entries: Omit<UnifiedLogEntry, "id">[]) => void;
   clearEntries: () => void;
@@ -46,6 +52,8 @@ interface LogViewerState {
   setSourceFilter: (filter: Set<LogSource>) => void;
   setSearchText: (text: string) => void;
   toggleLiveTail: () => void;
+  setSortOrder: (order: "desc" | "asc") => void;
+  setScope: (scope: "session" | "all") => void;
 }
 
 export const useLogViewerStore = create<LogViewerState>((set) => ({
@@ -56,6 +64,9 @@ export const useLogViewerStore = create<LogViewerState>((set) => ({
   sourceFilter: new Set<LogSource>(["frontend", "backend"]),
   searchText: "",
   liveTail: true,
+  sessionStart: new Date().toISOString(),
+  sortOrder: "desc",
+  scope: "session",
 
   addEntries: (newEntries) =>
     set((state) => {
@@ -112,6 +123,8 @@ export const useLogViewerStore = create<LogViewerState>((set) => ({
   setSourceFilter: (filter) => set({ sourceFilter: filter }),
   setSearchText: (text) => set({ searchText: text }),
   toggleLiveTail: () => set((state) => ({ liveTail: !state.liveTail })),
+  setSortOrder: (order) => set({ sortOrder: order }),
+  setScope: (scope) => set({ scope }),
 }));
 
 /**

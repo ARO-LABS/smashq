@@ -21,6 +21,22 @@ describe("formatTime", () => {
   });
 });
 
+describe("logViewerStore — sort & scope state", () => {
+  it("defaults to desc sort, session scope, and a non-empty ISO sessionStart", () => {
+    const s = useLogViewerStore.getState();
+    expect(s.sortOrder).toBe("desc");
+    expect(s.scope).toBe("session");
+    expect(s.sessionStart).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("setSortOrder and setScope update state", () => {
+    useLogViewerStore.getState().setSortOrder("asc");
+    expect(useLogViewerStore.getState().sortOrder).toBe("asc");
+    useLogViewerStore.getState().setScope("all");
+    expect(useLogViewerStore.getState().scope).toBe("all");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
@@ -32,6 +48,9 @@ beforeEach(() => {
     sourceFilter: new Set(["frontend", "backend"]),
     searchText: "",
     liveTail: true,
+    sortOrder: "desc",
+    scope: "session",
+    sessionStart: "2020-01-01T00:00:00.000Z",
   });
 });
 
