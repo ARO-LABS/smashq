@@ -58,6 +58,20 @@ fn state() -> &'static Mutex<WriterState> {
     })
 }
 
+/// App-launch timestamp (ISO-8601 UTC, millis, 'Z'), shared by every window as
+/// the "current session" boundary for the log viewer's scope filter. Pinned
+/// ONCE at startup (see `run()` in lib.rs) so it means process-launch, not
+/// first-Protokoll-open. The format MUST match the log entries' `ts`
+/// (lib.rs env_logger + the frontend's `new Date().toISOString()`), otherwise
+/// the viewer's string `<` comparison against entry timestamps is invalid.
+static SESSION_START: OnceLock<String> = OnceLock::new();
+
+pub fn session_start() -> String {
+    SESSION_START
+        .get_or_init(|| chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
+        .clone()
+}
+
 /// `%LOCALAPPDATA%/smashq/app-log.ndjson`, fallback to cwd.
 pub fn ndjson_path() -> PathBuf {
     if let Some(data_dir) = std::env::var_os("LOCALAPPDATA") {
@@ -300,6 +314,13 @@ pub mod commands {
     pub async fn clear_structured_log() -> Result<(), ADPError> {
         clear_entries().map_err(|e| ADPError::internal(format!("log clear failed: {e}")))
     }
+
+    /// The shared app-launch timestamp every window uses as its session
+    /// boundary. Sync (trivial) — no file I/O.
+    #[tauri::command]
+    pub fn app_session_start() -> String {
+        session_start()
+    }
 }
 
 #[cfg(test)]
@@ -527,6 +548,25 @@ mod tests {
         let read = read_from(&path, 500);
         assert_eq!(read.len(), 1);
         assert_eq!(read[0].message, "after");
+    }
+
+    #[test]
+    fn session_start_is_stable_and_matches_log_ts_format() {
+        let a = session_start();
+        let b = session_start();
+        assert_eq!(
+            a, b,
+            "session_start must be pinned (same value across calls)"
+        );
+        // Same shape as log entry ts: ends with 'Z', millisecond precision, has 'T'.
+        assert!(a.ends_with('Z'), "must be UTC 'Z' form, got {a}");
+        assert!(a.contains('T'));
+        // 2026-07-04T11:22:36.123Z → the '.' + 3 digits + 'Z' tail
+        let tail = &a[a.len() - 5..];
+        assert!(
+            tail.starts_with('.') && tail.ends_with('Z'),
+            "millis tail, got {tail}"
+        );
     }
 
     #[test]

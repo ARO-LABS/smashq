@@ -54,6 +54,7 @@ interface LogViewerState {
   toggleLiveTail: () => void;
   setSortOrder: (order: "desc" | "asc") => void;
   setScope: (scope: "session" | "all") => void;
+  setSessionStart: (ts: string) => void;
 }
 
 export const useLogViewerStore = create<LogViewerState>((set) => ({
@@ -125,6 +126,7 @@ export const useLogViewerStore = create<LogViewerState>((set) => ({
   toggleLiveTail: () => set((state) => ({ liveTail: !state.liveTail })),
   setSortOrder: (order) => set({ sortOrder: order }),
   setScope: (scope) => set({ scope }),
+  setSessionStart: (ts) => set({ sessionStart: ts }),
 }));
 
 /**

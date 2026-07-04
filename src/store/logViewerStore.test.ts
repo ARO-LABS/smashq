@@ -35,6 +35,11 @@ describe("logViewerStore — sort & scope state", () => {
     useLogViewerStore.getState().setScope("all");
     expect(useLogViewerStore.getState().scope).toBe("all");
   });
+
+  it("setSessionStart overrides the session boundary", () => {
+    useLogViewerStore.getState().setSessionStart("2021-06-01T00:00:00.000Z");
+    expect(useLogViewerStore.getState().sessionStart).toBe("2021-06-01T00:00:00.000Z");
+  });
 });
 
 // ---------------------------------------------------------------------------

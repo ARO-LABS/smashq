@@ -72,7 +72,15 @@ beforeEach(async () => {
   // mockResolvedValueOnce queues from a prior test don't bleed over.
   const { invoke } = await import("@tauri-apps/api/core");
   vi.mocked(invoke).mockReset();
-  vi.mocked(invoke).mockResolvedValue([]);
+  // Command-aware default: the mount now fires TWO invokes (read_structured_log
+  // + app_session_start). A blanket mockResolvedValue([]) would resolve
+  // app_session_start to [] and call setSessionStart([]), corrupting the
+  // store's sessionStart for every other test. Seed the SAME value the store
+  // already has by default here (2020-01-01) so the sync is a no-op.
+  vi.mocked(invoke).mockImplementation((cmd: string) => {
+    if (cmd === "app_session_start") return Promise.resolve("2020-01-01T00:00:00.000Z");
+    return Promise.resolve([]);
+  });
   listenMock.mockReset();
   // Default: pending listener registration (never resolves) — harmless for
   // tests that don't exercise the event paths.

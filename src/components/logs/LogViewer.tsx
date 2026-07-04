@@ -36,6 +36,7 @@ const selectSetSearchText = (s: ReturnType<typeof useLogViewerStore.getState>) =
 const selectToggleLiveTail = (s: ReturnType<typeof useLogViewerStore.getState>) => s.toggleLiveTail;
 const selectSetSortOrder = (s: ReturnType<typeof useLogViewerStore.getState>) => s.setSortOrder;
 const selectSetScope = (s: ReturnType<typeof useLogViewerStore.getState>) => s.setScope;
+const selectSetSessionStart = (s: ReturnType<typeof useLogViewerStore.getState>) => s.setSessionStart;
 
 export function LogViewer() {
   const entries = useLogViewerStore(selectEntries);
@@ -54,6 +55,7 @@ export function LogViewer() {
   const toggleLiveTail = useLogViewerStore(selectToggleLiveTail);
   const setSortOrder = useLogViewerStore(selectSetSortOrder);
   const setScope = useLogViewerStore(selectSetScope);
+  const setSessionStart = useLogViewerStore(selectSetSessionStart);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -87,6 +89,17 @@ export function LogViewer() {
     // log on every mount; the store handles dedup.
     loadBackendLogs();
   }, [loadBackendLogs]);
+
+  // Adopt the shared app-launch session boundary so every window (incl. the
+  // detached log window with its own JS realm) agrees on what "this session"
+  // means. Falls back to the store's JS-side default if the invoke fails.
+  useEffect(() => {
+    invoke<string>("app_session_start")
+      .then((ts) => {
+        if (ts) setSessionStart(ts);
+      })
+      .catch((err) => logError("LogViewer.appSessionStart", err));
+  }, [setSessionStart]);
 
   // Live event subscription: each backend log line arrives as a `log-line`
   // event (gated by backendFileLogging on the Rust side). Only subscribe while

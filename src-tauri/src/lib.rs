@@ -238,6 +238,9 @@ pub fn run() {
     LOGGING_ENABLED.store(initial_logging, Ordering::Relaxed);
 
     init_logging();
+    // Pin the shared session-start timestamp at process launch so every window's
+    // log viewer agrees on the "current session" boundary.
+    let _ = structured_log::session_start();
     log::info!("Smashq starting up");
 
     let session_manager = std::sync::Arc::new(session::manager::SessionManager::new());
@@ -319,6 +322,7 @@ pub fn run() {
             structured_log::commands::append_frontend_logs,
             structured_log::commands::read_structured_log,
             structured_log::commands::clear_structured_log,
+            structured_log::commands::app_session_start,
             // ICS calendar export
             session::ics_export::commands::export_task_ics,
             // User settings (Documents/Smashq/)
