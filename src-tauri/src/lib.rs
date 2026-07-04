@@ -318,6 +318,7 @@ pub fn run() {
             // Structured NDJSON log sink (backend + frontend)
             structured_log::commands::append_frontend_logs,
             structured_log::commands::read_structured_log,
+            structured_log::commands::clear_structured_log,
             // ICS calendar export
             session::ics_export::commands::export_task_ics,
             // User settings (Documents/Smashq/)

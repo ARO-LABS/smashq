@@ -157,6 +157,38 @@ pub fn write_entries(entries: &[StructuredEntry]) -> std::io::Result<bool> {
     }
 }
 
+/// Truncate the primary log file and remove rotated siblings, then reset the
+/// shared writer so the next append reopens the fresh file. Reihenfolge ist
+/// kritisch: den offenen BufWriter ZUERST droppen — auf Windows (kein
+/// FILE_SHARE_DELETE) schluege sonst schon das Truncate am eigenen Handle fehl.
+fn clear_to(st: &mut WriterState, path: &Path, keep: usize) -> std::io::Result<()> {
+    // 1. Offenes Schreib-Handle freigeben.
+    st.writer = None;
+    // 2. Primaerdatei leeren. truncate statt remove: Inode bleibt erhalten,
+    //    kein Delete-am-eigenen-Handle-Problem. create(true) deckt den Fall ab,
+    //    dass die Datei noch nicht existiert.
+    OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)?;
+    st.bytes = 0;
+    // 3. Rotierte Dateien wegraeumen (kein offenes Handle -> best-effort).
+    for n in 1..=keep {
+        let _ = std::fs::remove_file(path.with_extension(format!("ndjson.{n}")));
+    }
+    Ok(())
+}
+
+/// Public: leert das gesamte On-Disk-Log (primaer + rotiert). Recovered einen
+/// vergifteten Mutex via into_inner(), weil das offene Handle sonst nie
+/// freigegeben wird und der Wipe scheiterte.
+pub fn clear_entries() -> std::io::Result<()> {
+    let path = ndjson_path();
+    let mut st = state().lock().unwrap_or_else(|e| e.into_inner());
+    clear_to(&mut st, &path, KEEP_ROTATED)
+}
+
 fn truncate_at_boundary(s: &mut String, max: usize) {
     if s.len() <= max {
         return;
@@ -259,6 +291,14 @@ pub mod commands {
             &ndjson_path(),
             max_lines.unwrap_or(500).min(5000),
         ))
+    }
+
+    /// Wipe das gesamte On-Disk-Protokoll (primaere + rotierte NDJSON-Dateien).
+    /// Destruktiv und irreversibel — das Frontend fragt vorher per confirm nach.
+    /// `async` haelt die Datei-I/O vom Main-Thread fern.
+    #[tauri::command]
+    pub async fn clear_structured_log() -> Result<(), ADPError> {
+        clear_entries().map_err(|e| ADPError::internal(format!("log clear failed: {e}")))
     }
 }
 
@@ -442,5 +482,43 @@ mod tests {
         let read = read_from(&path, 500);
         assert_eq!(read.len(), 1);
         assert_eq!(read[0].message, "ok");
+    }
+
+    #[test]
+    fn clear_empties_primary_and_rotated_then_writes_fresh() {
+        let dir = std::env::temp_dir().join("smashq-log-test-clear");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("app-log.ndjson");
+        // Seed: primaere Datei + eine rotierte Datei.
+        std::fs::write(&path, "line\n").unwrap();
+        std::fs::write(path.with_extension("ndjson.1"), "old\n").unwrap();
+
+        let mut st = WriterState {
+            writer: None,
+            bytes: 99,
+        };
+        clear_to(&mut st, &path, KEEP_ROTATED).unwrap();
+
+        // Primaere Datei existiert und ist leer, rotierte weg, bytes zurueckgesetzt.
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "");
+        assert!(!path.with_extension("ndjson.1").exists());
+        assert_eq!(st.bytes, 0);
+        assert!(st.writer.is_none());
+
+        // Ein Write NACH dem Clear landet in der frischen Datei (kein stale Handle).
+        write_to(
+            &mut st,
+            &path,
+            &[entry("info", "after")],
+            MAX_BYTES,
+            KEEP_ROTATED,
+        )
+        .unwrap();
+        if let Some(mut w) = st.writer.take() {
+            w.flush().unwrap();
+        }
+        let read = read_from(&path, 500);
+        assert_eq!(read.len(), 1);
+        assert_eq!(read[0].message, "after");
     }
 }
