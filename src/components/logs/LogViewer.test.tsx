@@ -402,6 +402,7 @@ describe("LogViewer — toolbar interactions", () => {
 
     expect(mockInvoke).not.toHaveBeenCalledWith("clear_structured_log");
     expect(screen.getByText("keep me")).toBeInTheDocument();
+    expect(confirmSpy).toHaveBeenCalled();
     confirmSpy.mockRestore();
   });
 
