@@ -184,7 +184,7 @@ fn load_with_fallback(path: &Path, label: &str) -> Result<String, ADPError> {
         }
     }
 
-    log::warn!(
+    log::debug!(
         "{}: all files corrupt or missing, returning empty (fresh start)",
         label
     );
