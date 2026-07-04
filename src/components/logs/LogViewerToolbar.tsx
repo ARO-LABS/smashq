@@ -113,11 +113,14 @@ export function LogViewerToolbar({
           className={`px-2 py-1 text-[11px] rounded transition-all ${
             scope === "all" ? "bg-accent-a10 text-accent" : "text-neutral-400 hover:text-neutral-200"
           }`}
-          title="Verlauf umschalten"
+          title={scope === "session" ? "Gesamten Verlauf anzeigen" : "Nur aktuelle Session anzeigen"}
         >
           {scope === "session" ? "Session" : "Verlauf"}
         </button>
 
+        {/* No active-state accent: the accent (see scope button) is reserved for
+            "all" scope, which changes WHICH entries are shown. Sort only reorders
+            the same entries, so neither direction is a signal-worthy deviation. */}
         <button
           onClick={() => onSetSortOrder(sortOrder === "desc" ? "asc" : "desc")}
           className="px-2 py-1 text-[11px] text-neutral-400 hover:text-neutral-200 rounded transition-all"

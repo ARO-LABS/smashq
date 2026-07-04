@@ -31,10 +31,23 @@ describe("LogViewerToolbar", () => {
     expect(props.onSetSortOrder).toHaveBeenCalledWith("asc");
   });
 
+  it("flips sort order to desc when currently asc", () => {
+    const props = renderToolbar({ sortOrder: "asc" });
+    fireEvent.click(screen.getByTitle("Sortierung umschalten"));
+    expect(props.onSetSortOrder).toHaveBeenCalledWith("desc");
+  });
+
   it("flips scope to all when currently session", () => {
     const props = renderToolbar({ scope: "session" });
-    fireEvent.click(screen.getByTitle("Verlauf umschalten"));
+    fireEvent.click(screen.getByTitle("Gesamten Verlauf anzeigen"));
     expect(props.onSetScope).toHaveBeenCalledWith("all");
+  });
+
+  it("flips scope to session when currently all", () => {
+    const props = renderToolbar({ scope: "all" });
+    // In the 'all' state the title is the reverse action.
+    fireEvent.click(screen.getByTitle("Nur aktuelle Session anzeigen"));
+    expect(props.onSetScope).toHaveBeenCalledWith("session");
   });
 
   it("fires onClear when the trash button is clicked", () => {
