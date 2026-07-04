@@ -7,6 +7,16 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-07-04 — Subagent-Driven Logging-Redesign: neuer `errorLogger`-Export brach zwei `vi.mock`-Voll-Replacements, die kein Per-Task-Testlauf ausführte
+
+**Kontext:** 8-Task-Redesign des Protokoll-Viewers (subagent-driven, zweistufiges Review pro Task). Task 7 fügte den Export `listenForLogCleared` zu `errorLogger.ts` hinzu und ließ `wireRuntimeGates.ts` ihn aufrufen. Alle Per-Task-Gates + Spec- + Code-Quality-Reviews grün. Erst der finale Gesamt-Suite-Lauf (2432 Tests) zeigte 4 rote Tests: `wireRuntimeGates.test.ts` (3) + `LogWindowApp.test.tsx` (1).
+
+**Fehler:** Beide Test-Dateien haben `vi.mock("./errorLogger", () => ({...}))`-**Voll-Replacement**-Mocks, die die genutzten Exports einzeln auflisten. Der neue Export `listenForLogCleared` fehlte in beiden → bei Aufruf `undefined` → Crash in `wireRuntimeGates`. Der Task-7-Implementer aktualisierte nur den Mock in `LogViewer.test.tsx` (die er kannte) und meldete fälschlich „wireRuntimeGates.test.ts existiert nicht" — er hatte nicht nach ALLEN `vi.mock.*errorLogger`-Stellen gegreppt. Die Per-Task-Reviewer liefen nur den Logs-Cluster + `errorLogger.test.ts`, nie die Dateien, die den neuen Export indirekt (via `wireRuntimeGates`) ausführen.
+
+**Korrektur:** `listenForLogCleared: vi.fn(() => Promise.resolve(() => {}))` in beide Mock-Objekte ergänzt (gleiche Shape wie das benachbarte `listenForLogSnapshotRequests`). Full-Suite danach grün (2432).
+
+**Regel:** (1) Wird ein Export eines Moduls hinzugefügt/umbenannt, das irgendwo per `vi.mock(modul, () => ({...}))` **voll ersetzt** wird: `grep -rn "vi.mock.*<modul>"` über ALLE Testdateien laufen und JEDES Replacement-Objekt um den neuen Export ergänzen — ein Voll-Replacement listet Exports einzeln, ein fehlender ist zur Laufzeit `undefined` (nicht der echte). Verschärft die bestehende CLAUDE.md-Regel „Signature Changes → grep alle Usages" auf Mock-Objekte. (2) Subagent-Driven: der Per-Task-Testlauf deckt nur die Dateien ab, die der Implementer kennt — ein Export-Change mit INDIREKTEN Consumern (hier `wireRuntimeGates` → `LogWindowApp`) rutscht durch die Per-Task-Reviews. Der finale FULL-SUITE-Gesamt-Gate ist dafür Pflicht, nicht optional — genau er fing es. (3) „Datei existiert nicht" eines Implementers nie ungeprüft glauben — hier existierte sie (eigener Glob/Grep). Verwandt: [[feedback_subagent_report_skepticism]], 2026-06-09 „Prop entfernt ohne ALLE Caller zu greppen".
+
 ### 2026-07-02 — `todo.md` behauptete `folderAccents` sei „implementiert + gepusht", der Code hatte es aber nie
 
 **Kontext:** Bugfix-Auftrag (Rechtsklick-Farbe auf Sessions/Favoriten). Die „Aktuelle Phase" in `todo.md` listete `folderAccents` bereits als fertig+gepusht. Der tatsaechliche Code (`SessionCard` keyte per `claudeSessionId`, `FavoriteCard` hatte gar kein Kontextmenü) und `git log` widersprachen dem — das Feature existierte nicht.

@@ -25,6 +25,7 @@
 
 - [ ] fix(tauri): macOS-Aequivalent zum `win_job`-Prozessbaum-Kill — auf macOS ueberleben claude + MCP-Server-Grandchildren einen App-Crash (Job Object ist Windows-only; Kandidat: Prozessgruppen + SIGKILL). Aus Mac-Support 2026-07-02.
 - [ ] fix(store): `resetToDefaults` umgeht Rust-Gate-Sync + Cross-Window-Broadcast für `backendFileLogging` (settingsStore.ts, latent — kein UI-Caller). Aus Logging-Review (low).
+- [ ] fix(ui): Protokoll-„Löschen" bei **3+** Fenstern — ein frisch mountendes Log-Fenster kann via `log-snapshot-request` eine Snapshot-Antwort von einem Fenster erhalten, dessen `log-cleared`-Handler noch nicht lief, und die gerade gelöschten Einträge re-importieren. Zwei-Fenster-Fall ist dicht (Task 7, Logging-Redesign 2026-07-04). Kandidat: Clear-Generation/Watermark, die Snapshot-Antworten respektieren. Aus finalem Review (important, narrow race).
 - [ ] perf(tauri): env_logger-Format-Closure macht sync open/write/flush pro Log-Record auf dem loggenden Thread — Batching/Channel-Entkopplung. Aus Logging-Review (medium, Perf).
 - [ ] perf(tauri): Seek-basierter Tail-Read für `read_structured_log` statt Volldatei-Scan (aktuell gebounded VecDeque, aber weiterhin voller Scan). Aus Logging-Review (Optimierung).
 - [ ] security(tauri): `validate_id` führenden Bindestrich verbieten — ASCII-only ist erledigt (2026-06-14, `is_ascii_alphanumeric`). Rest: ein alleinstehender `-`/`--`-Prefix kann von gh als Flag interpretiert werden (latente Argument-Injection bei `move_project_item`). Low; Test mit anpassen.
