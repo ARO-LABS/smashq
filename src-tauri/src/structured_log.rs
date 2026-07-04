@@ -493,8 +493,15 @@ mod tests {
         std::fs::write(&path, "line\n").unwrap();
         std::fs::write(path.with_extension("ndjson.1"), "old\n").unwrap();
 
+        // Seed an OPEN writer over the primary file so the assertion below
+        // actually proves clear_to dropped the handle (not a no-op on None).
+        let handle = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .unwrap();
         let mut st = WriterState {
-            writer: None,
+            writer: Some(BufWriter::new(handle)),
             bytes: 99,
         };
         clear_to(&mut st, &path, KEEP_ROTATED).unwrap();
@@ -520,5 +527,22 @@ mod tests {
         let read = read_from(&path, 500);
         assert_eq!(read.len(), 1);
         assert_eq!(read[0].message, "after");
+    }
+
+    #[test]
+    fn clear_on_missing_primary_creates_empty_file() {
+        let dir = std::env::temp_dir().join("smashq-log-test-clear-missing");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("app-log.ndjson");
+        let _ = std::fs::remove_file(&path); // ensure it does not exist
+
+        let mut st = WriterState {
+            writer: None,
+            bytes: 0,
+        };
+        clear_to(&mut st, &path, KEEP_ROTATED).unwrap();
+
+        assert!(path.exists());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "");
     }
 }
