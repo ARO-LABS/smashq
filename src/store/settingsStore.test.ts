@@ -505,9 +505,11 @@ describe("addFavorite", () => {
     expect(getState().favorites[0].label).toBe("Mein Projekt");
   });
 
-  it("sets shell to 'powershell' as default", () => {
+  it("sets shell to 'auto' as default so the backend resolves it per-platform", () => {
+    // Regression guard: a hardcoded "powershell" here made Quick Start fail
+    // silently on macOS (favorite resolved to the absent `pwsh`).
     getState().addFavorite("C:/Projects/test");
-    expect(getState().favorites[0].shell).toBe("powershell");
+    expect(getState().favorites[0].shell).toBe("auto");
   });
 
   it("sets addedAt to approximately now", () => {

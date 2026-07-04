@@ -5,7 +5,8 @@ import { useSessionStore, generateUniqueDisplayId } from "../../../store/session
 import { useSettingsStore } from "../../../store/settingsStore";
 import { useUIStore } from "../../../store/uiStore";
 import { logError } from "../../../utils/errorLogger";
-import type { FavoriteFolder, SettingsState } from "../../../store/settingsStore";
+import { isWindows } from "../../../utils/platform";
+import type { FavoriteFolder } from "../../../store/settingsStore";
 import type { SessionShell } from "../../../store/sessionStore";
 
 function generateSessionId(): string {
@@ -23,9 +24,16 @@ function extractFolderName(path: string): string {
  * zsh, Linux → bash) and echoes the concrete shell in `result.shell`. This
  * helper is only the defensive fallback for the store entry when that echo
  * is unexpectedly missing.
+ *
+ * It must be platform-aware itself: defaulting "auto" to "powershell" on every
+ * OS mislabels macOS/Linux sessions as PowerShell in the session list.
  */
-function concreteShellFallback(pref: SettingsState["defaultShell"]): SessionShell {
-  return pref === "auto" ? "powershell" : pref;
+function concreteShellFallback(pref: string): SessionShell {
+  if (pref === "powershell" || pref === "cmd" || pref === "gitbash" || pref === "bash" || pref === "zsh") {
+    return pref;
+  }
+  // "auto" or anything unexpected → the platform's real default shell.
+  return isWindows() ? "powershell" : "zsh";
 }
 
 export interface UseSessionCreationReturn {
@@ -84,6 +92,11 @@ export function useSessionCreation(): UseSessionCreationReturn {
         });
       } catch (err) {
         logError("useSessionCreation.resumeSession", err);
+        useUIStore.getState().addToast({
+          type: "error",
+          title: "Session-Start fehlgeschlagen",
+          message: err instanceof Error ? err.message : String(err),
+        });
       }
     },
     [],
@@ -110,14 +123,22 @@ export function useSessionCreation(): UseSessionCreationReturn {
         title: result?.title ?? title,
         displayId: generateUniqueDisplayId(sessions),
         folder: result?.folder ?? folder,
-        shell: (result?.shell ?? shell) as SessionShell,
+        shell: (result?.shell ?? concreteShellFallback(shell)) as SessionShell,
         isGitRepo: result?.isGitRepo,
         snapshotCommit: result?.snapshotCommit,
       });
       useSettingsStore.getState().updateFavoriteLastUsed(favorite.id);
       useUIStore.getState().closePreview();
     } catch (err) {
+      // Surface the failure — a silent logError here is exactly what hid the
+      // macOS "favorite starts nothing" bug (backend rejected the shell, user
+      // saw no feedback).
       logError("useSessionCreation.quickStart", err);
+      useUIStore.getState().addToast({
+        type: "error",
+        title: "Session-Start fehlgeschlagen",
+        message: err instanceof Error ? err.message : String(err),
+      });
     }
   }, []);
 

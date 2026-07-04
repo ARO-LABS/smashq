@@ -119,7 +119,24 @@ impl SessionManager {
         // — every downstream consumer (exe lookup, args, SessionInfo) sees
         // only concrete values.
         let platform = ShellPlatform::current();
-        let shell = resolve_shell_pref(&shell, platform).to_string();
+        // Resolve the preference to a shell whose executable is actually on
+        // PATH, degrading to the platform default when the preferred one is
+        // missing — this is what keeps a legacy Windows "powershell" favorite
+        // (which maps to the usually-absent `pwsh` on macOS) from silently
+        // killing the session start. Only errors when nothing usable exists.
+        let (shell, shell_exe) = match resolve_available_shell(&shell, platform, |exe| {
+            which_executable(exe).is_some()
+        }) {
+            Some((resolved, exe)) => (resolved.to_string(), exe),
+            None => {
+                let msg = format!(
+                        "Failed to create session {}: no usable shell found on PATH for preference '{}' (platform {:?})",
+                        id, shell, platform
+                    );
+                log::error!("{}", msg);
+                return Err(ADPError::new(ADPErrorCode::TerminalSpawnFailed, msg));
+            }
+        };
 
         log::info!(
             "Creating session id={}, shell={}, folder={}, size={}x{}",
@@ -129,17 +146,6 @@ impl SessionManager {
             cols,
             rows
         );
-
-        // Validate the shell executable exists
-        let shell_exe = shell_executable(&shell, platform);
-        if which_executable(shell_exe).is_none() {
-            let msg = format!(
-                "Failed to create session {}: shell executable '{}' not found in PATH",
-                id, shell_exe
-            );
-            log::error!("{}", msg);
-            return Err(ADPError::new(ADPErrorCode::TerminalSpawnFailed, msg));
-        }
 
         let pty_system = native_pty_system();
 
@@ -753,6 +759,51 @@ fn shell_executable(shell: &str, platform: ShellPlatform) -> &'static str {
     }
 }
 
+/// Resolve a shell preference to a concrete `(shell, executable)` pair whose
+/// executable is actually present on PATH, degrading to the platform default
+/// shell when the preferred one is missing.
+///
+/// This is the PATH-aware guard that keeps a session start from dying on a
+/// platform-foreign preference. The canonical trigger: favorites hardcode
+/// shell `"powershell"` (see `settingsStore.ts` `addFavorite`), which
+/// [`shell_executable`] maps to `pwsh` on Unix. On a Mac without PowerShell
+/// installed the old code hard-failed with "shell executable 'pwsh' not found"
+/// and the frontend swallowed the error — the user clicked a favorite and
+/// nothing happened. We now fall back to zsh/bash instead. A Mac user who DID
+/// install pwsh still gets it (the fallback only fires when the preferred shell
+/// is genuinely absent).
+///
+/// `is_installed` probes PATH; production passes
+/// `|exe| which_executable(exe).is_some()`, tests inject a stub. Returns `None`
+/// only when neither the preferred shell nor the platform default is available,
+/// so `create_session` can surface a precise error.
+fn resolve_available_shell(
+    pref: &str,
+    platform: ShellPlatform,
+    is_installed: impl Fn(&str) -> bool,
+) -> Option<(&'static str, &'static str)> {
+    let shell = resolve_shell_pref(pref, platform);
+    let exe = shell_executable(shell, platform);
+    if is_installed(exe) {
+        return Some((shell, exe));
+    }
+
+    let default = platform.default_shell();
+    let default_exe = shell_executable(default, platform);
+    if is_installed(default_exe) {
+        log::warn!(
+            "Shell '{}' (exe '{}') not found on PATH; falling back to platform default '{}' (exe '{}')",
+            shell,
+            exe,
+            default,
+            default_exe
+        );
+        return Some((default, default_exe));
+    }
+
+    None
+}
+
 fn shell_args(
     shell: &str,
     platform: ShellPlatform,
@@ -1208,6 +1259,67 @@ mod tests {
             "powershell"
         );
         assert_eq!(resolve_shell_pref("", ShellPlatform::MacOs), "zsh");
+    }
+
+    // --- resolve_available_shell (PATH-aware fallback) ---
+    //
+    // Regression guard for the macOS session-start bug: favorites hardcode
+    // shell "powershell" (settingsStore.ts addFavorite), which resolves to the
+    // `pwsh` executable on Unix. On a Mac without PowerShell installed, the old
+    // create_session errored out ("shell executable 'pwsh' not found") and the
+    // frontend swallowed it — the user saw nothing happen. resolve_available_shell
+    // now falls back to the platform default when the preferred shell is missing.
+
+    #[test]
+    fn available_shell_falls_back_when_pwsh_missing_on_macos() {
+        // Only zsh is installed (typical Mac): a legacy "powershell" favorite
+        // must degrade to zsh instead of failing the spawn.
+        let installed = |exe: &str| exe == "zsh";
+        assert_eq!(
+            resolve_available_shell("powershell", ShellPlatform::MacOs, installed),
+            Some(("zsh", "zsh"))
+        );
+    }
+
+    #[test]
+    fn available_shell_prefers_pwsh_when_installed() {
+        // A Mac user who DID install PowerShell still gets pwsh — the fallback
+        // only triggers when the preferred shell is genuinely absent.
+        let installed = |_: &str| true;
+        assert_eq!(
+            resolve_available_shell("powershell", ShellPlatform::MacOs, installed),
+            Some(("powershell", "pwsh"))
+        );
+    }
+
+    #[test]
+    fn available_shell_passes_through_installed_default() {
+        let installed = |_: &str| true;
+        assert_eq!(
+            resolve_available_shell("auto", ShellPlatform::MacOs, installed),
+            Some(("zsh", "zsh"))
+        );
+    }
+
+    #[test]
+    fn available_shell_none_when_nothing_is_installed() {
+        // Neither pwsh nor the zsh fallback exist — surface the failure so
+        // create_session returns a precise error rather than spawning garbage.
+        let installed = |_: &str| false;
+        assert_eq!(
+            resolve_available_shell("powershell", ShellPlatform::MacOs, installed),
+            None
+        );
+    }
+
+    #[test]
+    fn available_shell_windows_powershell_unchanged() {
+        // Windows behavior is untouched: powershell.exe is the resolved exe.
+        let installed = |_: &str| true;
+        assert_eq!(
+            resolve_available_shell("powershell", ShellPlatform::Windows, installed),
+            Some(("powershell", "powershell.exe"))
+        );
     }
 
     // --- shell_executable ---
