@@ -42,6 +42,9 @@ const selectSeverityFilter = (s: ReturnType<typeof useLogViewerStore.getState>) 
 const selectSourceFilter = (s: ReturnType<typeof useLogViewerStore.getState>) => s.sourceFilter;
 const selectSearchText = (s: ReturnType<typeof useLogViewerStore.getState>) => s.searchText;
 const selectLiveTail = (s: ReturnType<typeof useLogViewerStore.getState>) => s.liveTail;
+const selectSessionStart = (s: ReturnType<typeof useLogViewerStore.getState>) => s.sessionStart;
+const selectSortOrder = (s: ReturnType<typeof useLogViewerStore.getState>) => s.sortOrder;
+const selectScope = (s: ReturnType<typeof useLogViewerStore.getState>) => s.scope;
 const selectAddEntries = (s: ReturnType<typeof useLogViewerStore.getState>) => s.addEntries;
 const selectClearEntries = (s: ReturnType<typeof useLogViewerStore.getState>) => s.clearEntries;
 const selectSetSeverityFilter = (s: ReturnType<typeof useLogViewerStore.getState>) => s.setSeverityFilter;
@@ -55,6 +58,9 @@ export function LogViewer() {
   const sourceFilter = useLogViewerStore(selectSourceFilter);
   const searchText = useLogViewerStore(selectSearchText);
   const liveTail = useLogViewerStore(selectLiveTail);
+  const sessionStart = useLogViewerStore(selectSessionStart);
+  const sortOrder = useLogViewerStore(selectSortOrder);
+  const scope = useLogViewerStore(selectScope);
   const addEntries = useLogViewerStore(selectAddEntries);
   const clearEntries = useLogViewerStore(selectClearEntries);
   const setSeverityFilter = useLogViewerStore(selectSetSeverityFilter);
@@ -75,6 +81,15 @@ export function LogViewer() {
       })
       .catch((err) => logError("LogViewer.readStructuredLog", err));
   }, [addEntries]);
+
+  // Hard truncate: window.confirm (established destructive-action pattern,
+  // cf. ConfigPanelTabList), then Rust wipes file + rotated, then clear the view.
+  const handleClear = useCallback(() => {
+    if (!window.confirm("Gesamtes Protokoll unwiderruflich löschen (Datei + Verlauf)?")) return;
+    invoke("clear_structured_log")
+      .then(() => clearEntries())
+      .catch((err) => logError("LogViewer.clearLog", err));
+  }, [clearEntries]);
 
   useEffect(() => {
     // Frontend logs flow into logViewerStore directly via errorLogger —
@@ -153,15 +168,17 @@ export function LogViewer() {
   const grouped = useMemo(() => {
     const lowerSearch = searchText.toLowerCase();
     const filtered = entries.filter((e) => {
+      if (scope === "session" && e.timestamp < sessionStart) return false;
       if (!severityFilter.has(e.severity)) return false;
       if (!sourceFilter.has(e.source)) return false;
       if (lowerSearch && !e.message.toLowerCase().includes(lowerSearch)) return false;
       return true;
     });
-    // Group on chronological order (consecutive-dedup depends on it), then
-    // reverse for display so the newest entry sits on top.
-    return groupConsecutiveEntries(filtered).reverse();
-  }, [entries, severityFilter, sourceFilter, searchText]);
+    // Group on chronological order (consecutive-dedup depends on it). "desc"
+    // reverses for newest-on-top; "asc" keeps chronological (oldest on top).
+    const groups = groupConsecutiveEntries(filtered);
+    return sortOrder === "desc" ? groups.reverse() : groups;
+  }, [entries, severityFilter, sourceFilter, searchText, scope, sessionStart, sortOrder]);
 
   // Virtualizer for performant rendering
   const virtualizer = useVirtualizer({
@@ -275,7 +292,7 @@ export function LogViewer() {
           </button>
 
           <button
-            onClick={clearEntries}
+            onClick={handleClear}
             className="flex items-center gap-1 px-2 py-1 text-[11px] text-neutral-400 hover:text-red-400 rounded transition-all"
             title="Logs leeren"
           >

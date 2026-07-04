@@ -63,6 +63,9 @@ beforeEach(async () => {
     sourceFilter: new Set(["frontend", "backend"]),
     searchText: "",
     liveTail: true,
+    sortOrder: "desc",
+    scope: "session",
+    sessionStart: "2020-01-01T00:00:00.000Z",
   });
   // Reset invoke to the default empty-array resolution so leftover
   // mockResolvedValueOnce queues from a prior test don't bleed over.
@@ -347,7 +350,11 @@ describe("LogViewer — toolbar interactions", () => {
     expect(screen.getByText(/0 Gruppen von 1 Einträgen/)).toBeInTheDocument();
   });
 
-  it("clears all entries when the trash button is clicked", () => {
+  it("wipes the on-disk log and clears the view after confirm", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const mockInvoke = vi.mocked(invoke);
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
     useLogViewerStore.getState().addEntries([
       {
         timestamp: "2025-01-15T10:30:00.000Z",
@@ -358,13 +365,44 @@ describe("LogViewer — toolbar interactions", () => {
     ]);
 
     render(<LogViewer />);
+    mockInvoke.mockClear();
     expect(screen.getByText("to be cleared")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTitle("Logs leeren"));
 
-    expect(screen.queryByText("to be cleared")).not.toBeInTheDocument();
+    expect(confirmSpy).toHaveBeenCalled();
+    await vi.waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith("clear_structured_log"),
+    );
     expect(useLogViewerStore.getState().entries).toHaveLength(0);
-    expect(screen.getByText("Keine Logs vorhanden")).toBeInTheDocument();
+    // findByText (not getByText): the store update lands via a promise
+    // .then() outside any React-tracked event, so the re-render flushes on
+    // a later tick — wait for it instead of asserting the DOM synchronously.
+    expect(await screen.findByText("Keine Logs vorhanden")).toBeInTheDocument();
+    confirmSpy.mockRestore();
+  });
+
+  it("does nothing when the wipe confirm is cancelled", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const mockInvoke = vi.mocked(invoke);
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    useLogViewerStore.getState().addEntries([
+      {
+        timestamp: "2025-01-15T10:30:00.000Z",
+        severity: "info",
+        source: "frontend",
+        message: "keep me",
+      },
+    ]);
+
+    render(<LogViewer />);
+    mockInvoke.mockClear();
+    fireEvent.click(screen.getByTitle("Logs leeren"));
+
+    expect(mockInvoke).not.toHaveBeenCalledWith("clear_structured_log");
+    expect(screen.getByText("keep me")).toBeInTheDocument();
+    confirmSpy.mockRestore();
   });
 
   it("toggles live-tail state when the Live button is clicked", () => {
@@ -490,5 +528,55 @@ describe("LogViewer — listener lifecycle", () => {
 
     for (const resolve of resolvers) resolve(unlistenSpy);
     await vi.waitFor(() => expect(unlistenSpy).toHaveBeenCalled());
+  });
+});
+
+describe("LogViewer — scope & sort", () => {
+  function seedOldAndNew() {
+    useLogViewerStore.getState().addEntries([
+      {
+        timestamp: "2019-01-01T00:00:00.000Z",
+        severity: "info",
+        source: "frontend",
+        message: "old entry",
+      },
+      {
+        timestamp: "2025-01-15T10:30:00.000Z",
+        severity: "info",
+        source: "frontend",
+        message: "session entry",
+      },
+    ]);
+  }
+
+  it("hides entries older than sessionStart when scope is 'session'", () => {
+    useLogViewerStore.setState({ sessionStart: "2020-01-01T00:00:00.000Z", scope: "session" });
+    seedOldAndNew();
+    render(<LogViewer />);
+    expect(screen.getByText("session entry")).toBeInTheDocument();
+    expect(screen.queryByText("old entry")).not.toBeInTheDocument();
+  });
+
+  it("shows pre-session entries when scope is 'all'", () => {
+    useLogViewerStore.setState({ sessionStart: "2020-01-01T00:00:00.000Z", scope: "all" });
+    seedOldAndNew();
+    render(<LogViewer />);
+    expect(screen.getByText("old entry")).toBeInTheDocument();
+    expect(screen.getByText("session entry")).toBeInTheDocument();
+  });
+
+  it("reverses display order when sortOrder is 'asc' (oldest on top)", () => {
+    useLogViewerStore.setState({ sortOrder: "asc" });
+    useLogViewerStore.getState().addEntries([
+      { timestamp: "2025-01-15T10:30:00.000Z", severity: "info", source: "frontend", message: "first" },
+      { timestamp: "2025-01-15T10:30:05.000Z", severity: "info", source: "frontend", message: "second" },
+    ]);
+    render(<LogViewer />);
+    const first = screen.getByText("first");
+    const second = screen.getByText("second");
+    // asc: "first" (older) must appear BEFORE "second" in the DOM.
+    expect(
+      first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });
