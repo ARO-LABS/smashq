@@ -6,6 +6,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { writeText, readText } from "@tauri-apps/plugin-clipboard-manager";
 import { logError } from "../../utils/errorLogger";
+import { isWindows } from "../../utils/platform";
 import { useUIStore } from "../../store/uiStore";
 import { useSettingsStore, sanitizeScrollbackLines } from "../../store/settingsStore";
 import "@xterm/xterm/css/xterm.css";
@@ -105,11 +106,13 @@ export function SessionTerminal({ sessionId }: SessionTerminalProps) {
       // only when the user is NOT actively reading scrollback. Leaving the default
       // (true) causes xterm to scroll on every keystroke and fights our own tracking.
       scrollOnUserInput: false,
-      // Tell xterm it's attached to a ConPTY backend on Windows. This enables the
-      // correct line-wrap / reflow heuristics for ConPTY output (xtermjs/xterm.js#2666).
-      // buildNumber 19041 = Windows 10 20H1 baseline; >= 21376 would unlock reflow,
-      // but Claude-Code's output does not rely on it and we stay conservative.
-      windowsPty: { backend: "conpty", buildNumber: 19041 },
+      // Tell xterm it's attached to a ConPTY backend — ONLY on Windows. This
+      // enables the correct line-wrap / reflow heuristics for ConPTY output
+      // (xtermjs/xterm.js#2666). buildNumber 19041 = Windows 10 20H1 baseline;
+      // >= 21376 would unlock reflow, but Claude-Code's output does not rely on
+      // it and we stay conservative. On macOS/Linux the PTY is a Unix pty, not
+      // ConPTY — passing this option there feeds xterm wrong reflow heuristics.
+      ...(isWindows() ? { windowsPty: { backend: "conpty" as const, buildNumber: 19041 } } : {}),
       theme: {
         background: "#0d1117",
         foreground: "#e6edf3",

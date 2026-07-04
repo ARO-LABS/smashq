@@ -243,6 +243,12 @@ pub fn run() {
     let _ = structured_log::session_start();
     log::info!("Smashq starting up");
 
+    // macOS: a Finder/Dock/Spotlight-launched .app inherits only the minimal
+    // launchd PATH, so `gh`/`git`/`node` shell-outs via util::silent_command
+    // can't find Homebrew binaries. Hydrate the process PATH from the login
+    // shell now, before any worker thread spawns. No-op on Windows/Linux.
+    crate::util::hydrate_path_from_login_shell();
+
     let session_manager = std::sync::Arc::new(session::manager::SessionManager::new());
     let session_manager_cleanup = session_manager.clone();
 

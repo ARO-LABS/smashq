@@ -235,3 +235,64 @@ describe("useSessionCreation.handleNewSessionFromDefaults — Layer-B", () => {
     });
   });
 });
+
+/**
+ * Layer-B integration tests for handleQuickStart — the favorite/Quick-Start
+ * path that was the actual macOS session-start blocker. Favorites used to
+ * hardcode shell "powershell" (→ absent `pwsh` on macOS), create_session
+ * rejected, and the catch only logError'd — the user clicked and nothing
+ * happened. These guard both halves of the fix: the failure is now visible,
+ * and the favorite's preference (now "auto") reaches the backend verbatim.
+ */
+describe("useSessionCreation.handleQuickStart — Layer-B (macOS session-start guard)", () => {
+  const favorite = {
+    id: "fav-1",
+    path: "/Users/me/proj",
+    label: "Proj",
+    shell: "auto" as const,
+    addedAt: 0,
+    lastUsedAt: 0,
+    groupId: null,
+    sortIndex: 0,
+  };
+
+  beforeEach(() => {
+    resetAllStores();
+  });
+
+  it("favorite spawn failure surfaces a visible error toast (no silent logError)", async () => {
+    const failingCreate: IPCHandler = async () => {
+      throw new Error("shell executable 'pwsh' not found in PATH");
+    };
+    installRealIPC({ create_session: failingCreate });
+
+    const { result } = renderHook(() => useSessionCreation());
+    await act(async () => {
+      await result.current.handleQuickStart(favorite);
+    });
+
+    // No phantom session left behind by the failed spawn.
+    expect(useSessionStore.getState().sessions).toHaveLength(0);
+
+    // The user sees the real backend error instead of nothing.
+    const errorToast = useUIStore.getState().toasts.find((t) => t.type === "error");
+    expect(errorToast).toBeDefined();
+    expect(errorToast?.title).toBe("Session-Start fehlgeschlagen");
+    expect(errorToast?.message).toContain("pwsh");
+  });
+
+  it("passes the favorite's shell preference through to create_session", async () => {
+    const { handler, calls } = buildCreateSessionHandler();
+    installRealIPC({ create_session: handler });
+
+    const { result } = renderHook(() => useSessionCreation());
+    await act(async () => {
+      await result.current.handleQuickStart(favorite);
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].shell).toBe("auto");
+    expect(calls[0].folder).toBe("/Users/me/proj");
+    expect(useSessionStore.getState().sessions).toHaveLength(1);
+  });
+});

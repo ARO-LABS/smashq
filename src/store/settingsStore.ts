@@ -21,7 +21,14 @@ export interface FavoriteFolder {
   id: string;
   path: string;
   label: string;
-  shell: "powershell" | "cmd" | "gitbash";
+  /**
+   * Shell preference for Quick-Start sessions from this favorite. Defaults to
+   * "auto" so the Rust backend resolves it per-platform (zsh on macOS, bash on
+   * Linux, powershell on Windows) — a hardcoded Windows shell here used to make
+   * Quick Start fail silently on macOS (favorites resolved to the absent
+   * `pwsh`). The Windows-specific values remain valid for existing favorites.
+   */
+  shell: "auto" | "powershell" | "cmd" | "gitbash" | "bash" | "zsh";
   addedAt: number;
   lastUsedAt: number;
   // NEW (v5):
@@ -951,7 +958,9 @@ export const useSettingsStore = create<SettingsState>()(
             id: `fav-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             path,
             label: label ?? folderName,
-            shell: "powershell",
+            // "auto": let the backend pick the right shell per platform. A
+            // hardcoded "powershell" here made Quick Start fail on macOS.
+            shell: "auto",
             addedAt: Date.now(),
             lastUsedAt: Date.now(),
             groupId: null,
