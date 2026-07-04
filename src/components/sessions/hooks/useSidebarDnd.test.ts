@@ -17,7 +17,12 @@ vi.mock("@dnd-kit/core", async (importOriginal) => {
   };
 });
 
-import { useSidebarDnd, isInteractiveTarget, SmartPointerSensor } from "./useSidebarDnd";
+import {
+  useSidebarDnd,
+  isInteractiveTarget,
+  SmartPointerSensor,
+  SmartKeyboardSensor,
+} from "./useSidebarDnd";
 import { useSettingsStore } from "../../../store/settingsStore";
 
 /**
@@ -309,5 +314,53 @@ describe("SmartPointerSensor guard", () => {
     const el = document.createElement("div");
     el.setAttribute("data-no-dnd", "true");
     expect(isInteractiveTarget(el)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SmartKeyboardSensor — keyboard-drag activation guard for editable targets
+// ---------------------------------------------------------------------------
+
+describe("SmartKeyboardSensor guard", () => {
+  // dnd-kit's KeyboardSensor treats Space AND Enter as drag-start activator
+  // codes and calls preventDefault() on them. Spread whole-tile via {...listeners},
+  // that swallows the space/enter of an inline rename <input>. The guard must
+  // let editable targets keep those keys for text entry.
+  function keyboardEvent(target: Element, code: string) {
+    const preventDefault = vi.fn();
+    const event = {
+      target,
+      nativeEvent: { code },
+      preventDefault,
+    } as unknown as React.KeyboardEvent;
+    return { event, preventDefault };
+  }
+
+  // The default handler reads active.activatorNode.current; null means "no
+  // dedicated drag handle" (our whole-tile case), so its own guard is skipped.
+  const context = { active: { activatorNode: { current: null } } } as never;
+
+  it("ignores Space on an input so the rename field keeps the space", () => {
+    const handler = SmartKeyboardSensor.activators[0].handler;
+    const input = document.createElement("input");
+    const { event, preventDefault } = keyboardEvent(input, "Space");
+    expect(handler(event, {}, context)).toBe(false);
+    expect(preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("ignores Enter on an input (Enter is also a dnd-kit start code)", () => {
+    const handler = SmartKeyboardSensor.activators[0].handler;
+    const input = document.createElement("input");
+    const { event, preventDefault } = keyboardEvent(input, "Enter");
+    expect(handler(event, {}, context)).toBe(false);
+    expect(preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("starts the drag on Space for a plain tile surface", () => {
+    const handler = SmartKeyboardSensor.activators[0].handler;
+    const div = document.createElement("div");
+    const { event, preventDefault } = keyboardEvent(div, "Space");
+    expect(handler(event, {}, context)).toBe(true);
+    expect(preventDefault).toHaveBeenCalled();
   });
 });

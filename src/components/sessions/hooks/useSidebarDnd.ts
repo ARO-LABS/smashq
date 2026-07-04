@@ -48,6 +48,31 @@ export class SmartPointerSensor extends PointerSensor {
 }
 
 /**
+ * KeyboardSensor with the same interactive-target guard as SmartPointerSensor.
+ *
+ * dnd-kit's KeyboardSensor treats Space and Enter as drag-start activator keys
+ * and calls `preventDefault()` on them. Because the sortable rows spread the
+ * drag `{...listeners}` on the whole tile (no dedicated activator handle), that
+ * `onKeyDown` sees keystrokes bubbling up from inline rename `<input>`s — and
+ * the swallowed Space is exactly why typing a space in a rename field did
+ * nothing. Gate the activator on editable targets, then delegate to dnd-kit's
+ * own handler so the start-code list and activatorNode logic stay authoritative
+ * (survives @dnd-kit version bumps — we reuse its handler, not reimplement it).
+ */
+const guardedKeyboardActivator: (typeof KeyboardSensor.activators)[0]["handler"] = (
+  event,
+  options,
+  context,
+) => {
+  if (isInteractiveTarget(event.target)) return false;
+  return KeyboardSensor.activators[0].handler(event, options, context);
+};
+
+export class SmartKeyboardSensor extends KeyboardSensor {
+  static activators = [{ eventName: "onKeyDown" as const, handler: guardedKeyboardActivator }];
+}
+
+/**
  * Shared sensor set for both sidebar lists (favorites + sessions). The 6px
  * activation distance is what separates a click from a drag on whole-tile
  * drag surfaces — below it, the pointer-up still fires the click.
@@ -55,7 +80,7 @@ export class SmartPointerSensor extends PointerSensor {
 export function useSidebarSensors(): SensorDescriptor<SensorOptions>[] {
   return useSensors(
     useSensor(SmartPointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(SmartKeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 }
 
