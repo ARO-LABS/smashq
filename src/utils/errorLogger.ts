@@ -221,6 +221,44 @@ export async function listenForLogSnapshotRequests(): Promise<() => void> {
   });
 }
 
+const LOG_CLEARED_EVENT = "log-cleared";
+
+/**
+ * Broadcast a "log cleared" signal to every other window so each wipes its own
+ * in-memory logViewerStore. Without this, a clear in one window leaves other
+ * windows' entries in RAM; they flow back via the snapshot sync on the next
+ * LogViewer mount, re-hydrating exactly what the user just deleted. Fire-and-
+ * forget — a failed broadcast must not break the local clear.
+ */
+export async function broadcastLogCleared(): Promise<void> {
+  if (!isTauriEnv()) return;
+  try {
+    const [{ emit }, sourceWindow] = await Promise.all([
+      import("@tauri-apps/api/event"),
+      getWindowLabel(),
+    ]);
+    await emit(LOG_CLEARED_EVENT, { sourceWindow });
+  } catch {
+    // best-effort
+  }
+}
+
+/**
+ * Wire a receiver: when ANOTHER window broadcasts log-cleared, run onCleared
+ * (clears this window's logViewerStore). Filters this window's own echo.
+ */
+export async function listenForLogCleared(onCleared: () => void): Promise<() => void> {
+  if (!isTauriEnv()) return () => {};
+  const [{ listen }, myLabel] = await Promise.all([
+    import("@tauri-apps/api/event"),
+    getWindowLabel(),
+  ]);
+  return listen<{ sourceWindow: string }>(LOG_CLEARED_EVENT, (event) => {
+    if (!event.payload || event.payload.sourceWindow === myLabel) return;
+    onCleared();
+  });
+}
+
 function formatEntry(entry: LogEntry): string {
   return `[${entry.timestamp}] [${entry.severity.toUpperCase()}] [${entry.source}] ${entry.message}`;
 }

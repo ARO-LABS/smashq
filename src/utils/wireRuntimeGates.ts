@@ -5,8 +5,10 @@ import {
   wirePersistenceGate,
   flushFrontendLogs,
   listenForLogSnapshotRequests,
+  listenForLogCleared,
   logError,
 } from "./errorLogger";
+import { useLogViewerStore } from "../store/logViewerStore";
 import { setPerfEnabled } from "./perfLogger";
 import { listenForPreferencesChanges, type BroadcastPartial } from "./preferencesBroadcast";
 import { useTasksStore, sanitizeTasks, type TaskItem } from "../store/tasksStore";
@@ -186,6 +188,21 @@ export function wireRuntimeGates(options?: WireRuntimeGatesOptions): () => void 
     })
     .catch((err) => logError("wireRuntimeGates.logSnapshot", err));
 
+  // A clear in any window wipes that window's store + the on-disk file, but
+  // other windows keep their in-memory entries — which would flow back via the
+  // snapshot sync on the next LogViewer mount. Clear this window's store too
+  // when any other window broadcasts log-cleared.
+  let unlistenLogCleared: (() => void) | null = null;
+  void listenForLogCleared(() => useLogViewerStore.getState().clearEntries())
+    .then((unlisten) => {
+      if (disposed) {
+        unlisten();
+        return;
+      }
+      unlistenLogCleared = unlisten;
+    })
+    .catch((err) => logError("wireRuntimeGates.logCleared", err));
+
   // Flush buffered frontend logs (and any caller-supplied additional work,
   // e.g. App.tsx's settings/notes/tasks flush) when THIS window closes. Use
   // Tauri's close-requested event (async-aware) — NOT `beforeunload`, which
@@ -232,6 +249,7 @@ export function wireRuntimeGates(options?: WireRuntimeGatesOptions): () => void 
     unlistenCrossWindow?.();
     unlistenTasks?.();
     unlistenSnapshot?.();
+    unlistenLogCleared?.();
     unlistenClose?.();
     // Final flush on React unmount (covers HMR + detached-view teardown).
     void flushFrontendLogs();

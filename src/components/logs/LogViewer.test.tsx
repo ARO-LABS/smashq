@@ -30,6 +30,7 @@ vi.mock("../../utils/errorLogger", () => ({
   logWarn: vi.fn(),
   logInfo: vi.fn(),
   wireLoggingGate: vi.fn(),
+  broadcastLogCleared: vi.fn(() => Promise.resolve()),
 }));
 
 // Mock @tanstack/react-virtual — jsdom has no layout engine, so the virtualizer
@@ -77,6 +78,11 @@ beforeEach(async () => {
   // tests that don't exercise the event paths.
   listenMock.mockImplementation(() => new Promise<() => void>(() => {}));
   emitMock.mockClear();
+  // Clear call history from a prior test's handleClear (mocks are shared
+  // module state — otherwise "does nothing when cancelled" would see the
+  // previous test's broadcastLogCleared call and false-fail).
+  const { broadcastLogCleared } = await import("../../utils/errorLogger");
+  vi.mocked(broadcastLogCleared).mockClear();
 });
 
 // ---------------------------------------------------------------------------
@@ -379,6 +385,8 @@ describe("LogViewer — toolbar interactions", () => {
     // .then() outside any React-tracked event, so the re-render flushes on
     // a later tick — wait for it instead of asserting the DOM synchronously.
     expect(await screen.findByText("Keine Logs vorhanden")).toBeInTheDocument();
+    const { broadcastLogCleared } = await import("../../utils/errorLogger");
+    await vi.waitFor(() => expect(vi.mocked(broadcastLogCleared)).toHaveBeenCalled());
     confirmSpy.mockRestore();
   });
 
@@ -403,6 +411,8 @@ describe("LogViewer — toolbar interactions", () => {
     expect(mockInvoke).not.toHaveBeenCalledWith("clear_structured_log");
     expect(screen.getByText("keep me")).toBeInTheDocument();
     expect(confirmSpy).toHaveBeenCalled();
+    const { broadcastLogCleared } = await import("../../utils/errorLogger");
+    expect(vi.mocked(broadcastLogCleared)).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
   });
 

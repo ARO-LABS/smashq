@@ -12,6 +12,7 @@ import {
 } from "../../store/logViewerStore";
 import {
   logError,
+  broadcastLogCleared,
   type LogEntryBroadcast,
   type LogSnapshotResponse,
 } from "../../utils/errorLogger";
@@ -73,7 +74,10 @@ export function LogViewer() {
   const handleClear = useCallback(() => {
     if (!window.confirm("Gesamtes Protokoll unwiderruflich löschen (Datei + Verlauf)?")) return;
     invoke<void>("clear_structured_log")
-      .then(() => clearEntries())
+      .then(() => {
+        clearEntries();
+        void broadcastLogCleared();
+      })
       .catch((err) => logError("LogViewer.clearLog", err));
   }, [clearEntries]);
 

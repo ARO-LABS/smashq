@@ -12,6 +12,8 @@ import {
   flushFrontendLogs,
   flushBeforeGateClose,
   listenForLogSnapshotRequests,
+  broadcastLogCleared,
+  listenForLogCleared,
 } from "./errorLogger";
 import { useLogViewerStore } from "../store/logViewerStore";
 
@@ -569,6 +571,69 @@ describe("cross-window log sync", () => {
     await new Promise((r) => setTimeout(r, 20));
     const resp = vi.mocked(emit).mock.calls.find((c) => c[0] === "log-snapshot-response");
     expect(resp).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// log-cleared broadcast (Task 7: a delete in one window must wipe the
+// in-memory logViewerStore of every OTHER window too — otherwise those
+// entries flow back via the log-snapshot-request/response sync on the next
+// LogViewer mount, re-hydrating exactly what the user just deleted).
+// ---------------------------------------------------------------------------
+
+describe("log-cleared broadcast", () => {
+  beforeEach(() => {
+    clearMocks();
+    mockIPC(() => undefined);
+    mockWindows("test-window");
+  });
+  afterEach(() => {
+    clearMocks();
+  });
+
+  it("broadcasts a log-cleared event carrying this window's label", async () => {
+    const { emit } = await import("@tauri-apps/api/event");
+
+    await broadcastLogCleared();
+
+    await vi.waitFor(() => {
+      const call = vi.mocked(emit).mock.calls.find((c) => c[0] === "log-cleared");
+      expect(call).toBeDefined();
+      expect((call![1] as { sourceWindow: string }).sourceWindow).toBe("test-window");
+    });
+  });
+
+  it("calls the callback when another window broadcasts log-cleared", async () => {
+    const { listen } = await import("@tauri-apps/api/event");
+    const onCleared = vi.fn();
+
+    await listenForLogCleared(onCleared);
+    const call = vi.mocked(listen).mock.calls.find((c) => c[0] === "log-cleared");
+    expect(call).toBeDefined();
+    const handler = call![1] as (e: {
+      event: string;
+      payload: { sourceWindow: string };
+    }) => void;
+
+    handler({ event: "log-cleared", payload: { sourceWindow: "other-window" } });
+
+    expect(onCleared).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores its own echo (same sourceWindow)", async () => {
+    const { listen } = await import("@tauri-apps/api/event");
+    const onCleared = vi.fn();
+
+    await listenForLogCleared(onCleared);
+    const call = vi.mocked(listen).mock.calls.find((c) => c[0] === "log-cleared");
+    const handler = call![1] as (e: {
+      event: string;
+      payload: { sourceWindow: string };
+    }) => void;
+
+    handler({ event: "log-cleared", payload: { sourceWindow: "test-window" } }); // eigenes Label
+
+    expect(onCleared).not.toHaveBeenCalled();
   });
 });
 
