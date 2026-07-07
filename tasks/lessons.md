@@ -7,6 +7,16 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-07-07 — Design-System-Remediation: zwei CSS-Fallen, die grüne Gates NICHT fangen (Tailwind-Opacity auf var-Farben + OKLCH-Gamma-Crush am schwarzen Ende)
+
+**Kontext:** Token-Kette-Fix (cyan→azure Rebrand + Tailwind-Token-Mapping) plus visuelles Feedback (Dark-Mode-Surfaces „verschmolzen"). Zwei Bugs waren rein visuell — tsc/eslint/vitest/build alle grün, weil keiner davon gerenderte Pixel prüft.
+
+**Fehler 1 — Tailwind droppt den Opacity-Modifier auf plain-var-Farben:** `bg-cat-violet/15` (und jeder `/NN`-Modifier) auf einer Farbe, die als nackte `var(--x)` in `tailwind.config.js` steht, wird von Tailwind still zu *transparent* aufgelöst — Tailwind kann `<alpha-value>` nicht in eine fertige `var()` injizieren, also fällt der Alpha-Kanal auf 0. Symptom: Kategorie-Badges unsichtbar/farblos, keine Fehlermeldung. **Fehler 2 — OKLCH-L-Prozente stauchen am schwarzen Ende zu identischen sRGB-Bytes:** die `.dark`-Ramp nutzte gleichmäßige OKLCH-L-Stufen (8%/12%/15%), die beim OKLCH→sRGB-Transfer (Gamma-Kurve ist am dunklen Ende extrem flach) zu rgb 2/5/11 kollabieren → base↔raised-Kontrast 1.02:1, die Flächen sahen wie EINE Fläche aus.
+
+**Korrektur:** (1) `alpha()`-Helper, der var-Farben in `color-mix(in srgb, var(--x) calc(<alpha-value> * 100%), transparent)` wickelt — damit greift der Tailwind-Opacity-Modifier wieder. (2) „Lifted Charcoal"-Ramp: base L 8%→18%, Stufen so gewählt dass die *gemessenen* sRGB-Kontraste 1.09–1.15:1 sind — **jeder Wert vor dem Commit live via Playwright gegen WCAG gemessen**: CSS-Vars in die laufende Seite injizieren, per 1×1-Canvas-`getImageData` zu sRGB rasterisieren (der Canvas zwingt die oklch→sRGB-Konvertierung, die man sonst nur schätzt), Kontrast rechnen, iterieren.
+
+**Regel:** (1) Ein `/NN`-Opacity-Modifier in Tailwind funktioniert nur auf Farben, die Tailwind als Kanäle kennt — nackte `var(--x)`-Farben brauchen einen `color-mix`/`alpha()`-Wrapper, sonst wird der Modifier still zu transparent (kein Build-Fehler). Bei neuen tokenisierten Farben IMMER einen `/NN`-Nutzungsfall visuell prüfen. (2) Dunkle Flächen NIE nach gleichmäßigen OKLCH-L-Prozenten stufen — die sRGB-Gamma-Kurve staucht das schwarze Ende, gleiche L-Abstände ≠ gleiche wahrgenommene/gemessene Abstände. Kontrast MESSEN (Playwright-Canvas-Rasterisierung), nicht aus L-Werten schätzen. (3) Rein visuelle Regressionen (Kontrast, Opacity, Farbe) sind für tsc/eslint/vitest/build strukturell unsichtbar — ein gerenderter Pixel-Check (Playwright/Browser-Smoke) ist hier das einzige Netz, VOR dem Commit. Verwandt: [[design-system-audit]], „grüne Gates ≠ Bug gefangen wenn die Gate-Umgebung den Pfad nicht ausführt".
+
 ### 2026-07-04 — Subagent-Driven Logging-Redesign: neuer `errorLogger`-Export brach zwei `vi.mock`-Voll-Replacements, die kein Per-Task-Testlauf ausführte
 
 **Kontext:** 8-Task-Redesign des Protokoll-Viewers (subagent-driven, zweistufiges Review pro Task). Task 7 fügte den Export `listenForLogCleared` zu `errorLogger.ts` hinzu und ließ `wireRuntimeGates.ts` ihn aufrufen. Alle Per-Task-Gates + Spec- + Code-Quality-Reviews grün. Erst der finale Gesamt-Suite-Lauf (2432 Tests) zeigte 4 rote Tests: `wireRuntimeGates.test.ts` (3) + `LogWindowApp.test.tsx` (1).
