@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { RefreshCw, Webhook, Code2 } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import {
   type SettingsSource,
   SETTINGS_SOURCES,
@@ -8,6 +8,10 @@ import {
   SourceLegend,
   RawJsonView,
 } from "./claudeSettingsSources";
+
+const RefreshCw = ICONS.action.refresh;
+const Webhook = ICONS.library.hook;
+const Code2 = ICONS.viewer.code;
 
 interface HooksViewerProps {
   folder: string;

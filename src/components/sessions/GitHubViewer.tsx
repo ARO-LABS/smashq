@@ -1,17 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-shell";
-import {
-  RefreshCw,
-  GitBranch,
-  GitCommit,
-  GitPullRequest,
-  CircleDot,
-  ExternalLink,
-  Github,
-} from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { logWarn } from "../../utils/errorLogger";
 import type { GitInfo } from "../../types/git";
+
+const RefreshCw = ICONS.action.refresh;
+const GitBranch = ICONS.git.branch;
+const GitCommit = ICONS.git.commit;
+const GitPullRequest = ICONS.git.pr;
+const CircleDot = ICONS.git.issueOpen;
+const ExternalLink = ICONS.action.externalLink;
+const Github = ICONS.git.github;
 
 interface GitHubViewerProps {
   folder: string;

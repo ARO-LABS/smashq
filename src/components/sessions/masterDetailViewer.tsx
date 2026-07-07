@@ -6,7 +6,9 @@
 // viewer and are passed in as props/children.
 
 import type { ReactNode } from "react";
-import { RefreshCw } from "lucide-react";
+import { ICONS } from "../../utils/icons";
+
+const RefreshCw = ICONS.action.refresh;
 
 interface MasterDetailViewerProps {
   /** Left-column heading, e.g. "Agents". */

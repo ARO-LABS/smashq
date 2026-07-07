@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Bot } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import {
   parseAgentFrontmatter,
   type ParsedAgent,
@@ -10,6 +10,8 @@ import {
   DetailSectionHeading,
   DetailBody,
 } from "./masterDetailViewer";
+
+const Bot = ICONS.library.agent;
 
 interface AgentsViewerProps {
   folder: string;

@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { RefreshCw, GitBranch } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { getErrorMessage } from "../../utils/adpError";
+
+const RefreshCw = ICONS.action.refresh;
+const GitBranch = ICONS.git.branch;
 
 interface WorktreeViewerProps {
   folder: string;

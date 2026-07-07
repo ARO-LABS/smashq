@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Puzzle, FolderOpen } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import {
   parseSkillFrontmatter,
   type ParsedSkill,
@@ -10,6 +10,9 @@ import {
   DetailSectionHeading,
   DetailBody,
 } from "./masterDetailViewer";
+
+const Puzzle = ICONS.library.plugin;
+const FolderOpen = ICONS.action.folderOpen;
 
 interface SkillsViewerProps {
   folder: string;

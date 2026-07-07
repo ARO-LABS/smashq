@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { RefreshCw, Settings, Code2, Shield, ShieldOff, Server, Cpu } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import {
   type SettingsSource,
   SETTINGS_SOURCES,
@@ -8,6 +8,14 @@ import {
   SourceLegend,
   RawJsonView,
 } from "./claudeSettingsSources";
+
+const RefreshCw = ICONS.action.refresh;
+const Settings = ICONS.nav.settings;
+const Code2 = ICONS.viewer.code;
+const Shield = ICONS.viewer.permissions;
+const ShieldOff = ICONS.viewer.permissionsOff;
+const Server = ICONS.viewer.server;
+const Cpu = ICONS.viewer.system;
 
 interface SettingsViewerProps {
   folder: string;

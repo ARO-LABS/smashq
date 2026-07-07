@@ -1,11 +1,19 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { RefreshCw, FileText, Pencil, Eye, Save, Loader2, Pin } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { getErrorMessage } from "../../utils/adpError";
 import { logError } from "../../utils/errorLogger";
 import { MarkdownPreview } from "../editor/MarkdownPreview";
 import { useUIStore } from "../../store/uiStore";
 import { useSettingsStore, normalizeProjectKey } from "../../store/settingsStore";
+
+const RefreshCw = ICONS.action.refresh;
+const FileText = ICONS.file.text;
+const Pencil = ICONS.action.edit;
+const Eye = ICONS.action.preview;
+const Save = ICONS.action.save;
+const Loader2 = ICONS.action.loading;
+const Pin = ICONS.pin;
 
 const CodeMirrorEditor = lazy(() =>
   import("../editor/CodeMirrorEditor").then((m) => ({ default: m.CodeMirrorEditor }))
