@@ -1,8 +1,7 @@
 import { useEffect } from "react";
 import { motion } from "framer-motion";
-import type { LucideIcon } from "lucide-react";
 import { DURATION, EASE } from "../../utils/motion";
-import { ICONS, ICON_SIZE } from "../../utils/icons";
+import { ICONS, ICON_SIZE, type LucideIcon } from "../../utils/icons";
 
 export interface ToastAction {
   label: string;
