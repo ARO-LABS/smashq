@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Play, X, FolderOpen, Terminal } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { invoke } from "@tauri-apps/api/core";
 import { motion } from "framer-motion";
 import { DURATION, EASE } from "../../utils/motion";
@@ -11,6 +11,11 @@ import { logError } from "../../utils/errorLogger";
 import { DiffActionButton } from "../diff/DiffActionButton";
 import { accentColorFor, hashFolderToAccent, isAccentName, type AccentName } from "../../utils/sessionAccent";
 import { SessionAccentMenu } from "./SessionAccentMenu";
+
+const Play = ICONS.action.run;
+const X = ICONS.action.close;
+const FolderOpen = ICONS.action.folderOpen;
+const Terminal = ICONS.action.terminal;
 
 /**
  * Returns the most recently created live session in this favorite's folder,

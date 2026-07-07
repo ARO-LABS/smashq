@@ -1,5 +1,8 @@
-import { Monitor, FolderPlus } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { Button } from "../ui/Button";
+
+const Monitor = ICONS.nav.sessions;
+const FolderPlus = ICONS.action.addFavorite;
 
 interface EmptyStateProps {
   onNewSession: () => void;

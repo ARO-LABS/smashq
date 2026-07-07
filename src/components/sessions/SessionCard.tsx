@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { X, FolderOpen, Terminal } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { invoke } from "@tauri-apps/api/core";
 import { DiffActionButton } from "../diff/DiffActionButton";
 import { useSessionStore } from "../../store/sessionStore";
@@ -10,6 +10,10 @@ import { folderLabel } from "../../utils/pathUtils";
 import { resolveSessionAccent, accentCssVars, accentColorFor, type AccentName } from "../../utils/sessionAccent";
 import { getGridMiniMap } from "./sessionGridLayout";
 import { SessionAccentMenu } from "./SessionAccentMenu";
+
+const X = ICONS.action.close;
+const FolderOpen = ICONS.action.folderOpen;
+const Terminal = ICONS.action.terminal;
 
 interface SessionCardProps {
   session: ClaudeSession;

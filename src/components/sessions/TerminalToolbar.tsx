@@ -1,8 +1,14 @@
-import { LayoutList, LayoutGrid, PanelRightOpen, PanelRightClose, GitBranch } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import type { LayoutMode } from "../../store/sessionStore";
 import { useGitBranch } from "../../hooks/useGitBranch";
 import { DiffActionButton } from "../diff/DiffActionButton";
 import { TasksPanel } from "../shared/TasksPanel";
+
+const LayoutList = ICONS.action.listView;
+const LayoutGrid = ICONS.action.detach;
+const PanelRightOpen = ICONS.action.panelOpen;
+const PanelRightClose = ICONS.action.panelClose;
+const GitBranch = ICONS.git.branch;
 
 interface TerminalToolbarProps {
   layoutMode: LayoutMode;

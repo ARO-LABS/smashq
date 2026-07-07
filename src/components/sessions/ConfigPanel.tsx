@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { useUIStore } from "../../store/uiStore";
 import { ConfigPanelContent } from "./configPanelShared";
 import { ConfigPanelTabList } from "./ConfigPanelTabList";
@@ -16,6 +16,8 @@ interface ConfigPanelProps {
   onResumeSession?: (sessionId: string, cwd: string, title?: string) => void;
   onClose?: () => void;
 }
+
+const X = ICONS.action.close;
 
 export function ConfigPanel({ folder, width, accent, onResumeSession, onClose }: ConfigPanelProps) {
   const configSubTab = useUIStore((s) => s.configSubTab);

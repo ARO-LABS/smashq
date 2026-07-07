@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, Fragment } from "react";
-import { X, Plus, Pin } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useUIStore, type ConfigSubTab } from "../../store/uiStore";
@@ -10,6 +10,10 @@ import { CONFIG_TABS, type PresenceKey } from "./configPanelShared";
 // Single source of truth: derive the presence map shape from PresenceKey so a
 // new presence-gated tab forces a compile error here until setPresence supplies it.
 type Presence = Record<PresenceKey, boolean>;
+
+const X = ICONS.action.close;
+const Plus = ICONS.action.newSession;
+const Pin = ICONS.pin;
 
 interface ConfigPanelTabListProps {
   folder: string;

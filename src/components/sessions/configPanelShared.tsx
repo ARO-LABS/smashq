@@ -1,7 +1,16 @@
 import { lazy, Suspense } from "react";
-import { FileText, Puzzle, Webhook, Settings, Bot, Github, GitBranch, Clock } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import type { ConfigSubTab } from "../../store/uiStore";
 import { isPinTab, getPinIdFromTab } from "../../store/uiStore";
+
+const FileText = ICONS.file.text;
+const Puzzle = ICONS.library.plugin;
+const Webhook = ICONS.library.hook;
+const Settings = ICONS.nav.settings;
+const Bot = ICONS.library.agent;
+const Github = ICONS.git.github;
+const GitBranch = ICONS.git.branch;
+const Clock = ICONS.tasks.clock;
 
 export const ClaudeMdViewer = lazy(() => import("./ClaudeMdViewer").then(m => ({ default: m.ClaudeMdViewer })));
 export const SkillsViewer = lazy(() => import("./SkillsViewer").then(m => ({ default: m.SkillsViewer })));

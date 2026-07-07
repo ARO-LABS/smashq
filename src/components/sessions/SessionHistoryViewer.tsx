@@ -1,11 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { RefreshCw, GitBranch, Bot, MessageSquare, Clock, Play, Trash2 } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { getErrorMessage } from "../../utils/adpError";
 import { logError } from "../../utils/errorLogger";
 import { formatElapsed } from "../../utils/format";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useUIStore } from "../../store/uiStore";
+
+const RefreshCw = ICONS.action.refresh;
+const GitBranch = ICONS.git.branch;
+const Bot = ICONS.library.agent;
+const MessageSquare = ICONS.git.comment;
+const Clock = ICONS.tasks.clock;
+const Play = ICONS.action.run;
+const Trash2 = ICONS.action.trash;
 
 // ============================================================================
 // Types (matches Rust ClaudeSessionSummary)

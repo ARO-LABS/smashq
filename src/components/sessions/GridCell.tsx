@@ -1,8 +1,12 @@
-import { Maximize2, X, GitBranch } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { useSessionStore } from "../../store/sessionStore";
 import { useGitBranch } from "../../hooks/useGitBranch";
 import { DiffActionButton } from "../diff/DiffActionButton";
 import { TasksPanel } from "../shared/TasksPanel";
+
+const Maximize2 = ICONS.action.maximize;
+const X = ICONS.action.close;
+const GitBranch = ICONS.git.branch;
 
 interface GridCellChromeProps {
   sessionId: string;

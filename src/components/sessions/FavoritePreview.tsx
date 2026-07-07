@@ -1,9 +1,12 @@
-import { X, FolderOpen } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { useUIStore } from "../../store/uiStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import { ConfigPanelContent } from "./configPanelShared";
 import { ConfigPanelTabList } from "./ConfigPanelTabList";
 import { accentCssVars, hashFolderToAccent, isAccentName } from "../../utils/sessionAccent";
+
+const X = ICONS.action.close;
+const FolderOpen = ICONS.action.folderOpen;
 
 interface FavoritePreviewProps {
   folder: string;
