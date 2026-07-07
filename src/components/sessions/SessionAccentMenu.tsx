@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ACCENT_HUES, ACCENT_NAMES, type AccentName } from "../../utils/sessionAccent";
+import { ACCENT_NAMES, accentColorFor, type AccentName } from "../../utils/sessionAccent";
 
 interface SessionAccentMenuProps {
   x: number;
@@ -58,7 +58,7 @@ export function SessionAccentMenu({
             className={`w-5 h-5 rounded-full transition-transform hover:scale-110 ${
               name === current ? "ring-2 ring-offset-1 ring-neutral-200" : ""
             }`}
-            style={{ background: `oklch(72% 0.16 ${ACCENT_HUES[name]})` }}
+            style={{ background: accentColorFor("", name) }}
           />
         ))}
       </div>
