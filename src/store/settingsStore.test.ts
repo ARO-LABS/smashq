@@ -92,7 +92,7 @@ describe("initial state", () => {
   });
 
   it("defaults theme.accentColor to oklch value", () => {
-    expect(getState().theme.accentColor).toBe("oklch(72% 0.14 190)");
+    expect(getState().theme.accentColor).toBe("oklch(72% 0.14 230)");
   });
 
   it("defaults sound.enabled to false", () => {
@@ -843,6 +843,18 @@ describe("folderAccents", () => {
     expect(migrated.folderAccents["C:/a"]).toBe("violet");
     expect("C:/b" in migrated.folderAccents).toBe(false);
     expect("" in migrated.folderAccents).toBe(false);
+  });
+
+  it("migrate remaps persisted cyan folderAccents/sessionAccents to azure, keeps valid names, drops garbage", () => {
+    const migrated = useSettingsStoreMigrateForTest(
+      {
+        folderAccents: { "/a": "cyan", "/b": "violet", "/c": "bogus" },
+        sessionAccents: { s1: "cyan", s2: "amber" },
+      },
+      9,
+    ) as SettingsState;
+    expect(migrated.folderAccents).toEqual({ "/a": "azure", "/b": "violet" });
+    expect(migrated.sessionAccents).toEqual({ s1: "azure", s2: "amber" });
   });
 });
 

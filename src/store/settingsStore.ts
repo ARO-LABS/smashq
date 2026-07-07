@@ -5,7 +5,7 @@ import { tauriStorage, getLoadedFavorites, getLoadedFavoriteGroups, getLoadedNot
 import { useUIStore } from "./uiStore";
 import { logError, flushBeforeGateClose } from "../utils/errorLogger";
 import { broadcastPreferencesChange } from "../utils/preferencesBroadcast";
-import { isAccentName } from "../utils/sessionAccent";
+import { isAccentName, normalizeAccentName, type AccentName } from "../utils/sessionAccent";
 
 // ============================================================================
 // Types
@@ -350,7 +350,7 @@ export interface SettingsState {
 
 const defaultTheme: ThemeSettings = {
   mode: "dark",
-  accentColor: "oklch(72% 0.14 190)", // accent teal
+  accentColor: "oklch(72% 0.14 230)", // accent azure
   reducedMotion: false,
   animationSpeed: 1.0,
 };
@@ -653,16 +653,16 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
       : defaults.sessionTitleOverrides,
     sessionAccents: p.sessionAccents && typeof p.sessionAccents === "object" && !Array.isArray(p.sessionAccents)
       ? Object.fromEntries(
-        Object.entries(p.sessionAccents as Record<string, unknown>).filter(
-          ([k, v]) => typeof k === "string" && !!k.trim() && isAccentName(v),
-        ),
+        Object.entries(p.sessionAccents as Record<string, unknown>)
+          .map(([k, v]) => [k, normalizeAccentName(v)] as const)
+          .filter(([k, v]) => typeof k === "string" && !!k.trim() && v !== null),
       )
       : defaults.sessionAccents,
     folderAccents: p.folderAccents && typeof p.folderAccents === "object" && !Array.isArray(p.folderAccents)
       ? Object.fromEntries(
-        Object.entries(p.folderAccents as Record<string, unknown>).filter(
-          ([k, v]) => typeof k === "string" && !!k.trim() && isAccentName(v),
-        ),
+        Object.entries(p.folderAccents as Record<string, unknown>)
+          .map(([k, v]) => [k, normalizeAccentName(v)] as const)
+          .filter(([k, v]) => typeof k === "string" && !!k.trim() && v !== null),
       )
       : defaults.folderAccents,
     notesWindowSize: sanitizeNotesWindowSize(p.notesWindowSize),
@@ -1280,7 +1280,7 @@ export const useSettingsStore = create<SettingsState>()(
         notesWindowSize: state.notesWindowSize,
         tasksWindowSize: state.tasksWindowSize,
       }),
-      version: 9,
+      version: 10,
       migrate: (persisted: unknown, fromVersion: number) => _settingsMigrate(persisted, fromVersion),
       // SYNCHRONOUS heal of the rehydrated state. This runs DURING rehydration
       // and its return value feeds the very first render — unlike
@@ -1382,21 +1382,23 @@ export const useSettingsStore = create<SettingsState>()(
             patches.preferences = cleanedPrefs;
           }
 
-          // Same-version recovery für sessionAccents: unbekannte AccentNames droppen.
+          // Same-version recovery für sessionAccents: Legacy-"cyan" remappen,
+          // unbekannte AccentNames droppen.
           const cleanedAccents = Object.fromEntries(
-            Object.entries(state.sessionAccents ?? {}).filter(
-              ([k, v]) => !!k.trim() && isAccentName(v),
-            ),
+            Object.entries(state.sessionAccents ?? {})
+              .map(([k, v]) => [k, normalizeAccentName(v)] as const)
+              .filter((entry): entry is [string, AccentName] => !!entry[0].trim() && entry[1] !== null),
           );
           if (JSON.stringify(cleanedAccents) !== JSON.stringify(state.sessionAccents ?? {})) {
             patches.sessionAccents = cleanedAccents;
           }
 
-          // Same-version recovery für folderAccents: unbekannte AccentNames droppen.
+          // Same-version recovery für folderAccents: Legacy-"cyan" remappen,
+          // unbekannte AccentNames droppen.
           const cleanedFolderAccents = Object.fromEntries(
-            Object.entries(state.folderAccents ?? {}).filter(
-              ([k, v]) => !!k.trim() && isAccentName(v),
-            ),
+            Object.entries(state.folderAccents ?? {})
+              .map(([k, v]) => [k, normalizeAccentName(v)] as const)
+              .filter((entry): entry is [string, AccentName] => !!entry[0].trim() && entry[1] !== null),
           );
           if (JSON.stringify(cleanedFolderAccents) !== JSON.stringify(state.folderAccents ?? {})) {
             patches.folderAccents = cleanedFolderAccents;
