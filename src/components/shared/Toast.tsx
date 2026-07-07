@@ -31,25 +31,25 @@ const TOAST_CONFIG: Record<
     icon: ICONS.toast.success,
     border: "border-success",
     text: "text-success",
-    glow: "0 0 8px oklch(72% 0.16 155), 0 0 12px oklch(72% 0.16 155 / 0.2)",
+    glow: "0 0 8px var(--color-success), 0 0 12px color-mix(in oklch, var(--color-success) 20%, transparent)",
   },
   error: {
     icon: ICONS.toast.error,
     border: "border-error",
     text: "text-error",
-    glow: "0 0 8px oklch(62% 0.22 25), 0 0 12px oklch(62% 0.22 25 / 0.2)",
+    glow: "0 0 8px var(--color-error), 0 0 12px color-mix(in oklch, var(--color-error) 20%, transparent)",
   },
   achievement: {
     icon: ICONS.toast.achievement,
     border: "border-warning",
     text: "text-warning",
-    glow: "0 0 8px oklch(75% 0.14 70), 0 0 12px oklch(75% 0.14 70 / 0.2)",
+    glow: "0 0 8px var(--color-warning), 0 0 12px color-mix(in oklch, var(--color-warning) 20%, transparent)",
   },
   info: {
     icon: ICONS.toast.info,
     border: "border-accent",
     text: "text-accent",
-    glow: "0 0 8px oklch(72% 0.14 190), 0 0 12px oklch(72% 0.14 190 / 0.2)",
+    glow: "0 0 8px var(--color-accent), 0 0 12px color-mix(in oklch, var(--color-accent) 20%, transparent)",
   },
 };
 

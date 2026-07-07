@@ -10,15 +10,15 @@ const SIZE_MAP: Record<SpinnerSize, string> = {
 const COLOR_MAP: Record<SpinnerColor, { border: string; glow: string }> = {
   green: {
     border: "border-success",
-    glow: "0 0 8px oklch(72% 0.16 155), 0 0 16px oklch(72% 0.16 155 / 0.3)",
+    glow: "0 0 8px var(--color-success), 0 0 16px color-mix(in oklch, var(--color-success) 30%, transparent)",
   },
   blue: {
     border: "border-accent",
-    glow: "0 0 8px oklch(72% 0.14 190), 0 0 16px oklch(72% 0.14 190 / 0.3)",
+    glow: "0 0 8px var(--color-accent), 0 0 16px color-mix(in oklch, var(--color-accent) 30%, transparent)",
   },
   purple: {
     border: "border-info",
-    glow: "0 0 8px oklch(60% 0.20 300), 0 0 16px oklch(60% 0.20 300 / 0.3)",
+    glow: "0 0 8px var(--color-info), 0 0 16px color-mix(in oklch, var(--color-info) 30%, transparent)",
   },
 };
 
