@@ -102,7 +102,7 @@ Der Tauri-Auto-Updater ist der einzige Pfad, ueber den Bugfixes die installierte
 2. **Production-Build sauber**: `npm run tauri build` ohne Errors. `.exe` + signierte `latest.json` werden erzeugt.
 3. **Manuelle Smoke in der installierten .exe** (Dev-Mode reicht NICHT, weil `__TAURI_INTERNALS__` & Updater-Endpoint nur produktiv greifen):
    - v-Badge unten im SessionPanelDock (Session-Leiste) klicken → Toast "Suche nach Updates..." erscheint oben rechts (Beweis: ToastContainer rendert)
-   - Bei verfuegbarem Update → Toast `Update vX verfuegbar` mit Button **Installieren**, Status-Dot accent (cyan)
+   - Bei verfuegbarem Update → Toast `Update vX verfuegbar` mit Button **Installieren**, Status-Dot accent (azure)
    - Klick "Installieren" → Download laeuft, Status-Dot wechselt auf success (gruen) sobald `status === "ready"`
    - Klick v-Badge erneut → Toast `Update bereit` mit Button **Neu starten**
    - Klick "Neu starten" → App-Relaunch in neuer Version
@@ -127,10 +127,10 @@ Der Tauri-Auto-Updater ist der einzige Pfad, ueber den Bugfixes die installierte
 
 ## Design System
 
-**Single Source**: `docs/design-system/README.md` (Concept-B, cyan-teal, soft corners). Skill: `docs/design-system/SKILL.md`. Preview: `docs/design-system/preview/*.html`.
+**Single Source**: `docs/design-system/README.md` (Concept-B, azure, soft corners). Skill: `docs/design-system/SKILL.md`. Preview: `docs/design-system/preview/*.html`.
 
 Pflicht-Check für jede neue Komponente (Details siehe Single Source):
-- Soft corners (`rounded-md`/`-lg`/`-sm`/`-full`), ein Akzent (cyan-teal hue 190), keine Gradients/Blur/Glassmorphism
+- Soft corners (`rounded-md`/`-lg`/`-sm`/`-full`), ein Akzent (azure hue 230), keine Gradients/Blur/Glassmorphism
 - Lucide-Icons via `src/utils/icons.ts` (`ICONS.*` + `ICON_SIZE.*`) — kein direkter `lucide-react`-Import
 - Deutsche UI-Copy in Imperativ/Infinitiv (kein `du`/`Sie`), kein Emoji, kein Unicode-as-Icon
 - Motion-Tokens aus `src/utils/motion.ts` (Exponential Easing, 100/200/300/500ms, keine Springs)

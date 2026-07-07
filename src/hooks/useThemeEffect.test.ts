@@ -24,7 +24,7 @@ afterEach(() => {
 describe("useThemeEffect", () => {
   it("adds 'dark' class when theme mode is dark", () => {
     useSettingsStore.setState({
-      theme: { mode: "dark", accentColor: "#00FF88", reducedMotion: false, animationSpeed: 1 },
+      theme: { mode: "dark", accentColor: "oklch(72% 0.14 230)", reducedMotion: false, animationSpeed: 1 },
     });
 
     renderHook(() => useThemeEffect());
@@ -42,7 +42,7 @@ describe("useThemeEffect", () => {
     document.documentElement.classList.add("dark");
 
     useSettingsStore.setState({
-      theme: { mode: "light", accentColor: "#00FF88", reducedMotion: false, animationSpeed: 1 },
+      theme: { mode: "light", accentColor: "oklch(72% 0.14 230)", reducedMotion: false, animationSpeed: 1 },
     });
 
     renderHook(() => useThemeEffect());
