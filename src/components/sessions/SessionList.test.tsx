@@ -97,59 +97,10 @@ describe("SessionList", () => {
     expect(screen.getByText("Session Beta")).toBeTruthy();
   });
 
-  it("sorts active sessions before done sessions", () => {
-    const now = Date.now();
-    useSessionStore.setState({
-      sessions: [
-        makeSession({ id: "s-done", title: "Done Session", status: "done", createdAt: now - 1000 }),
-        makeSession({ id: "s-run", title: "Running Session", status: "running", createdAt: now }),
-      ],
-      activeSessionId: "s-run",
-    });
-
-    const { container } = render(<SessionList onNewSession={vi.fn()} onQuickStart={vi.fn()} />);
-    // Running session should appear before done in DOM
-    const cards = container.querySelectorAll("[class*='cursor-pointer']");
-    const titles = Array.from(cards).map((c) => c.textContent ?? "");
-    const runIdx = titles.findIndex((t) => t.includes("Running Session"));
-    const doneIdx = titles.findIndex((t) => t.includes("Done Session"));
-    // Both should be found, running first
-    if (runIdx !== -1 && doneIdx !== -1) {
-      expect(runIdx).toBeLessThan(doneIdx);
-    }
-  });
-
-  // ── Sorting ────────────────────────────────────────────────────────────
-
-  it("sorts sessions within the active group by createdAt ascending", () => {
-    const now = Date.now();
-    useSessionStore.setState({
-      sessions: [
-        makeSession({ id: "s-late", title: "Late Session", status: "running", createdAt: now }),
-        makeSession({ id: "s-early", title: "Early Session", status: "running", createdAt: now - 5000 }),
-      ],
-    });
-
-    render(<SessionList onNewSession={vi.fn()} onQuickStart={vi.fn()} />);
-    const early = screen.getByText("Early Session");
-    const late = screen.getByText("Late Session");
-    expect(early.compareDocumentPosition(late) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it("treats waiting status as an active session for sorting", () => {
-    const now = Date.now();
-    useSessionStore.setState({
-      sessions: [
-        makeSession({ id: "s-done", title: "Done One", status: "done", createdAt: now - 10000 }),
-        makeSession({ id: "s-wait", title: "Waiting One", status: "waiting", createdAt: now }),
-      ],
-    });
-
-    render(<SessionList onNewSession={vi.fn()} onQuickStart={vi.fn()} />);
-    const wait = screen.getByText("Waiting One");
-    const done = screen.getByText("Done One");
-    expect(wait.compareDocumentPosition(done) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
+  // Ordering is intentionally NOT status/createdAt-derived anymore: the list
+  // renders the stored array order verbatim so drag-reorder survives (see the
+  // "renders sessions in stored array order" regression in the DnD wiring
+  // block). The former auto-sort tests were removed with that behavior.
 
   // ── Click handling (single mode) ───────────────────────────────────────
 
@@ -221,7 +172,7 @@ describe("SessionList", () => {
     expect(activeCard?.textContent).toContain("Grid Two");
   });
 
-  it("shows the grid marker icon for sessions currently in the grid", () => {
+  it("shows the position-aware mini-map only for sessions currently in the grid", () => {
     useSessionStore.setState({
       sessions: [
         makeSession({ id: "g1", title: "In Grid" }),
@@ -232,7 +183,10 @@ describe("SessionList", () => {
     });
     render(<SessionList onNewSession={vi.fn()} onQuickStart={vi.fn()} />);
 
-    expect(screen.getAllByLabelText("Im Grid")).toHaveLength(1);
+    const maps = screen.getAllByTestId("grid-minimap");
+    expect(maps).toHaveLength(1);
+    // Single grid session → the mini-map reports the full-screen slot.
+    expect(maps[0].getAttribute("aria-label")).toBe("Im Grid: Vollbild");
   });
 });
 
@@ -287,5 +241,25 @@ describe("SessionList DnD wiring", () => {
     const { container } = render(<SessionList onNewSession={vi.fn()} onQuickStart={vi.fn()} />);
     // All 3 rows present — store order is stable within same status+createdAt bucket
     expect(getSortableRows(container)).toHaveLength(3);
+  });
+
+  // Regression for the drag-reorder bug: the render must honor the stored
+  // array order verbatim — that is exactly what reorderSessions writes on drop.
+  // The store order below deliberately contradicts the former auto-sort
+  // (which floated active sessions up and ordered each group by createdAt):
+  // a done+late session sits BEFORE a running+early one. If the render still
+  // re-sorted, Beta would jump above Alpha and the drag would visibly snap back.
+  it("renders sessions in stored array order, ignoring status and createdAt", () => {
+    const now = Date.now();
+    useSessionStore.setState({
+      sessions: [
+        makeSession({ id: "s-a", title: "Alpha", status: "done", createdAt: now }),
+        makeSession({ id: "s-b", title: "Beta", status: "running", createdAt: now - 5000 }),
+      ],
+    });
+    const { container } = render(<SessionList onNewSession={vi.fn()} onQuickStart={vi.fn()} />);
+    const titles = getSortableRows(container).map((r) => r.textContent ?? "");
+    expect(titles[0]).toContain("Alpha");
+    expect(titles[1]).toContain("Beta");
   });
 });

@@ -26,6 +26,7 @@ import { renderHook } from "@testing-library/react";
 
 import { useSessionEvents } from "./useSessionEvents";
 import { useSessionStore } from "../../../store/sessionStore";
+import { useSettingsStore } from "../../../store/settingsStore";
 import { resetAllStores } from "../../../test/storeReset";
 import {
   emitTauriEvent,
@@ -176,6 +177,47 @@ describe("useSessionEvents — m2 race + discovery integration (B3.2)", () => {
 
     const session = useSessionStore.getState().sessions.find((s) => s.id === "s-closest");
     expect(session?.claudeSessionId).toBe(closestUuid);
+  });
+
+  // -------------------------------------------------------------------------
+  // 2b) Rename recorded before the UUID resolves is flushed onto the UUID by
+  //     discovery — and takes precedence over the auto-title seed. This is the
+  //     same-session half of the rename→History bug: pre-fix, a rename issued
+  //     before discovery never reached the override map (SessionCard.tsx gated
+  //     the write on claudeSessionId), so History showed the default title.
+  // -------------------------------------------------------------------------
+  it("discovery flushes a pre-resolution rename onto the UUID (over the auto title)", async () => {
+    const folder = "C:\\test\\pending";
+    const uuid = "55555555-5555-4555-8555-555555555555";
+
+    installRealIPC({
+      scan_claude_sessions: cannedScanHandler({
+        [folder]: [{ session_id: uuid, started_at: "2026-05-08T10:00:00.150Z" }],
+      }),
+    });
+
+    renderHook(() => useSessionEvents());
+    await Promise.resolve();
+
+    vi.setSystemTime(new Date(FAKE_NOW_MS + 100));
+    const id = "s-pending";
+    // Session's live title stays the auto default — the user's rename lives ONLY
+    // as a pending intent (mirrors renaming before Claude's UUID was discovered).
+    useSessionStore.getState().addSession({
+      id,
+      title: "auto-title",
+      folder,
+      shell: "powershell",
+    });
+    useSettingsStore.getState().setPendingTitleOverride(id, "Mein Name");
+
+    await emitTauriEvent("session-status", { id, status: "running" });
+    await flushDiscoveryRound();
+
+    // The renamed title — not the auto default — must land under the resolved
+    // UUID, and the pending intent must be consumed.
+    expect(useSettingsStore.getState().sessionTitleOverrides[uuid]).toBe("Mein Name");
+    expect(useSettingsStore.getState().pendingTitleOverrides[id]).toBeUndefined();
   });
 
   // -------------------------------------------------------------------------

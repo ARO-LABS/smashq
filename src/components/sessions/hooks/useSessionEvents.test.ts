@@ -41,6 +41,8 @@ vi.mock("../../../store/sessionStore", () => ({
 }));
 
 const mockSetSessionTitleOverride = vi.fn();
+const mockSetPendingTitleOverride = vi.fn();
+const mockFlushPendingTitleOverride = vi.fn();
 let mockSessionTitleOverridesData: Record<string, string> = {};
 
 vi.mock("../../../store/settingsStore", () => ({
@@ -48,6 +50,8 @@ vi.mock("../../../store/settingsStore", () => ({
     getState: () => ({
       sessionTitleOverrides: mockSessionTitleOverridesData,
       setSessionTitleOverride: mockSetSessionTitleOverride,
+      setPendingTitleOverride: mockSetPendingTitleOverride,
+      flushPendingTitleOverride: mockFlushPendingTitleOverride,
     }),
   },
 }));

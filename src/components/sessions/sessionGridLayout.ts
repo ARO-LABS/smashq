@@ -22,6 +22,79 @@ export const GRID_AREAS = ["a", "b", "c", "d"] as const;
  */
 export const MAX_GRID_SLOTS = GRID_AREAS.length;
 
+type SlotCount = 1 | 2 | 3 | 4;
+
+/**
+ * Rohe Template-Geometrie pro Slot-Anzahl — Single Source für den
+ * Positions-Indikator (`getGridMiniMap`). Jede `rowAreas`-Zeile ist eine
+ * Grid-Reihe mit space-getrennten Area-Namen und spiegelt exakt die Templates
+ * aus `getGridStyle`. Ein Konsistenz-Test (`sessionGridLayout.test.ts`) hält
+ * beide gegen Drift zusammen.
+ */
+const GRID_TEMPLATES: Record<SlotCount, { columns: string; rowAreas: readonly string[] }> = {
+  1: { columns: "1fr", rowAreas: ["a"] },
+  2: { columns: "1fr", rowAreas: ["a", "b"] },
+  3: { columns: "1fr 1fr", rowAreas: ["a b", "c c"] },
+  4: { columns: "1fr 1fr", rowAreas: ["a b", "c d"] },
+};
+
+/** Menschlich lesbare Positions-Labels (aria) pro Slot-Anzahl und Index. */
+const GRID_POSITIONS: Record<SlotCount, readonly string[]> = {
+  1: ["Vollbild"],
+  2: ["oben", "unten"],
+  3: ["oben links", "oben rechts", "unten"],
+  4: ["oben links", "oben rechts", "unten links", "unten rechts"],
+};
+
+function clampSlotCount(count: number): SlotCount {
+  if (count <= 1) return 1;
+  if (count >= 4) return 4;
+  return count as SlotCount;
+}
+
+/** Positions-Modell für die Mini-Map in der SessionCard. */
+export interface GridMiniMap {
+  /** grid-template-columns der Mini-Map. */
+  columns: string;
+  /** grid-template-rows der Mini-Map. */
+  rows: string;
+  /** grid-template-areas (identisch zum echten Grid-Template). */
+  areas: string;
+  /** Alle Area-Namen dieser Slot-Anzahl (zu rendernde Zellen). */
+  cells: readonly string[];
+  /** Die Area, die diese Session belegt (hervorgehobene Zelle). */
+  active: string;
+  /** Positions-Label für aria (z.B. "oben links"). */
+  position: string;
+}
+
+/**
+ * Liefert das Mini-Map-Modell für eine im Grid liegende Session.
+ *
+ * - `index`: Position der Session in `gridSessionIds` (`indexOf`).
+ * - `count`: Anzahl der Grid-Sessions (`gridSessionIds.length`), auf 1..4 geclamped.
+ *
+ * Gibt `null` zurück, wenn die Session nicht im Grid ist (`index < 0`).
+ * Die Geometrie spiegelt 1:1 `getGridStyle`, sodass der Indikator die reale
+ * Anordnung abbildet: 2 = Hälften, 3 = T-Form, 4 = Quadranten.
+ */
+export function getGridMiniMap(index: number, count: number): GridMiniMap | null {
+  if (index < 0) return null;
+  const slots = clampSlotCount(count);
+  const template = GRID_TEMPLATES[slots];
+  const rows = template.rowAreas.map(() => "1fr").join(" ");
+  const areas = template.rowAreas.map((row) => `"${row}"`).join(" ");
+  const cells = GRID_AREAS.slice(0, slots);
+  return {
+    columns: template.columns,
+    rows,
+    areas,
+    cells,
+    active: GRID_AREAS[index] ?? cells[cells.length - 1],
+    position: GRID_POSITIONS[slots][index] ?? "im Grid",
+  };
+}
+
 /**
  * Liefert ein `gridTemplate`-CSS-Fragment für eine gegebene Session-Anzahl.
  *

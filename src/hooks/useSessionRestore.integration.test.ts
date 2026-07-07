@@ -331,3 +331,78 @@ describe("useSessionRestore — Layer-B integration (m2-ghost dedup contract)", 
     expect(store.activeSessionId).toBe(idA);
   });
 });
+
+describe("useSessionRestore — renamed-title persistence into History", () => {
+  beforeEach(() => {
+    resetAllStores();
+  });
+
+  // -------------------------------------------------------------------------
+  // Root-cause repro (Option-1 failing test).
+  //
+  // The History viewer resolves each row's label via
+  // `sessionTitleOverrides[session_id] || jsonlDefaultTitle`
+  // (SessionHistoryViewer.tsx:233-234). The ONLY channel a user rename reaches
+  // History is that override map.
+  //
+  // A session renamed BEFORE its Claude UUID was discovered never writes an
+  // override (SessionCard.tsx:80 gates the write on `session.claudeSessionId`,
+  // which is still undefined pre-discovery). The renamed title survives only in
+  // the ephemeral bar + the persisted `sessionRestore` snapshot title.
+  //
+  // On restart, restore resumes the session under a scan-picked UUID
+  // (useSessionRestore.ts:87-89,128) and shows the snapshot title in the bar —
+  // but it NEVER calls setSessionTitleOverride, and because addSession sets the
+  // claudeSessionId directly, discovery's self-heal seed is skipped
+  // (claudeIdDiscovery.ts:194 only runs for sessions without a UUID).
+  //
+  // Result: bar shows "Mein Name", History shows the jsonl default. This test
+  // asserts the desired end-state (override carries the rename) and MUST fail
+  // against current code.
+  // -------------------------------------------------------------------------
+
+  it("restoring a renamed session (UUID unknown at rename time) persists the rename into the override map", async () => {
+    const RESUME_UUID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+    // Persisted snapshot carries the user rename as the title but NO
+    // claudeSessionId — mirrors "renamed before discovery resolved the UUID".
+    useSettingsStore.getState().setSessionRestore({
+      enabled: true,
+      sessions: [
+        { folder: "C:\\test\\a", title: "Mein Name", shell: "powershell" },
+      ],
+      activeFolder: null,
+      layoutMode: "single",
+      gridFolders: [],
+    });
+
+    // Pre-condition: the rename never wrote an override (pre-discovery skip).
+    expect(useSettingsStore.getState().sessionTitleOverrides).toEqual({});
+
+    installRealIPC({
+      create_session: buildCreateSessionHandler().handler,
+      // On resume, the scan finds the real jsonl this session belongs to.
+      scan_claude_sessions: async () => [
+        { session_id: RESUME_UUID, started_at: "2026-05-08T10:00:00Z" },
+      ],
+    });
+
+    renderHook(() => useSessionRestore());
+
+    await waitFor(() => {
+      expect(useSessionStore.getState().sessions).toHaveLength(1);
+    });
+
+    const session = useSessionStore.getState().sessions[0];
+    // The bar correctly shows the renamed title (restored from the snapshot)
+    // and the session is resumed under the scan-picked UUID.
+    expect(session.title).toBe("Mein Name");
+    expect(session.claudeSessionId).toBe(RESUME_UUID);
+
+    // The History row for RESUME_UUID reads sessionTitleOverrides[RESUME_UUID].
+    // For the rename to be visible in History, restore must persist it there.
+    expect(
+      useSettingsStore.getState().sessionTitleOverrides[RESUME_UUID],
+    ).toBe("Mein Name");
+  });
+});

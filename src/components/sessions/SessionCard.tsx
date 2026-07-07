@@ -8,18 +8,24 @@ import type { ClaudeSession } from "../../store/sessionStore";
 import { logError } from "../../utils/errorLogger";
 import { folderLabel } from "../../utils/pathUtils";
 import { resolveSessionAccent, accentCssVars, accentColorFor, type AccentName } from "../../utils/sessionAccent";
+import { getGridMiniMap } from "./sessionGridLayout";
 import { SessionAccentMenu } from "./SessionAccentMenu";
 
 interface SessionCardProps {
   session: ClaudeSession;
   isActive: boolean;
-  isInGrid?: boolean;
+  /**
+   * Grid-Slot dieser Session, falls im Grid: `index` = Position in
+   * `gridSessionIds`, `count` = Anzahl der Grid-Sessions. Steuert die
+   * positions-aware Mini-Map. Undefined = nicht im Grid.
+   */
+  gridSlot?: { index: number; count: number };
   onClick: (sessionId: string) => void;
   onClose: (sessionId: string) => void;
 }
 
 
-const SessionCardInner = ({ session, isActive, isInGrid, onClick, onClose }: SessionCardProps) => {
+const SessionCardInner = ({ session, isActive, gridSlot, onClick, onClose }: SessionCardProps) => {
   const renameSession = useSessionStore((s) => s.renameSession);
 
   const sessionAccents = useSettingsStore((s) => s.sessionAccents);
@@ -35,6 +41,10 @@ const SessionCardInner = ({ session, isActive, isInGrid, onClick, onClose }: Ses
   const hasOverride = folder in folderAccents;
   const dotColor = accentColorFor(folder, accent);
   const projectName = folderLabel(session.folder);
+
+  // Position-aware grid indicator: a 12px mini-map mirroring the real grid
+  // template (2 = halves, 3 = T-shape, 4 = quadrants). null when not in grid.
+  const miniMap = gridSlot ? getGridMiniMap(gridSlot.index, gridSlot.count) : null;
 
   // Dot encodes session health on top of project identity:
   // error/waiting override the color; running pulses; done dims; else plain project color.
@@ -77,8 +87,14 @@ const SessionCardInner = ({ session, isActive, isInGrid, onClick, onClose }: Ses
     // does not trigger a rename.
     if (trimmed && trimmed !== displayString) {
       renameSession(session.id, trimmed);
+      // Record the rename under the stable internal id so the intent survives
+      // even when the Claude UUID isn't known yet. If it IS known, flush now so
+      // the History override updates synchronously (fast path); otherwise the
+      // discovery/restore seam flushes it once the UUID resolves.
+      const settings = useSettingsStore.getState();
+      settings.setPendingTitleOverride(session.id, trimmed);
       if (session.claudeSessionId) {
-        useSettingsStore.getState().setSessionTitleOverride(session.claudeSessionId, trimmed);
+        settings.flushPendingTitleOverride(session.id, session.claudeSessionId);
       }
     }
     setIsEditing(false);
@@ -181,17 +197,38 @@ const SessionCardInner = ({ session, isActive, isInGrid, onClick, onClose }: Ses
       </div>
 
       {/*
-        Grid-Indicator: 6px accent dot at bottom-right. Lives outside the hover
-        chrome (which occupies top-1.5 right-1.5), so it stays visible at rest
-        AND on hover. Replaces the inline LayoutGrid icon that previously sat
-        in the title row — that one was eclipsed by the chrome on hover.
+        Grid-Indicator: 12px mini-map at bottom-right, mirroring the real grid
+        template so it shows WHERE the session sits (2 = halves, 3 = T-shape,
+        4 = quadrants). The occupied cell is accent-filled, the rest dim. Lives
+        outside the hover chrome (top-1.5 right-1.5), so it stays visible at rest
+        AND on hover.
       */}
-      {isInGrid && (
+      {miniMap && (
         <div
-          className="absolute bottom-1 right-1 w-1.5 h-1.5 rounded-full bg-accent"
-          aria-label="Im Grid"
-          title="Im Grid"
-        />
+          data-testid="grid-minimap"
+          role="img"
+          aria-label={`Im Grid: ${miniMap.position}`}
+          title={`Im Grid: ${miniMap.position}`}
+          className="absolute bottom-1 right-1 grid gap-px w-3 h-3"
+          style={{
+            gridTemplateColumns: miniMap.columns,
+            gridTemplateRows: miniMap.rows,
+            gridTemplateAreas: miniMap.areas,
+          }}
+        >
+          {miniMap.cells.map((area) => {
+            const on = area === miniMap.active;
+            return (
+              <span
+                key={area}
+                data-cell={area}
+                data-active={on ? "true" : undefined}
+                className={`rounded-[1px] ${on ? "bg-accent" : "bg-neutral-600"}`}
+                style={{ gridArea: area }}
+              />
+            );
+          })}
+        </div>
       )}
       {menuPos && (
         <SessionAccentMenu

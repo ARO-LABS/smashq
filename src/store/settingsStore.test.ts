@@ -1603,3 +1603,42 @@ describe("moveFavorite + reorderFavorites (group-aware)", () => {
     expect(inGrp.map(f => f.sortIndex)).toEqual([0, 1000]);
   });
 });
+
+// ============================================================================
+// pendingTitleOverrides — rename intent survives async claudeSessionId resolution
+// ============================================================================
+
+describe("pendingTitleOverrides", () => {
+  const SID = "session-123-abc"; // internal (stable) session id
+  const UUID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"; // claude session UUID
+
+  beforeEach(() => {
+    // resetToDefaults() intentionally preserves sessionTitleOverrides — clear
+    // both maps here so cases don't leak override/pending state into each other.
+    useSettingsStore.setState({
+      sessionTitleOverrides: {},
+      pendingTitleOverrides: {},
+    });
+  });
+
+  it("setPendingTitleOverride records intent keyed by the internal session id", () => {
+    getState().setPendingTitleOverride(SID, "Mein Name");
+    expect(getState().pendingTitleOverrides[SID]).toBe("Mein Name");
+    // Pending must NOT leak into the persisted, UUID-keyed override map yet.
+    expect(getState().sessionTitleOverrides).toEqual({});
+  });
+
+  it("flushPendingTitleOverride moves the intent under the claude UUID and clears pending", () => {
+    getState().setPendingTitleOverride(SID, "Mein Name");
+    getState().flushPendingTitleOverride(SID, UUID);
+
+    expect(getState().sessionTitleOverrides[UUID]).toBe("Mein Name");
+    // Pending entry consumed — no dangling intent.
+    expect(getState().pendingTitleOverrides[SID]).toBeUndefined();
+  });
+
+  it("flushPendingTitleOverride is a no-op when there is no pending intent", () => {
+    getState().flushPendingTitleOverride(SID, UUID);
+    expect(getState().sessionTitleOverrides[UUID]).toBeUndefined();
+  });
+});

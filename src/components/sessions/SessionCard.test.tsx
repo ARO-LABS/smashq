@@ -362,7 +362,7 @@ describe("SessionCard", () => {
     expect(screen.queryByText("C:/Projects/animetrackler")).toBeNull();
   });
 
-  // ── isActive / isInGrid styling ──────────────────────────────────────
+  // ── isActive / grid-slot styling ─────────────────────────────────────
 
   describe("active and grid markers", () => {
     it("applies active accent-tint styling when isActive=true", () => {
@@ -379,22 +379,43 @@ describe("SessionCard", () => {
       expect(card?.className).not.toContain("bg-accent-a10");
     });
 
-    it("renders grid marker icon when isInGrid=true", () => {
+    it("renders a position-aware mini-map when gridSlot is set", () => {
       render(
         <SessionCard
           session={makeSession()}
           isActive={false}
-          isInGrid
+          gridSlot={{ index: 2, count: 4 }}
           onClick={vi.fn()}
           onClose={vi.fn()}
         />,
       );
-      expect(screen.getByLabelText("Im Grid")).toBeTruthy();
+      // index 2 of 4 → bottom-left quadrant (area "c").
+      const map = screen.getByLabelText("Im Grid: unten links");
+      expect(map).toBeTruthy();
+      const active = map.querySelector('[data-active="true"]');
+      expect(active?.getAttribute("data-cell")).toBe("c");
+      expect(active?.className).toContain("bg-accent");
     });
 
-    it("omits grid marker icon when isInGrid is not set", () => {
+    it("adapts the mini-map to the session count (2 sessions = halves)", () => {
+      render(
+        <SessionCard
+          session={makeSession()}
+          isActive={false}
+          gridSlot={{ index: 1, count: 2 }}
+          onClick={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      );
+      // index 1 of 2 → bottom half (area "b"); only two cells rendered.
+      const map = screen.getByLabelText("Im Grid: unten");
+      expect(map.querySelectorAll("[data-cell]").length).toBe(2);
+      expect(map.querySelector('[data-active="true"]')?.getAttribute("data-cell")).toBe("b");
+    });
+
+    it("omits the grid indicator when gridSlot is not set", () => {
       renderCard(makeSession());
-      expect(screen.queryByLabelText("Im Grid")).toBeNull();
+      expect(screen.queryByTestId("grid-minimap")).toBeNull();
     });
   });
 

@@ -129,6 +129,21 @@ async function restoreSessions(
         isGitRepo: result?.isGitRepo,
         snapshotCommit: result?.snapshotCommit,
       });
+
+      // Persist the (possibly user-renamed) snapshot title into the History
+      // override map under the resolved UUID. Restore sets claudeSessionId
+      // directly, which suppresses discovery's self-heal seed (it only runs for
+      // sessions without a UUID) — without this a session renamed before its
+      // UUID was ever discovered would show its default title in History after
+      // restart. Fills a gap only; never clobbers a newer existing override.
+      if (resumeSessionId && entry.title) {
+        const { sessionTitleOverrides } = useSettingsStore.getState();
+        if (!sessionTitleOverrides[resumeSessionId]) {
+          useSettingsStore
+            .getState()
+            .setSessionTitleOverride(resumeSessionId, entry.title);
+        }
+      }
       createdIds.push(sessionId);
     } catch (err) {
       logWarn("sessionRestore", `Session für "${entry.folder}" übersprungen: ${err}`);

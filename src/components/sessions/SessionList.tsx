@@ -28,23 +28,12 @@ interface SessionListProps {
   onQuickStart: (favorite: FavoriteFolder) => void;
 }
 
-/** Active/waiting sessions first, then done/error. Within each group: by createdAt. */
-function sortSessions(sessions: ClaudeSession[]): ClaudeSession[] {
-  const activeStatuses = new Set(["starting", "running", "waiting"]);
-  return [...sessions].sort((a, b) => {
-    const aActive = activeStatuses.has(a.status) ? 0 : 1;
-    const bActive = activeStatuses.has(b.status) ? 0 : 1;
-    if (aActive !== bActive) return aActive - bActive;
-    return a.createdAt - b.createdAt;
-  });
-}
-
 // ── SortableSessionRow ────────────────────────────────────────────────────────
 
 interface SortableSessionRowProps {
   session: ClaudeSession;
   isActive: boolean;
-  isInGrid: boolean;
+  gridSlot?: { index: number; count: number };
   onClick: (id: string) => void;
   onClose: (id: string) => void;
 }
@@ -52,7 +41,7 @@ interface SortableSessionRowProps {
 function SortableSessionRow({
   session,
   isActive,
-  isInGrid,
+  gridSlot,
   onClick,
   onClose,
 }: SortableSessionRowProps): JSX.Element {
@@ -79,7 +68,7 @@ function SortableSessionRow({
       <SessionCard
         session={session}
         isActive={isActive}
-        isInGrid={isInGrid}
+        gridSlot={gridSlot}
         onClick={onClick}
         onClose={onClose}
       />
@@ -107,21 +96,22 @@ export function SessionList({ onNewSession, onQuickStart }: SessionListProps): J
     }
   }, [addFavorite]);
 
-  const sorted = sortSessions(sessions);
-
   const sensors = useSidebarSensors();
 
   const handleDragEnd = useCallback(
     (e: DragEndEvent) => {
       const { active, over } = e;
       if (!over || active.id === over.id) return;
-      const ids = sorted.map((s) => s.id);
+      // Index into the stored order — the same order the list renders and
+      // reorderSessions persists. Deriving indices from a re-sorted copy would
+      // desync the arrayMove from what the user sees.
+      const ids = sessions.map((s) => s.id);
       const from = ids.indexOf(String(active.id));
       const to = ids.indexOf(String(over.id));
       if (from < 0 || to < 0) return;
       reorderSessions(arrayMove(ids, from, to));
     },
-    [sorted, reorderSessions],
+    [sessions, reorderSessions],
   );
 
   const handleClick = useCallback((sessionId: string) => {
@@ -172,9 +162,16 @@ export function SessionList({ onNewSession, onQuickStart }: SessionListProps): J
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
           >
-            <SortableContext items={sorted.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-              {sorted.map((session) => {
-                const isInGrid = gridSessionIds.includes(session.id);
+            <SortableContext items={sessions.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+              {sessions.map((session) => {
+                // Grid slot drives the position-aware mini-map. index+count
+                // mirror what SessionManagerView feeds getGridStyle, so the
+                // indicator matches the actual terminal layout.
+                const gridIndex = gridSessionIds.indexOf(session.id);
+                const gridSlot =
+                  gridIndex >= 0
+                    ? { index: gridIndex, count: Math.min(Math.max(gridSessionIds.length, 1), 4) }
+                    : undefined;
                 return (
                   <SortableSessionRow
                     key={session.id}
@@ -184,7 +181,7 @@ export function SessionList({ onNewSession, onQuickStart }: SessionListProps): J
                         ? session.id === focusedGridSessionId
                         : session.id === activeSessionId
                     }
-                    isInGrid={isInGrid}
+                    gridSlot={gridSlot}
                     onClick={handleClick}
                     onClose={handleClose}
                   />

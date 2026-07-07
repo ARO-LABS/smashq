@@ -260,6 +260,14 @@ export interface SettingsState {
   sessionRestore: SessionRestoreData;
   /** User-defined titles for Claude session IDs (history/resume override). */
   sessionTitleOverrides: Record<string, string>;
+  /**
+   * Rename intent keyed by the INTERNAL (stable-from-birth) session id, held
+   * until the async `claudeSessionId` is known and the intent can be flushed
+   * into `sessionTitleOverrides`. In-memory only (NOT persisted): the internal
+   * id is regenerated each run, so persisting it across restarts is worthless.
+   * Closes the rename-before-discovery gap where the override write was skipped.
+   */
+  pendingTitleOverrides: Record<string, string>;
   /** Per-Session-Akzentfarbe (key: claudeSessionId, value: AccentName). */
   sessionAccents: Record<string, string>;
   /**
@@ -288,6 +296,14 @@ export interface SettingsState {
   setSessionRestore: (data: SessionRestoreData) => void;
   setSessionTitleOverride: (sessionId: string, title: string) => void;
   clearSessionTitleOverride: (sessionId: string) => void;
+  /** Record a rename under the internal session id until the UUID resolves. */
+  setPendingTitleOverride: (sessionId: string, title: string) => void;
+  /**
+   * Move a pending rename intent onto its resolved Claude UUID and clear it.
+   * No-op when there is no pending entry for `sessionId`. Called at every seam
+   * where a session gains a `claudeSessionId` (discovery, resolve, restore).
+   */
+  flushPendingTitleOverride: (sessionId: string, claudeSessionId: string) => void;
   setSessionAccent: (claudeSessionId: string, name: string) => void;
   clearSessionAccent: (claudeSessionId: string) => void;
   setFolderAccent: (folder: string, name: string) => void;
@@ -512,6 +528,7 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
     pinnedDocs: {} as Record<string, PinnedDoc[]>,
     sessionRestore: defaultSessionRestore,
     sessionTitleOverrides: {} as Record<string, string>,
+    pendingTitleOverrides: {} as Record<string, string>,
     sessionAccents: {} as Record<string, string>,
     folderAccents: {} as Record<string, string>,
     notesWindowSize: DEFAULT_NOTES_WINDOW_SIZE,
@@ -724,6 +741,7 @@ export const useSettingsStore = create<SettingsState>()(
       pinnedDocs: {},
       sessionRestore: defaultSessionRestore,
       sessionTitleOverrides: {},
+      pendingTitleOverrides: {},
       sessionAccents: {},
       folderAccents: {},
       notesWindowSize: DEFAULT_NOTES_WINDOW_SIZE,
@@ -758,6 +776,45 @@ export const useSettingsStore = create<SettingsState>()(
           const next = { ...state.sessionTitleOverrides };
           delete next[key];
           return { sessionTitleOverrides: next };
+        }),
+
+      setPendingTitleOverride: (sessionId, title) =>
+        set((state) => {
+          const key = sessionId.trim();
+          const value = title.trim();
+          if (!key || !value) return state;
+          if (state.pendingTitleOverrides[key] === value) return state;
+          return {
+            pendingTitleOverrides: {
+              ...state.pendingTitleOverrides,
+              [key]: value,
+            },
+          };
+        }),
+
+      flushPendingTitleOverride: (sessionId, claudeSessionId) =>
+        set((state) => {
+          const sid = sessionId.trim();
+          const uuid = claudeSessionId.trim();
+          const pending = state.pendingTitleOverrides[sid];
+          if (!sid || !uuid || !pending) return state;
+
+          const nextPending = { ...state.pendingTitleOverrides };
+          delete nextPending[sid];
+
+          // Intent authoritative — write it under the resolved UUID. Skip the
+          // override write (but still consume the pending) when it already holds
+          // the same value, to avoid a redundant persist notification.
+          if (state.sessionTitleOverrides[uuid] === pending) {
+            return { pendingTitleOverrides: nextPending };
+          }
+          return {
+            sessionTitleOverrides: {
+              ...state.sessionTitleOverrides,
+              [uuid]: pending,
+            },
+            pendingTitleOverrides: nextPending,
+          };
         }),
 
       setSessionAccent: (claudeSessionId, name) =>

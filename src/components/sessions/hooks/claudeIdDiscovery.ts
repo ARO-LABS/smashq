@@ -144,8 +144,15 @@ export function createClaudeIdDiscovery(): ClaudeIdDiscovery {
           retryMap.delete(id);
           useSessionStore.getState().setClaudeSessionId(id, match.session_id);
 
+          // Flush any rename recorded before the UUID was known — carries the
+          // user's intent onto the now-resolved UUID (authoritative).
+          useSettingsStore
+            .getState()
+            .flushPendingTitleOverride(id, match.session_id);
+
           // Only write title override if none exists yet — never overwrite a
-          // user-set override with an auto-discovered default title (bug fix)
+          // user-set override with an auto-discovered default title (bug fix).
+          // No-op when the flush above already wrote the renamed title.
           const overrides = useSettingsStore.getState().sessionTitleOverrides;
           // Re-fetch session after setClaudeSessionId in case it was updated
           const refreshedSession = useSessionStore
@@ -217,6 +224,11 @@ export function createClaudeIdDiscovery(): ClaudeIdDiscovery {
     if (!session) return;
 
     useSessionStore.getState().setClaudeSessionId(id, claudeSessionId);
+
+    // Flush any rename recorded before the UUID resolved (mirrors the scan path).
+    useSettingsStore
+      .getState()
+      .flushPendingTitleOverride(id, claudeSessionId);
 
     const overrides = useSettingsStore.getState().sessionTitleOverrides;
     if (session.title?.trim() && !overrides[claudeSessionId]) {
