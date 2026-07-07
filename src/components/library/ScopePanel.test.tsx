@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { Globe } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { ScopePanel } from "./ScopePanel";
 import { useUIStore } from "../../store/uiStore";
 import { useConfigDiscoveryStore } from "../../store/configDiscoveryStore";
 import type { ScopeConfig } from "../../store/configDiscoveryStore";
+
+const Globe = ICONS.library.scopeGlobal;
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(() => Promise.resolve("")),

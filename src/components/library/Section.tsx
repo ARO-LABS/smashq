@@ -1,10 +1,13 @@
-import { Zap, ChevronDown, ChevronRight } from "lucide-react";
+import { ICONS, type LucideIcon } from "../../utils/icons";
 import { useUIStore } from "../../store/uiStore";
+
+const ChevronDown = ICONS.action.collapse;
+const ChevronRight = ICONS.action.chevronRight;
 
 // ── Collapsible Section ──────────────────────────────────────────────
 
 interface SectionProps {
-  icon: typeof Zap;
+  icon: LucideIcon;
   title: string;
   count: number;
   defaultOpen?: boolean;

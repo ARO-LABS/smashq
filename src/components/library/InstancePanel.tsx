@@ -1,4 +1,6 @@
-import { BookOpen } from "lucide-react";
+import { ICONS } from "../../utils/icons";
+
+const BookOpen = ICONS.nav.library;
 
 // ── InstancePanel ────────────────────────────────────────────────────
 // Right column of the Library Detail Modal.

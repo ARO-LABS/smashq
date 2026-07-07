@@ -1,15 +1,15 @@
 import { useState, useMemo } from "react";
-import {
-  BookText,
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  Check,
-  Shield,
-  FileCode,
-  FileText,
-} from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { useUIStore } from "../../store/uiStore";
+
+const BookText = ICONS.library.knowledge;
+const ChevronDown = ICONS.action.collapse;
+const ChevronRight = ICONS.action.chevronRight;
+const Copy = ICONS.action.copy;
+const Check = ICONS.tasks.check;
+const Shield = ICONS.viewer.permissions;
+const FileCode = ICONS.file.code;
+const FileText = ICONS.file.text;
 import type {
   DiscoveredKnowledge,
   KnowledgeCategory,

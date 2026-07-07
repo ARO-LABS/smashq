@@ -1,5 +1,4 @@
 import { useState, useCallback } from "react";
-import { Zap, Bot, Webhook, Brain } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   useConfigDiscoveryStore,
@@ -13,6 +12,11 @@ import { SkillArgBadge } from "./SkillArgBadge";
 import { ContentPreview } from "./ContentPreview";
 import { useUIStore } from "../../store/uiStore";
 import { ICONS, ICON_SIZE } from "../../utils/icons";
+
+const Zap = ICONS.library.command;
+const Bot = ICONS.library.agent;
+const Webhook = ICONS.library.hook;
+const Brain = ICONS.library.skill;
 
 // ── Card renderers ───────────────────────────────────────────────────
 // Tightly-coupled family of list-item cards rendered inside ScopePanel

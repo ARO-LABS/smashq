@@ -1,10 +1,15 @@
 import { useEffect, useCallback, useMemo } from "react";
-import { BookOpen, RefreshCw, Globe, FolderOpen } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { useSessionStore, selectEffectiveSession } from "../../store/sessionStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useConfigDiscoveryStore, hasScopeContent } from "../../store/configDiscoveryStore";
 import { LibraryDetailModal } from "./LibraryDetailModal";
 import { ScopePanel } from "./ScopePanel";
+
+const BookOpen = ICONS.nav.library;
+const RefreshCw = ICONS.action.refresh;
+const Globe = ICONS.library.scopeGlobal;
+const FolderOpen = ICONS.action.folderOpen;
 
 // ── Main View ────────────────────────────────────────────────────────
 

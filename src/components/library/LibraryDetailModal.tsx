@@ -1,4 +1,4 @@
-import { type LucideIcon, Zap, Bot, Webhook, Brain, Scroll, BookText } from "lucide-react";
+import { ICONS, type LucideIcon } from "../../utils/icons";
 import { Modal } from "../ui/Modal";
 import { LibraryDetailContent } from "./LibraryDetailContent";
 import {
@@ -7,6 +7,13 @@ import {
   selectCloseDetail,
   type SelectedDetail,
 } from "../../store/configDiscoveryStore";
+
+const Zap = ICONS.library.command;
+const Bot = ICONS.library.agent;
+const Webhook = ICONS.library.hook;
+const Brain = ICONS.library.skill;
+const Scroll = ICONS.library.rule;
+const BookText = ICONS.library.knowledge;
 
 // ── Header meta derivation ───────────────────────────────────────────
 

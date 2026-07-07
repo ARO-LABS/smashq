@@ -1,7 +1,11 @@
 import { useState } from "react";
-import { Scroll, ChevronDown, ChevronRight } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { useUIStore } from "../../store/uiStore";
 import type { DiscoveredRule } from "../../store/configDiscoveryStore";
+
+const Scroll = ICONS.library.rule;
+const ChevronDown = ICONS.action.collapse;
+const ChevronRight = ICONS.action.chevronRight;
 
 interface RulesSectionProps {
   rules: DiscoveredRule[];

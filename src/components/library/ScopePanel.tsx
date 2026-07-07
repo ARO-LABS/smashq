@@ -1,15 +1,5 @@
 import { useCallback } from "react";
-import {
-  Globe,
-  Zap,
-  Bot,
-  Webhook,
-  Settings,
-  FileText,
-  Brain,
-  ChevronDown,
-  ChevronRight,
-} from "lucide-react";
+import { ICONS, type LucideIcon } from "../../utils/icons";
 import { useUIStore } from "../../store/uiStore";
 import {
   hasScopeContent,
@@ -22,13 +12,22 @@ import { SkillCard, AgentCard, HookCard, MemoryFileCard } from "./LibraryCards";
 import { RulesSection } from "./RulesSection";
 import { KnowledgeSection } from "./KnowledgeSection";
 
+const Zap = ICONS.library.command;
+const Bot = ICONS.library.agent;
+const Webhook = ICONS.library.hook;
+const Settings = ICONS.nav.settings;
+const FileText = ICONS.file.text;
+const Brain = ICONS.library.skill;
+const ChevronDown = ICONS.action.collapse;
+const ChevronRight = ICONS.action.chevronRight;
+
 // ── Scope Panel ──────────────────────────────────────────────────────
 
 interface ScopePanelProps {
   scope: ConfigScope;
   config: ScopeConfig;
   label: string;
-  icon: typeof Globe;
+  icon: LucideIcon;
   scopeId: string;
   /** Unique key used to namespace the content cache — must be unique per panel */
   folder: string;
