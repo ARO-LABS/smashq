@@ -39,20 +39,20 @@ function checkStyle(check: CheckRun): {
   if (isSuccess) {
     return {
       className:
-        "bg-green-500/10 text-green-400 border-green-500/20",
+        "bg-success/10 text-success border-success/20",
       icon: <CheckCircle2 className="w-2.5 h-2.5" />,
     };
   }
   if (isFailed) {
     return {
-      className: "bg-red-500/10 text-red-400 border-red-500/20",
+      className: "bg-error/10 text-error border-error/20",
       icon: <XCircle className="w-2.5 h-2.5" />,
     };
   }
   if (isPending) {
     return {
       className:
-        "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+        "bg-warning/10 text-warning border-warning/20",
       icon: <Loader2 className="w-2.5 h-2.5 animate-spin" />,
     };
   }
@@ -87,10 +87,10 @@ export function IssueLinkedPRs({ linkedPRs }: IssueLinkedPRsProps) {
             <span
               className={`text-[10px] px-1.5 py-0.5 rounded-sm font-medium ${
                 pr.state === "MERGED"
-                  ? "bg-purple-500/20 text-purple-300"
+                  ? "bg-cat-violet/20 text-cat-violet"
                   : pr.state === "CLOSED"
-                    ? "bg-red-500/20 text-red-300"
-                    : "bg-green-500/20 text-green-300"
+                    ? "bg-error/20 text-error"
+                    : "bg-success/20 text-success"
               }`}
             >
               {pr.state === "MERGED"

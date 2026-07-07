@@ -128,8 +128,8 @@ export function KanbanDetailModal({
         <span
           className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-sm font-medium ${
             detail.state === "CLOSED"
-              ? "bg-purple-500/20 text-purple-300"
-              : "bg-green-500/20 text-green-300"
+              ? "bg-cat-violet/20 text-cat-violet"
+              : "bg-success/20 text-success"
           }`}
         >
           {detail.state === "CLOSED" ? "Geschlossen" : "Offen"}
@@ -169,7 +169,7 @@ export function KanbanDetailModal({
       ) : error ? (
         <div className="flex flex-col items-center justify-center py-12 gap-3">
           <AlertCircle className="w-8 h-8 text-neutral-600" />
-          <span className="text-red-400 text-sm">{error}</span>
+          <span className="text-error text-sm">{error}</span>
           <button
             onClick={() => void loadDetail()}
             className="px-3 py-1.5 text-xs rounded-md bg-surface-raised text-neutral-300 shadow-hairline hover:shadow-lift hover:bg-hover-overlay hover:text-neutral-100 transition-shadow duration-200"
