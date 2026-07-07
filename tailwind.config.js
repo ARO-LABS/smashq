@@ -16,6 +16,13 @@ export default {
         warning: "var(--color-warning)",
         info: "var(--color-info)",
 
+        /* ── Category colors (Typ-/Source-Kodierung, aus der Palette) ── */
+        "cat-azure":   "var(--cat-azure)",
+        "cat-violet":  "var(--cat-violet)",
+        "cat-amber":   "var(--cat-amber)",
+        "cat-rose":    "var(--cat-rose)",
+        "cat-emerald": "var(--cat-emerald)",
+
         /* ── Tinted Neutrals (switch with theme) ── */
         neutral: {
           50:  "var(--neutral-50)",

@@ -23,6 +23,13 @@
   --color-warning: oklch(58% 0.16 70);
   --color-info: oklch(52% 0.14 250);
 
+  /* ── Category colors (Typ-/Source-Kodierung) — die 5 kuratierten Palette-Hues ── */
+  --cat-azure:   oklch(52% 0.16 230);
+  --cat-violet:  oklch(52% 0.16 285);
+  --cat-amber:   oklch(52% 0.16 70);
+  --cat-rose:    oklch(52% 0.16 15);
+  --cat-emerald: oklch(52% 0.16 155);
+
   /* ── Tinted Neutrals (light mode: low = prominent text, high = backgrounds)
         Warm hue 20 (rotorange) — gives the Light Mode a "warm paper" feel.
         Chroma stays subliminal (0.005-0.012) so neutrals read as neutrals,
@@ -132,6 +139,13 @@
   --color-error: oklch(62% 0.22 25);
   --color-warning: oklch(75% 0.14 70);
   --color-info: oklch(68% 0.12 250);
+
+  /* Category colors — dark stops (match accent dark L/C) */
+  --cat-azure:   oklch(72% 0.14 230);
+  --cat-violet:  oklch(72% 0.14 285);
+  --cat-amber:   oklch(72% 0.14 70);
+  --cat-rose:    oklch(72% 0.14 15);
+  --cat-emerald: oklch(72% 0.14 155);
 
   /* Concept B — neutrals matched 1:1 to docs/design-system/preview/concept-b-organic-modern.
      Hue 280 (just-barely-cool grey, almost pure), chroma 0.003-0.011 (markedly
