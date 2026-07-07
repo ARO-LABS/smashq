@@ -154,7 +154,11 @@ const SessionCardInner = ({ session, isActive, gridSlot, onClick, onClose }: Ses
           {session.title}
         </span>
       )}
-      <span className="shrink-0 text-[11px] text-neutral-500 font-mono truncate max-w-[84px] group-hover:opacity-0 transition-opacity">
+      <span
+        className={`shrink-0 text-[11px] text-neutral-500 font-mono truncate max-w-[84px] group-hover:opacity-0 transition-opacity ${
+          miniMap ? "mr-4" : ""
+        }`}
+      >
         {projectName}
       </span>
 
@@ -201,11 +205,13 @@ const SessionCardInner = ({ session, isActive, gridSlot, onClick, onClose }: Ses
       </div>
 
       {/*
-        Grid-Indicator: 12px mini-map at bottom-right, mirroring the real grid
-        template so it shows WHERE the session sits (2 = halves, 3 = T-shape,
-        4 = quadrants). The occupied cell is accent-filled, the rest dim. Lives
-        outside the hover chrome (top-1.5 right-1.5), so it stays visible at rest
-        AND on hover.
+        Grid-Indicator: 12px mini-map at bottom-right (bottom-1 right-1),
+        mirroring the real grid template so it shows WHERE the session sits
+        (2 = halves, 3 = T-shape, 4 = quadrants). The occupied cell is
+        accent-filled, the rest dim. Fades out on hover so the action chrome
+        (same bottom-right zone) owns that corner while hovering — at rest the
+        mini-map owns it. Rest-state name clearance is handled via the
+        projectName span's conditional mr-4.
       */}
       {miniMap && (
         <div
@@ -213,7 +219,7 @@ const SessionCardInner = ({ session, isActive, gridSlot, onClick, onClose }: Ses
           role="img"
           aria-label={`Im Grid: ${miniMap.position}`}
           title={`Im Grid: ${miniMap.position}`}
-          className="absolute bottom-1 right-1 grid gap-px w-3 h-3"
+          className="absolute bottom-1 right-1 grid gap-px w-3 h-3 group-hover:opacity-0 transition-opacity"
           style={{
             gridTemplateColumns: miniMap.columns,
             gridTemplateRows: miniMap.rows,
