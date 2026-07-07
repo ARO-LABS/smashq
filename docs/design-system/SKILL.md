@@ -19,7 +19,7 @@ Key files:
 Non-negotiable rules:
 - German UI copy, English code identifiers. No emoji. No unicode-as-icon.
 - Sharp corners (radius 0) for panels/buttons/modals/inputs. 2px for kanban cards only. Full-round for status dots only.
-- One accent color (cyan-teal hue 190) used across light + dark — do not introduce new accents.
+- One accent color (azure hue 230) used across light + dark — do not introduce new accents.
 - Exponential easing (`cubic-bezier(0.16, 1, 0.3, 1)`) for motion, no bounce, 100/300/500 durations.
 - Lucide icons only, 2px stroke, currentColor.
 - Flat surfaces — no gradients, glassmorphism, blur, or illustrations.

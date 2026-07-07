@@ -2,7 +2,7 @@
 
 Design system for **Smashq** — a Tauri v2 + React desktop application for managing and monitoring multiple Claude CLI sessions. Multi-session terminal with project context tabs, favorites, pipeline visualization, and notes. Built for developers who run many Claude CLI sessions in parallel.
 
-> **Tone summary:** German UI, English code. Terse, technical, monospace-adjacent. Dense information. Sharp corners. Dark-mode-native with a first-class light theme. One accent color (cyan-teal, hue 190), high-contrast neutrals, semantic colors used structurally never decoratively.
+> **Tone summary:** German UI, English code. Terse, technical, monospace-adjacent. Dense information. Sharp corners. Dark-mode-native with a first-class light theme. One accent color (azure, hue 230), high-contrast neutrals, semantic colors used structurally never decoratively.
 
 ---
 
@@ -65,8 +65,8 @@ Design system for **Smashq** — a Tauri v2 + React desktop application for mana
 
 ### Colors
 
-- **One accent:** cyan-teal at hue 190. Light mode `oklch(55% 0.16 190)`, dark mode `oklch(72% 0.14 190)` — same hue, shifted lightness. The entire UI shares one primary.
-  - **Exception — per-session accent (#261):** Session cards may vary their accent across a curated 6-hue palette (`src/utils/sessionAccent.ts`) to tell parallel sessions/projects apart. Mechanism: only `--accent-h` is overridden per card; `--accent-l`/`--accent-c`/alpha inherit from the mode tokens in `index.css`, so lightness/contrast stays constant across hues. This is the **only** sanctioned accent variation — all other chrome (buttons, focus ring, toasts, tabs) stays cyan-teal.
+- **One accent:** azure at hue 230. Light mode `oklch(55% 0.16 230)`, dark mode `oklch(72% 0.14 230)` — same hue, shifted lightness. The entire UI shares one primary.
+  - **Exception — per-session accent (#261):** Session cards may vary their accent across a curated 5-hue palette (`src/utils/sessionAccent.ts`) to tell parallel sessions/projects apart. Mechanism: only `--accent-h` is overridden per card; `--accent-l`/`--accent-c`/alpha inherit from the mode tokens in `index.css`, so lightness/contrast stays constant across hues. This is the **only** sanctioned accent variation — all other chrome (buttons, focus ring, toasts, tabs) stays azure.
 - **Tinted neutrals:** hue 250 (slightly cool), very low chroma (`0.003–0.012`). Not pure gray — has a faint blue bias that reads as "calm tech."
 - **Semantic colors:** success (green 155°), error (red 25°), warning (amber 70°), info (blue 250°) — all at matched chroma so they feel like siblings, not a rainbow.
 - **OKLCH everywhere** for perceptual uniformity and predictable theme flips.

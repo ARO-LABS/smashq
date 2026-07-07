@@ -61,7 +61,7 @@ body {
   --neutral-500: oklch(52% 0.01 250);
   --neutral-400: oklch(62% 0.01 250);
   --neutral-200: oklch(80% 0.008 250);
-  --color-accent: oklch(72% 0.14 190);
+  --color-accent: oklch(72% 0.14 230);
   --color-success: oklch(72% 0.16 155);
   --color-error: oklch(62% 0.22 25);
   --color-warning: oklch(75% 0.14 70);
