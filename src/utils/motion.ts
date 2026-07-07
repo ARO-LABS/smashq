@@ -6,6 +6,11 @@
  * - Use exponential easing (ease-out-expo), never bounce/elastic
  * - Exit animations = 75% of enter duration
  * - Respect `prefers-reduced-motion` (handled in CSS)
+ *
+ * SSOT: src/index.css (--duration-*, --ease-*). These JS values mirror those
+ * CSS tokens for framer-motion, which cannot read CSS custom properties as
+ * numeric transition values. Durations are in SECONDS (framer's unit) and equal
+ * the CSS ms tokens (0.2s == --duration-fast 200ms). Change BOTH places together.
  */
 
 import type { BezierDefinition } from "framer-motion";
