@@ -36,6 +36,7 @@ describe("TasksWindow drag", () => {
         dragHandlers={dragHandlers}
         resizeHandlers={resizeHandlers}
         onClose={vi.fn()}
+        onOpenLarge={vi.fn()}
       />,
     );
     // pointerDown on the global tab must NOT bubble to the drag handler
@@ -55,6 +56,7 @@ describe("TasksWindow drag", () => {
         dragHandlers={{ onPointerDown: vi.fn() } as never}
         resizeHandlers={{ onPointerDown: vi.fn() } as never}
         onClose={vi.fn()}
+        onOpenLarge={vi.fn()}
       />,
     );
     expect(screen.queryByLabelText("Aufgaben-Fenster verschieben")).toBeNull();
@@ -71,6 +73,7 @@ describe("TasksWindow drag", () => {
         dragHandlers={dragHandlers}
         resizeHandlers={{ onPointerDown: vi.fn() } as never}
         onClose={vi.fn()}
+        onOpenLarge={vi.fn()}
       />,
     );
     // The dialog element is in document.body via portal; find the header
@@ -79,5 +82,24 @@ describe("TasksWindow drag", () => {
     const header = dialog.firstElementChild as HTMLElement;
     fireEvent.pointerDown(header);
     expect(onPointerDown).toHaveBeenCalledTimes(1);
+  });
+
+  it("invokes onOpenLarge when the maximize button is clicked", () => {
+    const onOpenLarge = vi.fn();
+    render(
+      <TasksWindow
+        ctx={makeCtx()}
+        pos={{ x: 0, y: 0 }}
+        size={{ w: 320, h: 360 }}
+        dragHandlers={{ onPointerDown: vi.fn() } as never}
+        resizeHandlers={{ onPointerDown: vi.fn() } as never}
+        onClose={vi.fn()}
+        onOpenLarge={onOpenLarge}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "In großer Ansicht öffnen" }),
+    );
+    expect(onOpenLarge).toHaveBeenCalledTimes(1);
   });
 });

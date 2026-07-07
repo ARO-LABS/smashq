@@ -11,7 +11,7 @@
  *     list    — up to ~5 rows: StatusDot8 + truncated title + compact deadline chip
  *               next task row: bg-accent-a05 border-l-2 border-accent
  *     add-row — quick-add input (Enter commits, scoped to the cell's projectKey)
- *     footer  — "In großer Ansicht öffnen" + ICONS.tasks.next
+ *     footer  — "In großer Ansicht öffnen" + ICONS.action.maximize
  *     empty   — "Keine offenen Aufgaben"
  *
  * Close behaviour: click-outside + Escape.
@@ -124,7 +124,7 @@ export function TaskGridTile({
   const openCount = openTasks.length;
   // Cap display to ~5 rows; overflow handled by scrollable container
   const DISPLAY_CAP = 5;
-  const NextIcon = ICONS.tasks.next;
+  const MaximizeIcon = ICONS.action.maximize;
 
   return (
     <div
@@ -198,7 +198,7 @@ export function TaskGridTile({
           ].join(" ")}
         >
           In großer Ansicht öffnen
-          <NextIcon className="w-3 h-3" aria-hidden="true" />
+          <MaximizeIcon className="w-3 h-3" aria-hidden="true" />
         </button>
       </div>
     </div>

@@ -46,6 +46,8 @@ export interface TasksWindowProps {
   dragHandlers: PointerDragHandlers;
   resizeHandlers: PointerDragHandlers;
   onClose: () => void;
+  /** Open the full TasksView in its own detached window. */
+  onOpenLarge: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -188,6 +190,7 @@ export function TasksWindow({
   dragHandlers,
   resizeHandlers,
   onClose,
+  onOpenLarge,
 }: TasksWindowProps): JSX.Element {
   const { activeTab, setActiveTab, projectTabLabel, openCountForProject, effectiveProjectKey, hasProjectContext } = ctx;
 
@@ -226,6 +229,7 @@ export function TasksWindow({
   };
 
   const CloseIcon = ICONS.action.close;
+  const MaximizeIcon = ICONS.action.maximize;
 
   return createPortal(
     <div
@@ -243,7 +247,7 @@ export function TasksWindow({
       {/* Header: segmented tabs + close button — drag surface */}
       <div
         {...dragHandlers}
-        className="flex items-center justify-between px-2 py-2 border-b border-neutral-800 cursor-move select-none"
+        className="flex items-center justify-between px-2 py-2 border-b border-neutral-700 cursor-move select-none"
         style={{ touchAction: "none" }}
       >
         <div
@@ -286,16 +290,28 @@ export function TasksWindow({
           </button>
         </div>
 
-        {/* Close button — outside segmented control */}
-        <button
-          onClick={onClose}
+        {/* Window actions — outside segmented control */}
+        <div
+          className="flex items-center gap-0.5 shrink-0"
           onPointerDown={(e) => e.stopPropagation()}
-          className="p-1 rounded-md text-neutral-500 hover:text-neutral-200 hover:bg-hover-overlay transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-          aria-label="Aufgaben schliessen"
-          title="Schliessen"
         >
-          <CloseIcon className="w-4 h-4" />
-        </button>
+          <button
+            onClick={onOpenLarge}
+            className="p-1 rounded-md text-neutral-500 hover:text-accent hover:bg-hover-overlay transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+            aria-label="In großer Ansicht öffnen"
+            title="Groß öffnen"
+          >
+            <MaximizeIcon className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-md text-neutral-500 hover:text-neutral-200 hover:bg-hover-overlay transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+            aria-label="Aufgaben schliessen"
+            title="Schliessen"
+          >
+            <CloseIcon className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Body */}

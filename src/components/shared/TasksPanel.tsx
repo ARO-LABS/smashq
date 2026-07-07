@@ -99,6 +99,15 @@ function WindowVariant({
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
+  // Open the full TasksView in its own window and close the floating one —
+  // same affordance the grid-tile already offers (consistency gap).
+  const handleOpenLarge = (): void => {
+    invoke("open_detached_window", { view: "tasks", title: "Aufgaben" }).catch(
+      (err: unknown) => logError("TasksPanel.openDetachedTasks", err),
+    );
+    setOpen(false);
+  };
+
   const PanelIcon = ICONS.tasks.panel;
 
   // Suppress unused-prop warning — sessionId is accepted for future use (IPC
@@ -134,6 +143,7 @@ function WindowVariant({
           dragHandlers={dragHandlers}
           resizeHandlers={resizeHandlers}
           onClose={() => setOpen(false)}
+          onOpenLarge={handleOpenLarge}
         />
       )}
     </>
