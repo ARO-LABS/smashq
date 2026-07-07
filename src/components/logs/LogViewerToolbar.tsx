@@ -7,16 +7,16 @@ const RefreshIcon = ICONS.action.refresh;
 const TrashIcon = ICONS.action.trash;
 
 const SEVERITY_OPTIONS: { key: LogSeverity; label: string; color: string }[] = [
-  { key: "error", label: "Error", color: "bg-red-400/20 text-red-400 border-red-400/40" },
-  { key: "warn", label: "Warn", color: "bg-yellow-400/20 text-yellow-400 border-yellow-400/40" },
-  { key: "info", label: "Info", color: "bg-blue-400/20 text-blue-400 border-blue-400/40" },
-  { key: "debug", label: "Debug", color: "bg-teal-400/20 text-teal-400 border-teal-400/40" },
+  { key: "error", label: "Error", color: "bg-error/20 text-error border-error/40" },
+  { key: "warn", label: "Warn", color: "bg-warning/20 text-warning border-warning/40" },
+  { key: "info", label: "Info", color: "bg-info/20 text-info border-info/40" },
+  { key: "debug", label: "Debug", color: "bg-neutral-400/20 text-neutral-400 border-neutral-400/40" },
   { key: "trace", label: "Trace", color: "bg-neutral-400/20 text-neutral-400 border-neutral-400/40" },
 ];
 
 const SOURCE_OPTIONS: { key: LogSource; label: string; color: string }[] = [
-  { key: "frontend", label: "Frontend", color: "bg-purple-400/20 text-purple-400 border-purple-400/40" },
-  { key: "backend", label: "Backend", color: "bg-emerald-400/20 text-emerald-400 border-emerald-400/40" },
+  { key: "frontend", label: "Frontend", color: "bg-cat-violet/20 text-cat-violet border-cat-violet/40" },
+  { key: "backend", label: "Backend", color: "bg-cat-emerald/20 text-cat-emerald border-cat-emerald/40" },
 ];
 
 export interface LogViewerToolbarProps {
@@ -150,7 +150,7 @@ export function LogViewerToolbar({
 
         <button
           onClick={onClear}
-          className="flex items-center gap-1 px-2 py-1 text-[11px] text-neutral-400 hover:text-red-400 rounded transition-all"
+          className="flex items-center gap-1 px-2 py-1 text-[11px] text-neutral-400 hover:text-error rounded transition-all"
           title="Logs leeren"
         >
           <TrashIcon className={ICON_SIZE.card} />

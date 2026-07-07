@@ -7,16 +7,16 @@ import {
 } from "../../store/logViewerStore";
 
 const severityColors: Record<LogSeverity, string> = {
-  error: "text-red-400 bg-red-400/10",
-  warn: "text-yellow-400 bg-yellow-400/10",
-  info: "text-blue-400 bg-blue-400/10",
-  debug: "text-teal-400 bg-teal-400/10",
+  error: "text-error bg-error/10",
+  warn: "text-warning bg-warning/10",
+  info: "text-info bg-info/10",
+  debug: "text-neutral-400 bg-neutral-400/10",
   trace: "text-neutral-400 bg-neutral-400/10",
 };
 
 const sourceColors: Record<string, string> = {
-  frontend: "text-purple-400 bg-purple-400/10",
-  backend: "text-emerald-400 bg-emerald-400/10",
+  frontend: "text-cat-violet bg-cat-violet/10",
+  backend: "text-cat-emerald bg-cat-emerald/10",
 };
 
 /** Row-height estimate for virtualization (px). Actual height is measured
