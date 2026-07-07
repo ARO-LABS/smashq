@@ -232,7 +232,7 @@ function SkillDetail({ entry }: { entry: SkillEntry }) {
                   {arg.name}
                 </code>
                 {arg.required && (
-                  <span className="text-[10px] text-red-400 shrink-0">
+                  <span className="text-[10px] text-error shrink-0">
                     *erforderlich
                   </span>
                 )}

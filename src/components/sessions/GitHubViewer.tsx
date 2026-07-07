@@ -51,7 +51,7 @@ function statusColor(status: string): string {
     case "CHANGES_REQUESTED":
       return "text-error";
     default:
-      return "text-yellow-400";
+      return "text-warning";
   }
 }
 

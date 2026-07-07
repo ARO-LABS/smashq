@@ -34,14 +34,14 @@ export const SOURCE_META: Record<
   },
   "project-local": {
     label: "Lokal",
-    color: "bg-yellow-500/15 text-yellow-400",
-    dot: "bg-yellow-500",
+    color: "bg-warning/15 text-warning",
+    dot: "bg-warning",
     path: ".claude/settings.local.json",
   },
   user: {
     label: "User",
-    color: "bg-purple-400/15 text-purple-300",
-    dot: "bg-purple-400",
+    color: "bg-cat-violet/15 text-cat-violet",
+    dot: "bg-cat-violet",
     path: "~/.claude/settings.json",
   },
 };

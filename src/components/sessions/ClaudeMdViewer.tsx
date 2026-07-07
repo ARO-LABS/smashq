@@ -131,7 +131,7 @@ export function ClaudeMdViewer({ folder }: ClaudeMdViewerProps) {
         <div className="flex items-center gap-2">
           <span className="text-xs text-neutral-400 font-medium uppercase tracking-widest">CLAUDE.md</span>
           {isDirty && (
-            <span className="w-2 h-2 rounded-full bg-orange-400" title="Ungespeicherte Änderungen" />
+            <span className="w-2 h-2 rounded-full bg-warning" title="Ungespeicherte Änderungen" />
           )}
         </div>
         <div className="flex items-center gap-1">

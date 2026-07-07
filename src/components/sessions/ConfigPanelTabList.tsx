@@ -301,7 +301,7 @@ export function ConfigPanelTabList({ folder, size = "md", isPrimary = true }: Co
                   e.stopPropagation();
                   handleRemovePin(pin.id, pin.label);
                 }}
-                className="p-0.5 pr-1.5 text-neutral-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="p-0.5 pr-1.5 text-neutral-500 hover:text-error opacity-0 group-hover:opacity-100 transition-opacity"
                 title="Pin entfernen"
                 aria-label={`Pin ${pin.label} entfernen`}
               >

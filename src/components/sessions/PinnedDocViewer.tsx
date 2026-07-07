@@ -189,7 +189,7 @@ export function PinnedDocViewer({ folder, pinId }: PinnedDocViewerProps) {
             </span>
           )}
           {isDirty && (
-            <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" title="Ungespeicherte Änderungen" />
+            <span className="w-2 h-2 rounded-full bg-warning shrink-0" title="Ungespeicherte Änderungen" />
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
