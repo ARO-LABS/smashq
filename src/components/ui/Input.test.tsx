@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { Input } from "./Input";
-import { Search } from "lucide-react";
+import { ICONS } from "../../utils/icons";
+
+const Search = ICONS.action.search;
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 

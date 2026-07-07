@@ -29,16 +29,26 @@ describe("ICONS registry", () => {
       "chevronRight",
       "close",
       "collapse",
+      "copy",
       "detach",
       "diff",
       "download",
+      "edit",
       "externalLink",
       "folderOpen",
+      "listView",
       "loading",
+      "maximize",
       "move",
       "newSession",
+      "panelClose",
+      "panelOpen",
+      "preview",
+      "previewOff",
       "refresh",
       "retry",
+      "run",
+      "save",
       "scrollToBottom",
       "search",
       "terminal",
@@ -90,7 +100,7 @@ describe("ICON_SIZE tokens", () => {
 describe("ICONS registry — completeness & validity", () => {
   it("exposes the icon groups plus top-level pin + notes + tasks + group icons", () => {
     expect(Object.keys(ICONS).sort()).toEqual(
-      ["action", "groupCollapse", "groupCreate", "nav", "notes", "pin", "tasks", "theme", "toast", "update"],
+      ["action", "category", "file", "git", "groupCollapse", "groupCreate", "library", "nav", "notes", "pin", "tasks", "theme", "toast", "update", "viewer"],
     );
   });
 
@@ -136,7 +146,10 @@ describe("ICONS registry — completeness & validity", () => {
   });
 
   it("every leaf in every group resolves to a truthy component", () => {
-    const groups = [ICONS.nav, ICONS.theme, ICONS.action, ICONS.toast, ICONS.update];
+    const groups = [
+      ICONS.nav, ICONS.theme, ICONS.action, ICONS.toast, ICONS.update,
+      ICONS.library, ICONS.git, ICONS.file, ICONS.viewer, ICONS.category,
+    ];
     for (const group of groups) {
       for (const Icon of Object.values(group)) {
         expect(Icon).toBeTruthy();
@@ -148,8 +161,9 @@ describe("ICONS registry — completeness & validity", () => {
     expect(typeof ICONS.pin).toBe("object");
   });
 
-  it("action group has 19 distinct icon entries", () => {
-    // dragHandle entfiel mit dem Whole-Tile-Drag (Grip-Handles entfernt).
-    expect(Object.keys(ICONS.action).length).toBe(19);
+  it("action group has 29 distinct icon entries", () => {
+    // 19 original + 10 added in the icon-registry migration (copy/preview/
+    // previewOff/edit/save/run/maximize/listView/panelOpen/panelClose).
+    expect(Object.keys(ICONS.action).length).toBe(29);
   });
 });

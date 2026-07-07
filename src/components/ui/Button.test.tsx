@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { Button } from "./Button";
-import { Plus } from "lucide-react";
 import { ICONS } from "../../utils/icons";
+
+const Plus = ICONS.action.newSession;
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
