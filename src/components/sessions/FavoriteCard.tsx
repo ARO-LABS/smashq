@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Play, X, FolderOpen, Terminal } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { motion } from "framer-motion";
+import { DURATION, EASE } from "../../utils/motion";
 import type { FavoriteFolder } from "../../store/settingsStore";
 import { useUIStore } from "../../store/uiStore";
 import { useSessionStore } from "../../store/sessionStore";
@@ -70,7 +71,7 @@ export function FavoriteCard({ favorite, onStart, onRemove }: FavoriteCardProps)
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.15 }}
+      transition={{ duration: DURATION.fast, ease: EASE.out }}
       className="relative group flex items-center gap-2 h-7 pl-3 pr-2 cursor-pointer rounded-md hover:bg-hover-overlay transition-colors"
       onClick={() => openPreview(favorite.path)}
       onContextMenu={(e) => {

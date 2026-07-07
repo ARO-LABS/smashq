@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useId, useRef, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { DURATION, EASE } from "../../utils/motion";
 import { ICONS, ICON_SIZE } from "../../utils/icons";
 import { IconButton } from "./IconButton";
 
@@ -142,7 +143,7 @@ export function Modal({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: DURATION.fast, ease: EASE.out }}
           >
             {/* Header (optional) */}
             {title !== undefined && (
