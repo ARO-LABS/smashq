@@ -279,7 +279,7 @@ export function ConfigPanelTabList({ folder, size = "md", isPrimary = true }: Co
                       cancelRename();
                     }
                   }}
-                  className={`${textSize} font-medium bg-transparent border border-accent rounded-sm px-1 outline-none min-w-[60px] max-w-[200px]`}
+                  className={`${textSize} font-medium bg-transparent border border-accent rounded-sm px-1 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 min-w-[60px] max-w-[200px]`}
                   maxLength={64}
                   aria-label="Pin-Label bearbeiten"
                 />
