@@ -8,14 +8,14 @@
 :root {
   /* ── Accent (tuned for white backgrounds) ── */
   /* Accent als Hue/L/C-Vars — Per-Session-Override setzt nur --accent-h.
-     Default-Hue 195 + L 55% + C 0.18 reproduziert den bisherigen Light-Akzent. */
-  --accent-h: 195;
+     Default-Hue 230 (Azure) + L 55% + C 0.18. */
+  --accent-h: 230;
   --accent-l: 55%;
   --accent-c: 0.18;
   --color-accent: oklch(var(--accent-l) var(--accent-c) var(--accent-h));
-  --color-accent-light: oklch(72% 0.10 190);
-  --color-accent-dark: oklch(40% 0.14 190);
-  --color-accent-subtle: oklch(92% 0.03 190);
+  --color-accent-light: oklch(72% 0.10 230);
+  --color-accent-dark: oklch(40% 0.14 230);
+  --color-accent-subtle: oklch(92% 0.03 230);
 
   /* ── Semantic ── */
   --color-success: oklch(52% 0.18 155);
@@ -47,7 +47,7 @@
   /* ── Hover overlay — warm-tinted instead of pure black, matches the warm shell ── */
   --hover-overlay: oklch(40% 0.05 20 / 0.04);
 
-  /* Alpha variants locked to the live --color-accent (hue 195 chroma 0.18)
+  /* Alpha variants locked to the live --color-accent (hue 230 chroma 0.18)
      so bg-accent-a05/a10/etc render the same hue as bare bg-accent.
      Previously stale at hue 190 chroma 0.16 (pre-Concept-B accent) — matches
      the dark-mode fix in commit 264b7da. */
@@ -123,9 +123,9 @@
      und recomputen automatisch (var-Substitution pro Element). */
   --accent-l: 72%;
   --accent-c: 0.16;
-  --color-accent-light: oklch(85% 0.08 190);
-  --color-accent-dark: oklch(50% 0.12 190);
-  --color-accent-subtle: oklch(25% 0.04 190);
+  --color-accent-light: oklch(85% 0.08 230);
+  --color-accent-dark: oklch(50% 0.12 230);
+  --color-accent-subtle: oklch(25% 0.04 230);
 
   --color-success: oklch(72% 0.16 155);
   --color-error: oklch(62% 0.22 25);
@@ -135,7 +135,7 @@
   /* Concept B — neutrals matched 1:1 to docs/design-system/preview/concept-b-organic-modern.
      Hue 280 (just-barely-cool grey, almost pure), chroma 0.003-0.011 (markedly
      more neutral than the previous hue-250 blue-tint). Background pulled down
-     to L=8% so the cyan-teal accent reads with more contrast. */
+     to L=8% so the azure accent reads with more contrast. */
   --neutral-50:  oklch(98% 0.003 280);
   --neutral-100: oklch(95% 0.003 280);  /* #F2F2F4 — boldest text */
   --neutral-200: oklch(87% 0.004 280);  /* #D9D9DE — primary body text */
