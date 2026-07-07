@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { Terminal } from "@xterm/xterm";
+import { Terminal, type ITheme } from "@xterm/xterm";
 import { wrapInvoke, markRender } from "../../utils/perfLogger";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -49,6 +49,39 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number) {
     }
   };
   return debounced;
+}
+
+/**
+ * Builds the xterm theme from the live design tokens on :root so the terminal
+ * follows the app's light/dark switch and the azure accent.
+ *
+ * xterm's color parser accepts hex/rgb/rgba but NOT `oklch()`, and our tokens
+ * are authored in oklch. Reading the var and handing it to xterm directly would
+ * render as transparent/black. So we rasterize each token via a 1x1 canvas
+ * (fillRect + getImageData), which forces the browser to convert the oklch
+ * value to concrete sRGB bytes we then format as rgb()/rgba().
+ */
+function resolveTerminalTheme(): ITheme {
+  const cs = getComputedStyle(document.documentElement);
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 1;
+  const ctx = canvas.getContext("2d");
+  const toRgb = (varName: string, fallback: string): string => {
+    const raw = cs.getPropertyValue(varName).trim();
+    if (!raw || !ctx) return fallback;
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = fallback; // if `raw` is unparsable, fillStyle keeps the fallback
+    ctx.fillStyle = raw;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+    return a === 255 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`;
+  };
+  return {
+    background: toRgb("--surface-base", "#0d1117"),
+    foreground: toRgb("--neutral-100", "#e6edf3"),
+    cursor: toRgb("--color-accent", "#00b5f5"),
+    selectionBackground: toRgb("--accent-a30", "#264f78"),
+  };
 }
 
 export function SessionTerminal({ sessionId }: SessionTerminalProps) {
@@ -113,12 +146,7 @@ export function SessionTerminal({ sessionId }: SessionTerminalProps) {
       // it and we stay conservative. On macOS/Linux the PTY is a Unix pty, not
       // ConPTY — passing this option there feeds xterm wrong reflow heuristics.
       ...(isWindows() ? { windowsPty: { backend: "conpty" as const, buildNumber: 19041 } } : {}),
-      theme: {
-        background: "#0d1117",
-        foreground: "#e6edf3",
-        cursor: "#00ff88",
-        selectionBackground: "#264f78",
-      },
+      theme: resolveTerminalTheme(),
       allowProposedApi: true,
     });
 
@@ -304,11 +332,25 @@ export function SessionTerminal({ sessionId }: SessionTerminalProps) {
     };
   }, [sessionId, isAtBottom, addToast]);
 
+  // Re-theme the live terminal when the app toggles light/dark. useThemeEffect
+  // flips the `.dark` class on :root, which swaps the token values; we observe
+  // that class change and re-resolve the xterm theme from the fresh tokens.
+  // Reads terminalRef lazily so it survives terminal re-creation.
+  useEffect(() => {
+    const root = document.documentElement;
+    const observer = new MutationObserver(() => {
+      const term = terminalRef.current;
+      if (term) term.options.theme = resolveTerminalTheme();
+    });
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div
       ref={containerRef}
       className="h-full w-full"
-      style={{ padding: "4px", backgroundColor: "#0d1117", overflow: "hidden" }}
+      style={{ padding: "4px", backgroundColor: "var(--surface-base)", overflow: "hidden" }}
     />
   );
 }
