@@ -27,6 +27,28 @@ export default tseslint.config(
       ],
       "@typescript-eslint/no-explicit-any": "warn",
       "no-console": "warn",
+      // Icons must flow through the central registry (src/utils/icons.ts) so
+      // size/name/swap stays a one-file edit. The registry itself is exempted
+      // by the override block below.
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "lucide-react",
+              message:
+                "Icons nur über src/utils/icons.ts (ICONS/ICON_SIZE/LucideIcon) importieren — direkter lucide-react-Import ist verboten.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The icon registry is the ONLY module allowed to import lucide-react directly.
+    files: ["src/utils/icons.ts"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": "off",
     },
   },
   {
