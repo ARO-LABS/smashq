@@ -35,6 +35,13 @@ export default {
         "surface-base":    "var(--surface-base)",
         "surface-raised":  "var(--surface-raised)",
         "surface-overlay": "var(--surface-overlay)",
+        "surface-inset":   "var(--surface-inset)",
+
+        /* ── Diff backgrounds ── */
+        "diff-removed-bg":   "var(--diff-removed-bg)",
+        "diff-added-bg":     "var(--diff-added-bg)",
+        "diff-removed-emph": "var(--diff-removed-emph)",
+        "diff-added-emph":   "var(--diff-added-emph)",
 
         /* ── Alpha variants (for opacity modifiers) ── */
         "accent-a10": "var(--accent-a10)",
@@ -50,16 +57,15 @@ export default {
         /* ── Legacy aliases (for gradual migration) ── */
         "neon-green":  "var(--color-success)",
         "neon-blue":   "var(--color-accent)",
-        "neon-purple":  "oklch(60% 0.20 300)",
         "neon-orange":  "var(--color-warning)",
         "dark-bg":     "var(--surface-base)",
         "dark-card":   "var(--surface-raised)",
         "dark-border": "var(--neutral-700)",
       },
       fontFamily: {
-        display: ["Inter", "Segoe UI", "system-ui", "sans-serif"],
-        body:    ["Inter", "Segoe UI", "system-ui", "sans-serif"],
-        mono:    ["JetBrains Mono", "Fira Code", "Consolas", "monospace"],
+        display: "var(--font-display)",
+        body:    "var(--font-body)",
+        mono:    "var(--font-mono)",
       },
       borderRadius: {
         xs: "var(--radius-xs)",
@@ -87,8 +93,24 @@ export default {
         },
       },
       transitionTimingFunction: {
-        "out-expo": "cubic-bezier(0.16, 1, 0.3, 1)",
-        "in-expo":  "cubic-bezier(0.7, 0, 0.84, 0)",
+        "out-expo":    "var(--ease-out)",
+        "in-expo":     "var(--ease-in)",
+        "in-out-expo": "var(--ease-in-out)",
+      },
+      transitionDuration: {
+        instant: "var(--duration-instant)",
+        fast:    "var(--duration-fast)",
+        base:    "var(--duration-base)",
+        slow:    "var(--duration-slow)",
+      },
+      spacing: {
+        xs:    "var(--space-xs)",
+        sm:    "var(--space-sm)",
+        md:    "var(--space-md)",
+        lg:    "var(--space-lg)",
+        xl:    "var(--space-xl)",
+        "2xl": "var(--space-2xl)",
+        "3xl": "var(--space-3xl)",
       },
     },
   },

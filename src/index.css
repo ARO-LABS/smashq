@@ -43,6 +43,7 @@
   --surface-base:    oklch(97% 0.006 20);
   --surface-raised:  oklch(99% 0.004 20);
   --surface-overlay: oklch(98% 0.006 20);
+  --surface-inset:   oklch(94% 0.006 20);
 
   /* ── Hover overlay — warm-tinted instead of pure black, matches the warm shell ── */
   --hover-overlay: oklch(40% 0.05 20 / 0.04);
