@@ -46,8 +46,8 @@ describe("TasksView — happy path", () => {
 
     // App header title
     expect(screen.getByText("Aufgaben")).toBeTruthy();
-    // Primary action
-    expect(screen.getByText("Neue Aufgabe")).toBeTruthy();
+    // Primary action (visible label "Neu", accessible name "Neue Aufgabe")
+    expect(screen.getByRole("button", { name: "Neue Aufgabe" })).toBeTruthy();
     // Empty state copy (no tasks → "none" message)
     expect(
       screen.getByText("Noch keine Aufgaben — neue Aufgabe anlegen"),
@@ -116,5 +116,57 @@ describe("TasksView — with seeded tasks", () => {
 
     // The detail pane's action bar offers "Löschen" for the selected task.
     expect(screen.getByText("Löschen")).toBeTruthy();
+  });
+});
+
+// ── Project scope + sort (Option B header controls) ─────────────────────────
+
+describe("TasksView — project scope filter", () => {
+  it("shows all projects by default and filters to the chosen one", () => {
+    useTasksStore.setState({
+      tasks: [
+        makeTask({ id: "s", title: "Smashq-Task", projectKey: "c:/projects/smashq", sortIndex: 1000 }),
+        makeTask({ id: "g", title: "Global-Task", projectKey: null, sortIndex: 2000 }),
+      ],
+    });
+
+    render(<TasksView />);
+
+    // Default scope = "Alle Projekte" → both rows visible.
+    expect(screen.getByText("Smashq-Task")).toBeTruthy();
+    expect(screen.getByText("Global-Task")).toBeTruthy();
+
+    // Open the scope dropdown and pick the Smashq project.
+    fireEvent.click(screen.getByRole("button", { name: /Alle Projekte/ }));
+    fireEvent.click(screen.getByRole("option", { name: /smashq/i }));
+
+    // Now only the scoped project's task remains in the list.
+    expect(screen.getByText("Smashq-Task")).toBeTruthy();
+    expect(screen.queryByText("Global-Task")).toBeNull();
+  });
+});
+
+describe("TasksView — sort order", () => {
+  it("reorders by creation date when 'Zuletzt erstellt' is chosen", () => {
+    useTasksStore.setState({
+      tasks: [
+        makeTask({ id: "old", title: "Betagt-Task", sortIndex: 1000, createdAt: 1000 }),
+        makeTask({ id: "new", title: "Frisch-Task", sortIndex: 2000, createdAt: 5000 }),
+      ],
+    });
+
+    render(<TasksView />);
+
+    // Manual (default): sortIndex order → "Betagt" precedes "Frisch".
+    // Switch sort to "Zuletzt erstellt" via the Ansicht popover.
+    fireEvent.click(screen.getByRole("button", { name: /Ansicht/ }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Zuletzt erstellt" }));
+
+    // Newest (createdAt 5000) now renders before the older task.
+    const frisch = screen.getByText("Frisch-Task");
+    const betagt = screen.getByText("Betagt-Task");
+    expect(
+      frisch.compareDocumentPosition(betagt) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });

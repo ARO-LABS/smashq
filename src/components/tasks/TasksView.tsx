@@ -3,7 +3,7 @@
  *
  * Layout:
  *   ┌──────────────────────────────────────────────┐
- *   │ TasksHeader (title · search · Neue Aufgabe)   │
+ *   │ TasksToolbar (title·scope·search·chips·view) │
  *   ├──────────────┬───────────────────────────────┤
  *   │ Master list  │ Detail pane                    │
  *   │ (w-[312px])  │  <TaskDetail mode="pane">      │
@@ -29,10 +29,11 @@ import { useState, useMemo, useEffect } from "react";
 import { useTasksStore, selectActiveTasks } from "../../store/tasksStore";
 import type { UpdateTaskFields } from "../../store/tasksStore";
 import { useTasksContext } from "../shared/tasks/useTasksContext";
-import type { TaskFilter, TaskGrouping } from "../shared/tasks/useTasksContext";
+import type { TaskFilter, TaskGrouping, TaskSort } from "../shared/tasks/useTasksContext";
 import { filterTasks } from "../shared/tasks/taskGrouping";
 import { TaskDetail } from "../shared/tasks/TaskDetail";
-import { TasksHeader, TasksSubBar } from "./TasksToolbar";
+import { TasksToolbar } from "./TasksToolbar";
+import { ALL_SCOPE } from "./ProjectScopeDropdown";
 import { TaskMasterList } from "./TaskMasterList";
 import { exportTaskIcs } from "../../utils/exportTaskIcs";
 
@@ -47,6 +48,8 @@ export function TasksView(): JSX.Element {
   const [query, setQuery] = useState("");
   const [grouping, setGrouping] = useState<TaskGrouping>("project");
   const [filter, setFilter] = useState<TaskFilter>("open");
+  const [projectScope, setProjectScope] = useState<string | null>(ALL_SCOPE);
+  const [sort, setSort] = useState<TaskSort>("manual");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Id of a just-created task whose title should be auto-focused in the pane.
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
@@ -58,13 +61,31 @@ export function TasksView(): JSX.Element {
     () => filterTasks(tasks, "all", query),
     [tasks, query],
   );
+  // Project-scope filter: ALL_SCOPE shows everything; otherwise keep only tasks
+  // whose projectKey matches (null === the Global bucket).
+  const scoped = useMemo(
+    () =>
+      projectScope === ALL_SCOPE
+        ? matched
+        : matched.filter((t) => t.projectKey === projectScope),
+    [matched, projectScope],
+  );
+  // Sort: "recent" = newest first (createdAt desc); "manual" keeps the store's
+  // sortIndex order. Reorders within groups; grouping stays orthogonal.
+  const ordered = useMemo(
+    () =>
+      sort === "recent"
+        ? [...scoped].sort((a, b) => b.createdAt - a.createdAt)
+        : scoped,
+    [scoped, sort],
+  );
   const openTasks = useMemo(
-    () => matched.filter((t) => t.status !== "done"),
-    [matched],
+    () => ordered.filter((t) => t.status !== "done"),
+    [ordered],
   );
   const doneTasks = useMemo(
-    () => matched.filter((t) => t.status === "done"),
-    [matched],
+    () => ordered.filter((t) => t.status === "done"),
+    [ordered],
   );
 
   // ── Selectable set (respects the active filter) ──────────────────────────
@@ -133,21 +154,25 @@ export function TasksView(): JSX.Element {
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full bg-surface-base text-neutral-200">
-      <TasksHeader
+      <TasksToolbar
         query={query}
         onQueryChange={setQuery}
+        projectScope={projectScope}
+        onScopeChange={setProjectScope}
+        availableProjects={ctx.availableProjects}
+        openCountForProject={ctx.openCountForProject}
+        filter={filter}
+        onFilterChange={setFilter}
+        grouping={grouping}
+        onGroupingChange={setGrouping}
+        sort={sort}
+        onSortChange={setSort}
         onNewTask={handleNewTask}
       />
 
       <div className="flex-1 flex overflow-hidden min-h-0">
         {/* ── Master list ──────────────────────────────────────────── */}
-        <div className="w-[312px] shrink-0 border-r border-neutral-800 flex flex-col overflow-hidden">
-          <TasksSubBar
-            grouping={grouping}
-            onGroupingChange={setGrouping}
-            filter={filter}
-            onFilterChange={setFilter}
-          />
+        <div className="w-[312px] shrink-0 border-r border-neutral-700 flex flex-col overflow-hidden">
           <TaskMasterList
             openTasks={openTasks}
             doneTasks={doneTasks}

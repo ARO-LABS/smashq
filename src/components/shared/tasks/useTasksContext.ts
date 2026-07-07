@@ -18,6 +18,8 @@ import { folderLabel } from "../../../utils/pathUtils";
 export type TasksTab = "project" | "global";
 export type TaskFilter = "all" | "open" | "done";
 export type TaskGrouping = "project" | "deadline";
+/** List ordering: "manual" = stored sortIndex; "recent" = createdAt desc. */
+export type TaskSort = "manual" | "recent";
 
 export interface ProjectOption {
   key: string | null;

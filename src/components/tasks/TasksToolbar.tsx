@@ -1,83 +1,45 @@
 /**
- * TasksToolbar — header + master-list sub-bar controls for the global TasksView.
+ * TasksToolbar — the single consolidated header bar for the global TasksView
+ * (design "Option B"). One row holds, left→right:
+ *   title · project-scope dropdown · search · status chips · [spacer] ·
+ *   "Ansicht" popover (grouping+sort) · "Neu".
  *
- * Two exported pieces:
- * - TasksHeader  : app header (title + search box + "Neue Aufgabe" primary)
- * - TasksSubBar  : grouping segmented control (Projekt|Deadline) + filter chips
- *
- * Why split from TasksView?
- * Keeps TasksView focused on selection/data orchestration; the toolbar is pure
- * presentation driven by callbacks. Both live in the same folder per the
- * design-system "focused sub-components" rule.
+ * Why one bar instead of the former header + sub-bar?
+ * The two stacked border-b bars ate ~78px of chrome before the first task.
+ * Consolidating reclaims a full bar AND makes room for the new project-scope
+ * + sort controls: frequent controls stay visible, set-once controls (grouping,
+ * sort) move into the "Ansicht" popover. See ProjectScopeDropdown /
+ * ViewOptionsPopover for those two focused sub-components.
  */
 
 import type { JSX } from "react";
 import { ICONS } from "../../utils/icons";
-import type { TaskFilter, TaskGrouping } from "../shared/tasks/useTasksContext";
+import type {
+  ProjectOption,
+  TaskFilter,
+  TaskGrouping,
+  TaskSort,
+} from "../shared/tasks/useTasksContext";
+import { ProjectScopeDropdown } from "./ProjectScopeDropdown";
+import { ViewOptionsPopover } from "./ViewOptionsPopover";
 
-// ── Header ──────────────────────────────────────────────────────────────
+// ── Props ───────────────────────────────────────────────────────────────────
 
-export interface TasksHeaderProps {
+export interface TasksToolbarProps {
   query: string;
   onQueryChange: (value: string) => void;
-  onNewTask: () => void;
-}
-
-export function TasksHeader({
-  query,
-  onQueryChange,
-  onNewTask,
-}: TasksHeaderProps): JSX.Element {
-  const SearchIcon = ICONS.action.search;
-  const PlusIcon = ICONS.action.newSession;
-
-  return (
-    <header className="flex items-center justify-between px-4 py-3 border-b border-neutral-800">
-      <h1 className="text-xs tracking-widest uppercase text-neutral-300 font-semibold">
-        Aufgaben
-      </h1>
-
-      <div className="flex items-center gap-2">
-        {/* Search box */}
-        <div className="flex items-center gap-1.5 bg-surface-raised shadow-hairline rounded-md px-2.5 py-1.5 w-[170px]">
-          <SearchIcon className="w-3 h-3 text-neutral-500 shrink-0" aria-hidden="true" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="Suchen…"
-            className="flex-1 bg-transparent text-xs text-neutral-200 placeholder:text-neutral-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-inset rounded-sm"
-            aria-label="Aufgaben durchsuchen"
-          />
-        </div>
-
-        {/* Neue Aufgabe — opens inline-add row */}
-        <button
-          type="button"
-          onClick={onNewTask}
-          className="inline-flex items-center gap-1.5 bg-accent text-surface-base text-xs font-medium px-3 py-1.5 rounded-md shadow-hairline hover:opacity-90 transition-opacity focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-        >
-          <PlusIcon className="w-3 h-3" aria-hidden="true" />
-          Neue Aufgabe
-        </button>
-      </div>
-    </header>
-  );
-}
-
-// ── Sub-bar ─────────────────────────────────────────────────────────────
-
-export interface TasksSubBarProps {
-  grouping: TaskGrouping;
-  onGroupingChange: (g: TaskGrouping) => void;
+  projectScope: string | null;
+  onScopeChange: (scope: string | null) => void;
+  availableProjects: ProjectOption[];
+  openCountForProject: (key: string | null) => number;
   filter: TaskFilter;
   onFilterChange: (f: TaskFilter) => void;
+  grouping: TaskGrouping;
+  onGroupingChange: (g: TaskGrouping) => void;
+  sort: TaskSort;
+  onSortChange: (s: TaskSort) => void;
+  onNewTask: () => void;
 }
-
-const GROUPINGS: { value: TaskGrouping; label: string }[] = [
-  { value: "project", label: "Projekt" },
-  { value: "deadline", label: "Termin" },
-];
 
 const FILTERS: { value: TaskFilter; label: string }[] = [
   { value: "all", label: "Alle" },
@@ -85,40 +47,54 @@ const FILTERS: { value: TaskFilter; label: string }[] = [
   { value: "done", label: "Erledigt" },
 ];
 
-export function TasksSubBar({
-  grouping,
-  onGroupingChange,
+// ── Component ────────────────────────────────────────────────────────────────
+
+export function TasksToolbar({
+  query,
+  onQueryChange,
+  projectScope,
+  onScopeChange,
+  availableProjects,
+  openCountForProject,
   filter,
   onFilterChange,
-}: TasksSubBarProps): JSX.Element {
+  grouping,
+  onGroupingChange,
+  sort,
+  onSortChange,
+  onNewTask,
+}: TasksToolbarProps): JSX.Element {
+  const SearchIcon = ICONS.action.search;
+  const PlusIcon = ICONS.action.newSession;
+
   return (
-    <div className="flex items-center justify-between px-2.5 py-2 border-b border-neutral-800 gap-1.5">
-      {/* Grouping segmented control */}
-      <div className="inline-flex p-0.5 rounded-md bg-surface-base gap-0.5">
-        {GROUPINGS.map((g) => {
-          const active = grouping === g.value;
-          return (
-            <button
-              key={g.value}
-              type="button"
-              onClick={() => onGroupingChange(g.value)}
-              aria-pressed={active}
-              className={[
-                "text-[10.5px] px-2 py-0.5 rounded-md transition-colors",
-                "focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2",
-                active
-                  ? "bg-accent-a10 text-accent"
-                  : "text-neutral-400 hover:bg-hover-overlay",
-              ].join(" ")}
-            >
-              {g.label}
-            </button>
-          );
-        })}
+    <header className="flex items-center gap-2 px-3 py-2 border-b border-neutral-700">
+      <h1 className="text-xs tracking-widest uppercase text-neutral-300 font-semibold shrink-0">
+        Aufgaben
+      </h1>
+
+      <ProjectScopeDropdown
+        scope={projectScope}
+        onScopeChange={onScopeChange}
+        availableProjects={availableProjects}
+        openCountForProject={openCountForProject}
+      />
+
+      {/* Search */}
+      <div className="flex items-center gap-1.5 bg-surface-raised shadow-hairline rounded-md px-2.5 py-1.5 w-[150px] shrink-0">
+        <SearchIcon className="w-3 h-3 text-neutral-500 shrink-0" aria-hidden="true" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          placeholder="Suchen…"
+          className="flex-1 min-w-0 bg-transparent text-xs text-neutral-200 placeholder:text-neutral-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-inset rounded-sm"
+          aria-label="Aufgaben durchsuchen"
+        />
       </div>
 
-      {/* Filter chips */}
-      <div className="flex items-center gap-1">
+      {/* Status filter chips */}
+      <div className="flex items-center gap-1 shrink-0">
         {FILTERS.map((f) => {
           const active = filter === f.value;
           return (
@@ -140,6 +116,26 @@ export function TasksSubBar({
           );
         })}
       </div>
-    </div>
+
+      <div className="flex-1" />
+
+      <ViewOptionsPopover
+        grouping={grouping}
+        onGroupingChange={onGroupingChange}
+        sort={sort}
+        onSortChange={onSortChange}
+      />
+
+      {/* Neue Aufgabe — one-step create (see TasksView.handleNewTask) */}
+      <button
+        type="button"
+        onClick={onNewTask}
+        aria-label="Neue Aufgabe"
+        className="inline-flex items-center gap-1.5 bg-accent text-surface-base text-xs font-medium px-3 py-1.5 rounded-md shadow-hairline hover:opacity-90 transition-opacity focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 shrink-0"
+      >
+        <PlusIcon className="w-3 h-3" aria-hidden="true" />
+        Neu
+      </button>
+    </header>
   );
 }
