@@ -3,10 +3,12 @@
  *
  * Warum zentral?
  * - Design-System-Regel (CLAUDE.md): "Lucide-Icons only, 2px stroke, currentColor."
- * - 24+ kanonische Icon-Zuordnungen aus `docs/design-system/README.md` werden
- *   hier als Code-Konstanten abgelegt, damit Rename/Swap ein Ein-Datei-Edit ist.
- * - Groessen-Standard wird ueber `ICON_SIZE` erzwungen — nicht-standard
- *   Icon-Groessen (z. B. `w-6 h-6`) sollen kein Pattern werden.
+ * - Kanonische Icon-Zuordnungen aus `docs/design-system/README.md` werden hier
+ *   als Code-Konstanten abgelegt, damit Rename/Swap ein Ein-Datei-Edit ist.
+ * - Groessen-Standard wird ueber `ICON_SIZE` angeboten — freie `w-6 h-6`-Klassen
+ *   sollen kein Pattern werden.
+ * - Direkter `lucide-react`-Import ist ausserhalb dieser Datei per ESLint verboten
+ *   (`no-restricted-imports`). Neue Icons hier ergaenzen.
  *
  * Verwendung:
  * ```tsx
@@ -27,17 +29,31 @@ import {
   // actions
   X, FolderOpen, Terminal, ExternalLink, LayoutGrid, ChevronDown, ChevronLeft, ChevronRight, Loader2,
   RefreshCw, RotateCcw, Download, Trash2, ArrowDownToLine, Search, Move, FolderPlus, Plus,
+  Copy, Eye, EyeOff, Pencil, Save, Play, Maximize2, LayoutList, PanelRightOpen, PanelRightClose,
   // diff
   GitCompare,
   // toast
   CheckCircle2, AlertTriangle, Trophy, Info, CheckCircle,
   // update
   ArrowDownCircle, AlertCircle,
+  // library (Typ-/Scope-Kodierung)
+  Bot, Brain, Webhook, Scroll, Zap, BookText, Puzzle, Globe,
+  // git / issues
+  GitBranch, GitCommit, GitPullRequest, Github, CircleDot, MessageSquare, Milestone, Tag, User, XCircle,
+  // files
+  FileText, FileCode,
+  // config viewers
+  Code2, Cpu, Server, Shield, ShieldOff,
+  // settings categories
+  Bell, Bug, Palette,
   // misc
   Pin, NotebookPen,
   // tasks
   ListChecks, Check, CalendarClock, Calendar, CalendarPlus, ArrowRight, Clock, Circle,
 } from "lucide-react";
+
+/** Re-export the Lucide component type so consumers never import lucide directly. */
+export type { LucideIcon } from "lucide-react";
 
 /**
  * Kanonische Icon-Zuordnung — gruppiert nach semantischer Rolle.
@@ -79,6 +95,17 @@ export const ICONS = {
     search: Search,
     /** Lucide `GitCompare` = side-by-side diff icon. Used for the Session-Diff button. */
     diff: GitCompare,
+    copy: Copy,
+    /** Preview-toggle (Editor/Doc viewers). */
+    preview: Eye,
+    previewOff: EyeOff,
+    edit: Pencil,
+    save: Save,
+    run: Play,
+    maximize: Maximize2,
+    listView: LayoutList,
+    panelOpen: PanelRightOpen,
+    panelClose: PanelRightClose,
   },
   toast: {
     success: CheckCircle2,
@@ -90,6 +117,49 @@ export const ICONS = {
   update: {
     available: ArrowDownCircle,
     error: AlertCircle,
+  },
+  /** Library entry-type + scope glyphs. */
+  library: {
+    agent: Bot,
+    skill: Brain,
+    hook: Webhook,
+    rule: Scroll,
+    command: Zap,
+    knowledge: BookText,
+    plugin: Puzzle,
+    scopeGlobal: Globe,
+  },
+  /** Git / GitHub-issue glyphs (Kanban detail, GitHub viewer, history). */
+  git: {
+    branch: GitBranch,
+    commit: GitCommit,
+    pr: GitPullRequest,
+    github: Github,
+    issueOpen: CircleDot,
+    comment: MessageSquare,
+    milestone: Milestone,
+    tag: Tag,
+    user: User,
+    checkFailed: XCircle,
+  },
+  /** Generic file glyphs (knowledge/doc viewers, scope panel). */
+  file: {
+    text: FileText,
+    code: FileCode,
+  },
+  /** Config-viewer glyphs (settings sources, permissions, system). */
+  viewer: {
+    code: Code2,
+    system: Cpu,
+    server: Server,
+    permissions: Shield,
+    permissionsOff: ShieldOff,
+  },
+  /** Settings-category glyphs (categories.ts). */
+  category: {
+    notify: Bell,
+    debug: Bug,
+    theme: Palette,
   },
   pin: Pin,
   /** Notebook with pen — the Notes side-panel toggle. */
