@@ -56,13 +56,13 @@ function SourceLabel({ task }: { task: TaskItem }): JSX.Element | null {
   // Active state overrides source display
   if (task.status === "active") {
     return (
-      <span className="text-[9.5px] text-accent leading-none">in Arbeit</span>
+      <span className="text-[10px] text-accent leading-none">in Arbeit</span>
     );
   }
 
   if (task.source === "session") {
     return (
-      <span className="text-[9.5px] px-1.5 py-px rounded-full bg-accent-a15 text-accent leading-none whitespace-nowrap">
+      <span className="text-[10px] px-1.5 py-px rounded-full bg-accent-a15 text-accent leading-none whitespace-nowrap">
         via Session
       </span>
     );
@@ -129,8 +129,6 @@ export function TaskRow({
         >
           {task.title}
         </span>
-
-
       </div>
 
       {/* Footer row — comfortable only */}
