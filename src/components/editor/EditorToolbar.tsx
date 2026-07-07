@@ -1,11 +1,4 @@
-import {
-  Save,
-  Eye,
-  EyeOff,
-  FolderOpen,
-  X,
-  FileEdit,
-} from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import {
   useEditorStore,
   selectIsDirty,
@@ -17,6 +10,13 @@ import {
   selectOpenFileFromDialog,
   selectCloseFile,
 } from "../../store/editorStore";
+
+const Save = ICONS.action.save;
+const Eye = ICONS.action.preview;
+const EyeOff = ICONS.action.previewOff;
+const FolderOpen = ICONS.action.folderOpen;
+const X = ICONS.action.close;
+const FileEdit = ICONS.nav.editor;
 
 export function EditorToolbar() {
   const openFile = useEditorStore(selectOpenFile);

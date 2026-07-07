@@ -1,7 +1,12 @@
 import type { ComponentType, LazyExoticComponent } from "react";
 import { lazy } from "react";
-import { Palette, Monitor, Terminal as TerminalIcon, Bell, Bug } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { ICONS, type LucideIcon } from "../../utils/icons";
+
+const Palette = ICONS.category.theme;
+const Monitor = ICONS.nav.sessions;
+const TerminalIcon = ICONS.action.terminal;
+const Bell = ICONS.category.notify;
+const Bug = ICONS.category.debug;
 
 export interface SettingsCategory {
   id: string;

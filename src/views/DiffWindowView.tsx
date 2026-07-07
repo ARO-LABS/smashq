@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { AlertTriangle, GitCompare } from "lucide-react";
+import { ICONS } from "../utils/icons";
 import { DiffFileList } from "../components/diff/DiffFileList";
 import { DiffMergeView } from "../components/diff/DiffMergeView";
 import { DiffWindowFooter } from "../components/diff/DiffWindowFooter";
 import type { DiffViewMode, SessionDiff } from "../components/diff/types";
 import { Button } from "../components/ui/Button";
 import { logError } from "../utils/errorLogger";
+
+const AlertTriangle = ICONS.toast.error;
+const GitCompare = ICONS.action.diff;
 
 interface DiffWindowViewProps {
   sessionId: string | null;

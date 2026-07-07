@@ -1,6 +1,5 @@
 import type { JSX } from "react";
 import { createPortal } from "react-dom";
-import { FolderOpen, X } from "lucide-react";
 import { ICONS } from "../../../utils/icons";
 import type {
   WindowPos,
@@ -9,6 +8,9 @@ import type {
 } from "../../../hooks/useDraggableWindow";
 import type { ProjectNotesContext } from "./useProjectNotesContext";
 import { NotesTextarea } from "./NotesTextarea";
+
+const FolderOpen = ICONS.action.folderOpen;
+const X = ICONS.action.close;
 
 /**
  * The portal-mounted floating notes window: segmented tab control, optional

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FileEdit } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Button } from "../ui/Button";
@@ -19,6 +19,8 @@ import { OpenMdPathInput } from "../shared/OpenMdPathInput";
 import { EditorToolbar } from "./EditorToolbar";
 import { CodeMirrorEditor } from "./CodeMirrorEditor";
 import { MarkdownPreview } from "./MarkdownPreview";
+
+const FileEdit = ICONS.nav.editor;
 
 function EmptyState() {
   const openFileFromDialog = useEditorStore(selectOpenFileFromDialog);

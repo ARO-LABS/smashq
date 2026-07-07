@@ -1,10 +1,13 @@
 import { memo, useState } from "react";
-import { ChevronRight, ChevronDown } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import {
   formatTime,
   type GroupedLogEntry,
   type LogSeverity,
 } from "../../store/logViewerStore";
+
+const ChevronRight = ICONS.action.chevronRight;
+const ChevronDown = ICONS.action.collapse;
 
 const severityColors: Record<LogSeverity, string> = {
   error: "text-error bg-error/10",
