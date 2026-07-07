@@ -1,3 +1,11 @@
+/**
+ * Wraps a CSS-variable color so Tailwind opacity modifiers (bg-info/10) work.
+ * A plain `var(--x)` is opaque — Tailwind cannot inject alpha into it and skips
+ * the /NN variant entirely. color-mix + the <alpha-value> placeholder lets
+ * Tailwind substitute the opacity (0.1) or 1 (no modifier → solid color).
+ */
+const alpha = (v) => `color-mix(in oklch, ${v} calc(<alpha-value> * 100%), transparent)`;
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
@@ -5,23 +13,23 @@ export default {
     extend: {
       colors: {
         /* ── Accent (single primary, CSS-variable-backed) ── */
-        accent: "var(--color-accent)",
+        accent: alpha("var(--color-accent)"),
         "accent-light": "var(--color-accent-light)",
         "accent-dark": "var(--color-accent-dark)",
         "accent-subtle": "var(--color-accent-subtle)",
 
         /* ── Semantic ── */
-        success: "var(--color-success)",
-        error: "var(--color-error)",
-        warning: "var(--color-warning)",
-        info: "var(--color-info)",
+        success: alpha("var(--color-success)"),
+        error: alpha("var(--color-error)"),
+        warning: alpha("var(--color-warning)"),
+        info: alpha("var(--color-info)"),
 
         /* ── Category colors (Typ-/Source-Kodierung, aus der Palette) ── */
-        "cat-azure":   "var(--cat-azure)",
-        "cat-violet":  "var(--cat-violet)",
-        "cat-amber":   "var(--cat-amber)",
-        "cat-rose":    "var(--cat-rose)",
-        "cat-emerald": "var(--cat-emerald)",
+        "cat-azure":   alpha("var(--cat-azure)"),
+        "cat-violet":  alpha("var(--cat-violet)"),
+        "cat-amber":   alpha("var(--cat-amber)"),
+        "cat-rose":    alpha("var(--cat-rose)"),
+        "cat-emerald": alpha("var(--cat-emerald)"),
 
         /* ── Tinted Neutrals (switch with theme) ── */
         neutral: {
