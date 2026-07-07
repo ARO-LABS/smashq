@@ -147,28 +147,33 @@
   --cat-rose:    oklch(72% 0.14 15);
   --cat-emerald: oklch(72% 0.14 155);
 
-  /* Concept B — neutrals matched 1:1 to docs/design-system/preview/concept-b-organic-modern.
-     Hue 280 (just-barely-cool grey, almost pure), chroma 0.003-0.011 (markedly
-     more neutral than the previous hue-250 blue-tint). Background pulled down
-     to L=8% so the azure accent reads with more contrast. */
+  /* Concept B — "Lifted Charcoal" dark ramp. Hue 280 (just-barely-cool grey).
+     Base lifted from L=8% to L=18%: the OKLCH→sRGB gamma curve crushes the
+     bottom end (8/12/15% collapsed to rgb 2/5/11 — a 1–6 byte spread that the
+     eye and display can't resolve, so every surface merged). Lifting off pure
+     black gives perceptible fill steps (base↔raised 1.09:1, raised↔overlay
+     1.15:1) AND lets borders read (n700↔base 1.74:1). Text stops n400/n500
+     were lifted in lockstep to stay ≥AA-large on the brighter surfaces; n300
+     upward were already comfortable (7–16:1) and stay put. All values live-
+     measured via Playwright against WCAG — no FAIL. Light-mode untouched. */
   --neutral-50:  oklch(98% 0.003 280);
-  --neutral-100: oklch(95% 0.003 280);  /* #F2F2F4 — boldest text */
-  --neutral-200: oklch(87% 0.004 280);  /* #D9D9DE — primary body text */
-  --neutral-300: oklch(70% 0.006 280);  /* #A8A8B0 — secondary text */
-  --neutral-400: oklch(53% 0.009 280);  /* #76767E — tertiary text (WCAG AA on dark) */
-  --neutral-500: oklch(44% 0.011 280);  /* #5A5A62 — muted text */
-  --neutral-600: oklch(35% 0.008 280);  /* decorative / hairline borders */
-  --neutral-700: oklch(25% 0.005 280);  /* primary borders / dividers */
-  --neutral-800: oklch(15% 0.005 280);  /* #1D1D22 — raised cards */
-  --neutral-900: oklch(12% 0.004 280);  /* #16161A — surface */
-  --neutral-950: oklch(8%  0.004 280);  /* #0B0B0E — base background (deep) */
+  --neutral-100: oklch(95% 0.003 280);  /* boldest text — AA 16:1 on base */
+  --neutral-200: oklch(87% 0.004 280);  /* primary body text — AA 12.7:1 */
+  --neutral-300: oklch(70% 0.006 280);  /* secondary text — AA 7:1 */
+  --neutral-400: oklch(62% 0.011 280);  /* rgb 133 — tertiary text (AA on base) */
+  --neutral-500: oklch(56% 0.012 280);  /* rgb 115 — muted text (AA-large ≥3.24) */
+  --neutral-600: oklch(46% 0.010 280);  /* rgb 87 — decorative / hairline borders */
+  --neutral-700: oklch(36% 0.008 280);  /* rgb 60 — primary borders / dividers */
+  --neutral-800: oklch(27% 0.007 280);  /* rgb 38 — overlay / modals */
+  --neutral-900: oklch(22% 0.006 280);  /* rgb 26 — raised cards */
+  --neutral-950: oklch(18% 0.005 280);  /* rgb 17 — base background */
 
   --surface-base:    var(--neutral-950);
   --surface-raised:  var(--neutral-900);
   --surface-overlay: var(--neutral-800);
-  /* Concept B — additional inset level (#121215) used for chip backgrounds,
-     play-button pockets, status-pills. Bridges the gap between bg and surface. */
-  --surface-inset:   oklch(9% 0.003 280);
+  /* Recessed inset (chip backgrounds, play-button pockets, status-pills).
+     Must stay just BELOW base (18%) to read as a recess, not a raise. */
+  --surface-inset:   oklch(15% 0.004 280);
 
   --hover-overlay: oklch(100% 0 0 / 0.05);
 
