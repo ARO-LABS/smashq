@@ -27,11 +27,11 @@ describe("SkillArgBadge", () => {
     expect(screen.getByText("flag")).toBeTruthy();
   });
 
-  it("uses amber styling for a required argument", () => {
+  it("uses warning styling for a required argument", () => {
     const { container } = render(
       <SkillArgBadge arg={arg({ required: true })} />,
     );
-    expect(container.querySelector(".text-amber-400")).toBeTruthy();
+    expect(container.querySelector(".text-warning")).toBeTruthy();
   });
 
   it("uses neutral styling for an optional argument", () => {

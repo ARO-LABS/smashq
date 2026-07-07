@@ -38,7 +38,7 @@ function SkillFrontmatterTable({ skill }: { skill: DiscoveredSkill }) {
           </FrontmatterRow>
           {skill.hasReference && (
             <FrontmatterRow label="reference">
-              <span className="text-[10px] px-1 rounded bg-blue-500/15 text-blue-400">ref/</span>
+              <span className="text-[10px] px-1 rounded bg-cat-azure/15 text-cat-azure">ref/</span>
             </FrontmatterRow>
           )}
           {skill.args.length > 0 && (

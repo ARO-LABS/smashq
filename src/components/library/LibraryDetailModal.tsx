@@ -22,11 +22,11 @@ function getDetailMeta(detail: SelectedDetail): DetailMeta {
     case "skills":
       return { Icon: Zap, iconClass: "text-accent", title: detail.item.name, scope: detail.item.scope };
     case "agents":
-      return { Icon: Bot, iconClass: "text-purple-400", title: detail.item.name, scope: detail.item.scope };
+      return { Icon: Bot, iconClass: "text-cat-violet", title: detail.item.name, scope: detail.item.scope };
     case "hooks":
-      return { Icon: Webhook, iconClass: "text-amber-400", title: detail.item.event, scope: detail.item.scope };
+      return { Icon: Webhook, iconClass: "text-cat-amber", title: detail.item.event, scope: detail.item.scope };
     case "memory":
-      return { Icon: Brain, iconClass: "text-green-400", title: detail.item.name };
+      return { Icon: Brain, iconClass: "text-cat-emerald", title: detail.item.name };
     case "rules":
       return { Icon: Scroll, iconClass: "text-accent", title: detail.item.name, scope: "global" };
     case "knowledge":

@@ -48,7 +48,7 @@ export function SkillCard({ skill }: { skill: DiscoveredSkill }): JSX.Element {
             {skill.name}
           </span>
           {skill.hasReference && (
-            <span className="text-[10px] px-1 rounded bg-blue-500/15 text-blue-400">
+            <span className="text-[10px] px-1 rounded bg-cat-azure/15 text-cat-azure">
               ref/
             </span>
           )}
@@ -73,13 +73,13 @@ export function SkillCard({ skill }: { skill: DiscoveredSkill }): JSX.Element {
 export function AgentCard({ agent }: { agent: DiscoveredAgent }): JSX.Element {
   return (
     <div className="flex items-start gap-2 px-3 py-1.5 rounded-md shadow-hairline bg-surface-raised mb-1.5 hover:shadow-lift transition-shadow duration-200">
-      <Bot className="w-3 h-3 text-purple-400 shrink-0 mt-0.5" />
+      <Bot className="w-3 h-3 text-cat-violet shrink-0 mt-0.5" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <span className="text-xs font-semibold text-neutral-200">
             {agent.name}
           </span>
-          <span className="text-[10px] px-1.5 rounded-full bg-purple-500/15 text-purple-400 ml-auto shrink-0">
+          <span className="text-[10px] px-1.5 rounded-full bg-cat-violet/15 text-cat-violet ml-auto shrink-0">
             {agent.model}
           </span>
         </div>
@@ -104,7 +104,7 @@ export function HookCard({ hook }: { hook: DiscoveredHook }): JSX.Element {
         onClick={() => openDetail({ category: "hooks", item: hook })}
         className="w-full text-left flex items-start gap-2 px-3 py-1.5 hover:bg-hover-overlay transition-colors rounded-md"
       >
-        <Webhook className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+        <Webhook className="w-3 h-3 text-cat-amber shrink-0 mt-0.5" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-semibold text-neutral-200">
@@ -176,7 +176,7 @@ export function MemoryFileCard({
           className="flex-1 min-w-0 text-left px-3 py-1.5 hover:bg-hover-overlay transition-colors rounded-md"
         >
           <div className="flex items-center gap-2">
-            <Brain className="w-3 h-3 text-green-400 shrink-0" />
+            <Brain className="w-3 h-3 text-cat-emerald shrink-0" />
             <span className="text-xs text-neutral-200 truncate">{file.name}</span>
           </div>
         </button>
@@ -185,7 +185,7 @@ export function MemoryFileCard({
             <button
               onClick={handleDelete}
               title="Löschen bestätigen"
-              className="text-[10px] px-1.5 py-0.5 rounded-sm bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors"
+              className="text-[10px] px-1.5 py-0.5 rounded-sm bg-error/15 text-error hover:bg-error/25 transition-colors"
             >
               Löschen
             </button>
@@ -201,7 +201,7 @@ export function MemoryFileCard({
           <button
             onClick={() => setConfirming(true)}
             title="In Papierkorb verschieben"
-            className="p-1.5 mr-1 text-neutral-600 hover:text-red-400 transition-colors shrink-0"
+            className="p-1.5 mr-1 text-neutral-600 hover:text-error transition-colors shrink-0"
           >
             <ICONS.action.trash className={ICON_SIZE.inline} />
           </button>
