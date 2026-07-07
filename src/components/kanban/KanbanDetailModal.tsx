@@ -197,7 +197,7 @@ export function KanbanDetailModal({
           </main>
 
           {/* Sidebar */}
-          <aside className="w-[220px] shrink-0 border-l border-neutral-800 overflow-y-auto p-4 bg-surface-base">
+          <aside className="w-[220px] shrink-0 border-l border-neutral-700 overflow-y-auto p-4 bg-surface-base">
             <IssueSidebar
               state={detail.state}
               author={detail.author}
