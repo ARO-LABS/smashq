@@ -3,12 +3,12 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { SessionAccentMenu } from "./SessionAccentMenu";
 
 describe("SessionAccentMenu", () => {
-  const base = { x: 10, y: 10, current: "cyan" as const, hasOverride: false };
+  const base = { x: 10, y: 10, current: "azure" as const, hasOverride: false };
 
   it("renders a swatch button per palette color", () => {
     render(<SessionAccentMenu {...base} onSelect={vi.fn()} onReset={vi.fn()} onClose={vi.fn()} />);
     expect(screen.getByRole("button", { name: /violet/i })).toBeInTheDocument();
-    expect(screen.getAllByRole("button").length).toBeGreaterThanOrEqual(6);
+    expect(screen.getAllByRole("button").length).toBeGreaterThanOrEqual(5);
   });
 
   it("calls onSelect with the chosen accent name", () => {

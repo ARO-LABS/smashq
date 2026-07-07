@@ -3,30 +3,30 @@ import type { CSSProperties } from "react";
 /**
  * Kuratierte Per-Session-Akzentpalette. Werte = oklch-Hue-Winkel (Farbraum des
  * Codebase, NICHT HSL). An die semantischen Tokens angelehnt (amber↔warning 70,
- * emerald↔success 155, azure↔info ~250), damit die Palette im selben System sitzt.
+ * emerald↔success 155), damit die Palette im selben System sitzt.
  * Lightness/Chroma kommen mode-abhängig aus index.css (--accent-l/--accent-c),
- * daher hier nur der Hue. cyan = Index 0 = globaler Default (kein Breaking Change).
+ * daher hier nur der Hue. azure = Index 0 = globaler Default (Brand-Hue 230).
  */
 export const ACCENT_HUES = {
-  cyan: 195,
+  azure: 230,
   violet: 285,
   amber: 70,
   rose: 15,
   emerald: 155,
-  azure: 245,
 } as const;
 
 export type AccentName = keyof typeof ACCENT_HUES;
 
 export const ACCENT_NAMES = Object.keys(ACCENT_HUES) as AccentName[];
 
-/** oklch lightness for the dot/swatch — fixed at the dark-mode accent stop. */
-const ACCENT_DOT_L = "72%";
-/** oklch chroma for the dot/swatch — fixed at the dark-mode accent stop. */
-const ACCENT_DOT_C = "0.16";
-
 export function isAccentName(value: unknown): value is AccentName {
   return typeof value === "string" && value in ACCENT_HUES;
+}
+
+/** Legacy-Remap: "cyan" (vor Azure-Rebrand entfernt) → "azure". Sonst wie isAccentName. */
+export function normalizeAccentName(value: unknown): AccentName | null {
+  if (value === "cyan") return "azure";
+  return isAccentName(value) ? value : null;
 }
 
 /** Deterministischer String-Hash (FNV-artig), stabil über App-Neustarts. */
@@ -38,7 +38,7 @@ function hashString(input: string): number {
   return Math.abs(hash);
 }
 
-/** Ordnerpfad → stabile Palette-Farbe. Leerer Pfad → erster Eintrag (cyan). */
+/** Ordnerpfad → stabile Palette-Farbe. Leerer Pfad → erster Eintrag (azure). */
 export function hashFolderToAccent(folder: string): AccentName {
   const index = hashString(folder ?? "") % ACCENT_NAMES.length;
   return ACCENT_NAMES[index];
@@ -80,11 +80,12 @@ export function accentCssVars(name: AccentName): CSSProperties {
  * Resolve a project/session to a concrete oklch color string for a dot/swatch.
  * Mirrors the per-session accent (#261): an explicit, valid override name wins,
  * else the folder path deterministically hashes to a palette hue. Lightness and
- * chroma are fixed at the dark-mode accent stop so the dot reads consistently.
+ * chroma follow the mode stops from index.css (--accent-l/--accent-c), same
+ * mechanic as `accentFrameColorFor`.
  */
 export function accentColorFor(folder: string, override?: string | null): string {
   const name: AccentName = isAccentName(override) ? override : hashFolderToAccent(folder ?? "");
-  return `oklch(${ACCENT_DOT_L} ${ACCENT_DOT_C} ${ACCENT_HUES[name]})`;
+  return `oklch(var(--accent-l) var(--accent-c) ${ACCENT_HUES[name]})`;
 }
 
 /**

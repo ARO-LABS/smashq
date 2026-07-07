@@ -3,6 +3,7 @@ import {
   ACCENT_HUES,
   ACCENT_NAMES,
   isAccentName,
+  normalizeAccentName,
   hashFolderToAccent,
   resolveSessionAccent,
   accentCssVars,
@@ -11,10 +12,10 @@ import {
 } from "./sessionAccent";
 
 describe("sessionAccent", () => {
-  it("palette has 6 entries with cyan first (default)", () => {
-    expect(ACCENT_NAMES.length).toBe(6);
-    expect(ACCENT_NAMES[0]).toBe("cyan");
-    expect(ACCENT_HUES.cyan).toBe(195);
+  it("palette has 5 entries with azure first (default)", () => {
+    expect(ACCENT_NAMES.length).toBe(5);
+    expect(ACCENT_NAMES[0]).toBe("azure");
+    expect(ACCENT_HUES.azure).toBe(230);
   });
 
   it("isAccentName accepts known names, rejects others", () => {
@@ -103,5 +104,26 @@ describe("sessionAccent", () => {
     expect(accentFrameColorFor("C:/Projects/zovel", "bogus")).toBe(
       accentFrameColorFor("C:/Projects/zovel"),
     );
+  });
+});
+
+describe("azure rebrand", () => {
+  it("has no cyan and azure is 230, first entry", () => {
+    expect(ACCENT_NAMES).not.toContain("cyan");
+    expect(ACCENT_HUES).not.toHaveProperty("cyan");
+    expect(ACCENT_HUES.azure).toBe(230);
+    expect(ACCENT_NAMES[0]).toBe("azure");
+    expect(ACCENT_NAMES).toHaveLength(5);
+  });
+
+  it("remaps legacy cyan to azure, keeps valid names, drops garbage", () => {
+    expect(normalizeAccentName("cyan")).toBe("azure");
+    expect(normalizeAccentName("violet")).toBe("violet");
+    expect(normalizeAccentName("bogus")).toBeNull();
+    expect(normalizeAccentName(42)).toBeNull();
+  });
+
+  it("accentColorFor inherits theme L/C via vars (not fixed stops)", () => {
+    expect(accentColorFor("/proj", "azure")).toBe("oklch(var(--accent-l) var(--accent-c) 230)");
   });
 });
