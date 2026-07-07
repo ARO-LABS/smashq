@@ -504,6 +504,20 @@ function flushPendingNoteSaves(): Promise<void> {
 registerNoteFlush(flushPendingNoteSaves);
 
 // ============================================================================
+// remapAccentsRecord — extracted for testability
+// ============================================================================
+
+/** Cleaned accent-record: Legacy "cyan"→"azure" remap, unbekannte/leere verworfen. */
+export function remapAccentsRecord(raw: unknown): Record<string, AccentName> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return Object.fromEntries(
+    Object.entries(raw as Record<string, unknown>)
+      .map(([k, v]) => [k, normalizeAccentName(v)] as const)
+      .filter((e): e is [string, AccentName] => typeof e[0] === "string" && !!e[0].trim() && e[1] !== null),
+  );
+}
+
+// ============================================================================
 // _settingsMigrate — extracted for testability
 // ============================================================================
 
@@ -651,20 +665,8 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
         ),
       )
       : defaults.sessionTitleOverrides,
-    sessionAccents: p.sessionAccents && typeof p.sessionAccents === "object" && !Array.isArray(p.sessionAccents)
-      ? Object.fromEntries(
-        Object.entries(p.sessionAccents as Record<string, unknown>)
-          .map(([k, v]) => [k, normalizeAccentName(v)] as const)
-          .filter(([k, v]) => typeof k === "string" && !!k.trim() && v !== null),
-      )
-      : defaults.sessionAccents,
-    folderAccents: p.folderAccents && typeof p.folderAccents === "object" && !Array.isArray(p.folderAccents)
-      ? Object.fromEntries(
-        Object.entries(p.folderAccents as Record<string, unknown>)
-          .map(([k, v]) => [k, normalizeAccentName(v)] as const)
-          .filter(([k, v]) => typeof k === "string" && !!k.trim() && v !== null),
-      )
-      : defaults.folderAccents,
+    sessionAccents: remapAccentsRecord(p.sessionAccents),
+    folderAccents: remapAccentsRecord(p.folderAccents),
     notesWindowSize: sanitizeNotesWindowSize(p.notesWindowSize),
     tasksWindowSize: sanitizeTasksWindowSize(p.tasksWindowSize),
   } as unknown as SettingsState; // Actions are added by Zustand during merge
@@ -1384,22 +1386,14 @@ export const useSettingsStore = create<SettingsState>()(
 
           // Same-version recovery für sessionAccents: Legacy-"cyan" remappen,
           // unbekannte AccentNames droppen.
-          const cleanedAccents = Object.fromEntries(
-            Object.entries(state.sessionAccents ?? {})
-              .map(([k, v]) => [k, normalizeAccentName(v)] as const)
-              .filter((entry): entry is [string, AccentName] => !!entry[0].trim() && entry[1] !== null),
-          );
+          const cleanedAccents = remapAccentsRecord(state.sessionAccents);
           if (JSON.stringify(cleanedAccents) !== JSON.stringify(state.sessionAccents ?? {})) {
             patches.sessionAccents = cleanedAccents;
           }
 
           // Same-version recovery für folderAccents: Legacy-"cyan" remappen,
           // unbekannte AccentNames droppen.
-          const cleanedFolderAccents = Object.fromEntries(
-            Object.entries(state.folderAccents ?? {})
-              .map(([k, v]) => [k, normalizeAccentName(v)] as const)
-              .filter((entry): entry is [string, AccentName] => !!entry[0].trim() && entry[1] !== null),
-          );
+          const cleanedFolderAccents = remapAccentsRecord(state.folderAccents);
           if (JSON.stringify(cleanedFolderAccents) !== JSON.stringify(state.folderAccents ?? {})) {
             patches.folderAccents = cleanedFolderAccents;
           }

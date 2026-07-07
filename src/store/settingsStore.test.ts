@@ -9,6 +9,7 @@ import {
   SCROLLBACK_PRESETS,
   useSettingsStoreMigrateForTest,
   useSettingsStoreValidateForTest,
+  remapAccentsRecord,
 } from "./settingsStore";
 
 // ============================================================================
@@ -797,6 +798,16 @@ describe("favorites persistence", () => {
 // ============================================================================
 // folderAccents (per-project shared accent color)
 // ============================================================================
+
+describe("remapAccentsRecord", () => {
+  it("remaps cyan→azure, keeps valid, drops garbage/empty/non-object", () => {
+    expect(remapAccentsRecord({ "/a": "cyan", "/b": "violet", "/c": "bogus", "  ": "azure" }))
+      .toEqual({ "/a": "azure", "/b": "violet" });
+    expect(remapAccentsRecord(null)).toEqual({});
+    expect(remapAccentsRecord(["cyan"])).toEqual({});
+    expect(remapAccentsRecord("cyan")).toEqual({});
+  });
+});
 
 describe("folderAccents", () => {
   const folder = "C:/Projects/zovel";
