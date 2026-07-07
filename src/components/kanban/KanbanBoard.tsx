@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { RefreshCw, Columns3, AlertCircle, ChevronDown, X } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import {
   getErrorMessage,
   classifyGithubError,
@@ -11,6 +11,12 @@ import { KanbanCard, type KanbanIssue } from "./KanbanCard";
 import { KanbanDetailModal } from "./KanbanDetailModal";
 import { useProjectStore } from "../../store/projectStore";
 import { logError } from "../../utils/errorLogger";
+
+const RefreshCw = ICONS.action.refresh;
+const Columns3 = ICONS.nav.kanban;
+const AlertCircle = ICONS.update.error;
+const ChevronDown = ICONS.action.collapse;
+const X = ICONS.action.close;
 
 // ── Types from backend ────────────────────────────────────────────────
 

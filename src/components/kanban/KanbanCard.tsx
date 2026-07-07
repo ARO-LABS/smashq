@@ -1,8 +1,10 @@
 import { useState, useRef, useCallback, memo } from "react";
-import { ExternalLink } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { open } from "@tauri-apps/plugin-shell";
 import { logWarn } from "../../utils/errorLogger";
 import { labelStyle } from "./kanbanUtils";
+
+const ExternalLink = ICONS.action.externalLink;
 
 export interface KanbanLabel {
   name: string;

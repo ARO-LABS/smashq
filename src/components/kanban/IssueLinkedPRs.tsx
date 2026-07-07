@@ -1,5 +1,11 @@
 import { open } from "@tauri-apps/plugin-shell";
-import { GitPullRequest, CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react";
+import { ICONS } from "../../utils/icons";
+
+const GitPullRequest = ICONS.git.pr;
+const CheckCircle2 = ICONS.toast.success;
+const XCircle = ICONS.git.checkFailed;
+const Clock = ICONS.tasks.clock;
+const Loader2 = ICONS.action.loading;
 
 interface CheckRun {
   name: string;

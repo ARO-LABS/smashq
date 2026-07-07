@@ -1,5 +1,7 @@
-import { MessageSquare } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { MarkdownBody } from "../editor/MarkdownPreview";
+
+const MessageSquare = ICONS.git.comment;
 
 export interface IssueComment {
   id: string;

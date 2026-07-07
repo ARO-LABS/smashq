@@ -1,5 +1,10 @@
-import { User, Calendar, Tag, Milestone } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { labelStyle } from "./kanbanUtils";
+
+const User = ICONS.git.user;
+const Calendar = ICONS.tasks.calendar;
+const Tag = ICONS.git.tag;
+const Milestone = ICONS.git.milestone;
 import type { KanbanLabel } from "./KanbanCard";
 
 interface IssueSidebarProps {

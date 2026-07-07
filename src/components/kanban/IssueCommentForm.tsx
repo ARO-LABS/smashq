@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getErrorMessage } from "../../utils/adpError";
-import { MessageSquare } from "lucide-react";
+import { ICONS } from "../../utils/icons";
+
+const MessageSquare = ICONS.git.comment;
 
 interface IssueCommentFormProps {
   folder: string | null;

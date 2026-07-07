@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-shell";
 import { getErrorMessage } from "../../utils/adpError";
-import { ExternalLink, RefreshCw, AlertCircle } from "lucide-react";
+import { ICONS } from "../../utils/icons";
 import { Modal } from "../ui/Modal";
 import { IconButton } from "../ui/IconButton";
 import type { KanbanLabel } from "./KanbanCard";
@@ -11,6 +11,10 @@ import { IssueComments, type IssueComment } from "./IssueComments";
 import { IssueCommentForm } from "./IssueCommentForm";
 import { IssueLinkedPRs, type LinkedPR } from "./IssueLinkedPRs";
 import { IssueSidebar } from "./IssueSidebar";
+
+const ExternalLink = ICONS.action.externalLink;
+const RefreshCw = ICONS.action.refresh;
+const AlertCircle = ICONS.update.error;
 
 // ============================================================================
 // Types (matches Rust IssueDetail)
