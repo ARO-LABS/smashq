@@ -357,6 +357,6 @@ describe("IssueCommentForm", () => {
     const { container } = render(
       <IssueCommentForm folder="/test" repository={null} issueNumber={42} onCommentPosted={vi.fn()} />,
     );
-    expect(container.querySelector("p.text-red-400")).toBeNull();
+    expect(container.querySelector("p.text-error")).toBeNull();
   });
 });
