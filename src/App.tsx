@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
 import { AppShell } from "./components/layout/AppShell";
+import { WhatsNewModal } from "./components/shared/WhatsNewModal";
+import { useWhatsNew } from "./hooks/useWhatsNew";
 import { installGlobalErrorHandlers } from "./utils/globalErrorHandler";
 import { wireRuntimeGates, syncBackendFileLoggingFromPreferences } from "./utils/wireRuntimeGates";
 import { useThemeEffect } from "./hooks/useThemeEffect";
@@ -12,6 +14,9 @@ import { useUIStore } from "./store/uiStore";
 function App() {
   useThemeEffect();
   useSessionRestore();
+  // Einmaliges "Was ist neu"-Modal nach einem Update. Mount hier (nicht in
+  // AppShell — geschuetzter Updater-Pfad, siehe CLAUDE.md).
+  const { entry: whatsNewEntry, dismiss: dismissWhatsNew } = useWhatsNew();
 
   // Guard against double-registration in React Strict Mode: the ref persists
   // across the mount → unmount → remount cycle that Strict Mode triggers in dev.
@@ -78,7 +83,12 @@ function App() {
     };
   }, []);
 
-  return <AppShell />;
+  return (
+    <>
+      <AppShell />
+      <WhatsNewModal entry={whatsNewEntry} onClose={dismissWhatsNew} />
+    </>
+  );
 }
 
 export default App;

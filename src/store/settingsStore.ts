@@ -177,6 +177,17 @@ export function sanitizeTasksWindowSize(value: unknown): WindowSize {
   };
 }
 
+/**
+ * Sanitize the persisted `lastSeenVersion` (whats-new gating). Any non-string
+ * or empty value degrades to null — null means "fresh install": the whats-new
+ * modal is skipped and only the stamp is written.
+ */
+export function sanitizeLastSeenVersion(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 export interface ApiKeyMetadataEntry {
   id: string;
   provider: string;
@@ -284,6 +295,12 @@ export interface SettingsState {
    * Closes the rename-before-discovery gap where the override write was skipped.
    */
   pendingTitleOverrides: Record<string, string>;
+  /**
+   * App-Version, zu der das "Was ist neu"-Modal zuletzt gezeigt (bzw. beim
+   * Erststart gestempelt) wurde. null = Erstinstallation. Gestempelt wird
+   * beim ANZEIGEN, nicht beim Bestaetigen — verhindert Re-Show nach Crash.
+   */
+  lastSeenVersion: string | null;
   /** Per-Session-Akzentfarbe (key: claudeSessionId, value: AccentName). */
   sessionAccents: Record<string, string>;
   /**
@@ -336,6 +353,7 @@ export interface SettingsState {
 
   setNotesWindowSize: (size: WindowSize) => void;
   setTasksWindowSize: (size: WindowSize) => void;
+  setLastSeenVersion: (version: string) => void;
 
   addApiKeyMetadata: (entry: ApiKeyMetadataEntry) => void;
   removeApiKeyMetadata: (id: string) => void;
@@ -569,6 +587,7 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
     sessionRestore: defaultSessionRestore,
     sessionTitleOverrides: {} as Record<string, string>,
     pendingTitleOverrides: {} as Record<string, string>,
+    lastSeenVersion: null as string | null,
     sessionAccents: {} as Record<string, string>,
     folderAccents: {} as Record<string, string>,
     notesWindowSize: DEFAULT_NOTES_WINDOW_SIZE,
@@ -695,6 +714,7 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
     folderAccents: remapAccentsRecord(p.folderAccents),
     notesWindowSize: sanitizeNotesWindowSize(p.notesWindowSize),
     tasksWindowSize: sanitizeTasksWindowSize(p.tasksWindowSize),
+    lastSeenVersion: sanitizeLastSeenVersion(p.lastSeenVersion),
   } as unknown as SettingsState; // Actions are added by Zustand during merge
 }
 
@@ -770,10 +790,14 @@ export const useSettingsStore = create<SettingsState>()(
       sessionRestore: defaultSessionRestore,
       sessionTitleOverrides: {},
       pendingTitleOverrides: {},
+      lastSeenVersion: null,
       sessionAccents: {},
       folderAccents: {},
       notesWindowSize: DEFAULT_NOTES_WINDOW_SIZE,
       tasksWindowSize: DEFAULT_TASKS_WINDOW_SIZE,
+
+      setLastSeenVersion: (version) =>
+        set({ lastSeenVersion: sanitizeLastSeenVersion(version) }),
 
       setNotesWindowSize: (size) =>
         set({ notesWindowSize: sanitizeNotesWindowSize(size) }),
@@ -1307,12 +1331,17 @@ export const useSettingsStore = create<SettingsState>()(
         folderAccents: state.folderAccents,
         notesWindowSize: state.notesWindowSize,
         tasksWindowSize: state.tasksWindowSize,
+        lastSeenVersion: state.lastSeenVersion,
       }),
       // v11: added theme.syncTerminalTheme (default false). The migrate merge
       // `{ ...defaults.theme, ...p.theme }` fills it for existing users. No
       // onRehydrateStorage heal needed: a missing boolean is not the data-loss
       // (Issue #209) class — read sites default it with `?? false`.
-      version: 11,
+      // v12: added lastSeenVersion (whats-new gating, default null). Migrate
+      // sanitizes via sanitizeLastSeenVersion; onRehydrateStorage heals
+      // same-version corruption (non-string → null → modal shows once more,
+      // harmless fail-open).
+      version: 12,
       migrate: (persisted: unknown, fromVersion: number) => _settingsMigrate(persisted, fromVersion),
       // SYNCHRONOUS heal of the rehydrated state. This runs DURING rehydration
       // and its return value feeds the very first render — unlike
@@ -1369,6 +1398,14 @@ export const useSettingsStore = create<SettingsState>()(
           const validatedRestore = validateSessionRestore(state.sessionRestore);
           if (JSON.stringify(validatedRestore) !== JSON.stringify(state.sessionRestore)) {
             patches.sessionRestore = validatedRestore;
+          }
+
+          // Same-version-recovery for lastSeenVersion (whats-new gating):
+          // a tampered non-string value would break the === comparison in
+          // useWhatsNew. Heal to null (fail-open: modal shows once more).
+          const sanitizedLastSeen = sanitizeLastSeenVersion(state.lastSeenVersion);
+          if (sanitizedLastSeen !== state.lastSeenVersion) {
+            patches.lastSeenVersion = sanitizedLastSeen;
           }
 
           // Same-version-recovery for notesWindowSize: if a tampered

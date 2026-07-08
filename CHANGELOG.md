@@ -6,6 +6,31 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [1.0.22] — 2026-07-08
+
+Session-Zuordnung repariert (richtige Session beim Restore, Umbenennen erreicht
+den Verlauf), Seitenpanels skalierbar und einklappbar, Azure-Design mit klarerem
+Dark Mode, Auto-Updates auf macOS — und ein „Was ist neu"-Fenster, das nach
+jedem Update einmalig die wichtigsten Änderungen zeigt.
+
+### Hinzugefügt
+- „Was ist neu"-Fenster: öffnet einmalig nach einem Update und zeigt kuratierte Highlights plus Hinweise, worauf nach der Neuerung zu achten ist. Links auf das vollständige Changelog und die GitHub-Issues (Feedback und Pull Requests willkommen).
+- Auto-Updates auf macOS: Builds sind signiert und notarisiert; Updates laufen über den eingebauten Updater wie unter Windows.
+- Linke Navigation und Konfigurations-Panel lassen sich per Drag in der Breite anpassen und komplett einklappen.
+- Tasks-Ansicht: eine konsolidierte Kopfleiste mit Projekt-Filter und „Ansicht"-Popover (Gruppierung, Sortierung); Grid-Kacheln und Fenster öffnen sich per Klick in der großen Ansicht.
+
+### Behoben
+- Session-Wiederherstellung startete nach dem App-Start manchmal die falsche Session desselben Projekts: ohne gespeicherte Zuordnung wurde bisher die neueste Session im Projektordner fortgesetzt. Jede Session-Kachel merkt sich jetzt ihren Startzeitpunkt und wird darüber der richtigen Claude-Session zugeordnet; ohne eindeutige Zuordnung startet die Session frisch, statt eine falsche fortzusetzen.
+- Zwei gleichzeitig gestartete Sessions im selben Projekt konnten ihre Identität vertauschen — die Zuordnung wartet jetzt auf ein eindeutiges Ergebnis und verwirft doppelte Zuweisungen.
+- Umbenennen einer Session erschien nicht in der Verlaufs-Ansicht des Konfigurations-Panels, wenn die Session frisch erstellt war; der neue Titel wird jetzt sofort übernommen.
+- Lange Session-Titel überlappten die Hover-Symbole der Kachel nicht mehr; der Titel kürzt sich dynamisch.
+- Grid: Favoriten-Vorschau klappt beim Maximieren zu und leert sich; Mini-Map in der Session-Kachel vertikal zentriert.
+- Dunkle Flächen im Dark Mode sind wieder klar voneinander unterscheidbar (Kontrast der Flächen-Abstufungen messbar angehoben).
+
+### Geändert
+- Akzentfarbe der App wechselt von Cyan auf Azure; eine zuvor gewählte Cyan-Projektfarbe wird automatisch migriert.
+- Terminal-Farben folgen dem App-Theme nur noch per Opt-in (Einstellungen → Darstellung) — laufende Programme behalten so ihre Farbwahl.
+
 ## [1.0.21] — 2026-07-02
 
 Härtung der Logging-Pipeline (Review-Sweep), Drag & Drop am ganzen Element statt
