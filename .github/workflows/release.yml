@@ -48,11 +48,6 @@ jobs:
           releaseName: "Smashq ${{ github.ref_name }}"
           releaseBody: |
             Siehe CHANGELOG.md fuer Details.
-
-            ---
-            macOS (unsigniert): Falls beim ersten Start "App ist beschaedigt"
-            erscheint, im Terminal die Quarantaene entfernen:
-            xattr -dr com.apple.quarantine /Applications/Smashq.app
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
@@ -90,9 +85,13 @@ jobs:
           git diff --staged --quiet || git commit -m "docs: refresh design section [skip ci]"
           git push || true
 
-  # Mac ist best-effort: laeuft NACH Windows (needs:), laedt die universal DMG in
-  # dasselbe Release. Schlaegt er fehl, fehlt nur die DMG - das Windows-Release
-  # plus Updater sind da bereits publiziert und voellig unberuehrt.
+  # Mac laeuft NACH Windows (needs:) und haengt SIGNIERTE + NOTARISIERTE Artefakte
+  # ins selbe Release. Der Job produziert jetzt auch Updater-Artefakte
+  # (.app.tar.gz + .sig) und merged die darwin-Eintraege in die von build-windows
+  # angelegte latest.json. tauri-action FETCHT die bestehende latest.json und
+  # MERGED die Plattformen (uploadVersionJSON) -> die Windows-Eintraege bleiben
+  # erhalten, kein Ueberschreiben. Schlaegt der Mac-Job fehl, ist das
+  # Windows-Release + Updater bereits publiziert und unberuehrt.
   build-macos:
     needs: build-windows
     runs-on: macos-latest
@@ -115,16 +114,47 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Build macOS universal DMG
+      # Developer-ID-Zertifikat in eine temporaere Keychain importieren, damit
+      # `codesign` es findet. Base64-Secret dekodieren -> .p12 -> import. Die
+      # Keychain existiert nur fuer diesen Job-Run.
+      - name: Import Apple Developer ID certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          security find-identity -v -p codesigning build.keychain
+          rm -f certificate.p12
+
+      - name: Build, sign, notarize macOS app + updater artifacts
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Minisign (Updater-Integritaet) - derselbe Key wie Windows.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Apple Developer ID (Gatekeeper) - Code-Signierung.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # Notarisierung: greift NUR, wenn APPLE_ID + APPLE_PASSWORD + APPLE_TEAM_ID
+          # alle gesetzt sind. Fehlt APPLE_PASSWORD, wird signiert aber nicht notarisiert.
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
-          # Mac haengt sich an das von build-windows erzeugte Release.
+          # Haengt sich an das von build-windows erzeugte Release.
           releaseId: ${{ needs.build-windows.outputs.release_id }}
-          # --bundles dmg: nur der Installer. --config: createUpdaterArtifacts hart
-          # auf false (tauri.conf.json bleibt unangetastet) -> der Mac-Job
-          # produziert garantiert KEINE Updater-Artefakte. Zusammen mit dem
-          # fehlenden TAURI_SIGNING_*-env ist das doppelte Absicherung.
-          args: '--target universal-apple-darwin --bundles dmg --config {"bundle":{"createUpdaterArtifacts":false}}'
-          includeUpdaterJson: false
+          # universal-Binary -> ein .app.tar.gz deckt beide Archs ab. `app` MUSS in
+          # den Bundles sein, damit createUpdaterArtifacts (aus tauri.conf.json) das
+          # .app.tar.gz erzeugen kann; `dmg` bleibt der Erst-Installer.
+          args: "--target universal-apple-darwin --bundles app,dmg"
+          # true -> merged die darwin-Eintraege in die bestehende latest.json.
+          includeUpdaterJson: true
