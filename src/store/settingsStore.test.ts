@@ -11,6 +11,7 @@ import {
   useSettingsStoreValidateForTest,
   remapAccentsRecord,
   validateSessionRestore,
+  sanitizeLastSeenVersion,
 } from "./settingsStore";
 
 // ============================================================================
@@ -29,6 +30,41 @@ beforeEach(() => {
   useSettingsStore.getState().resetToDefaults();
   // Also clear favorites, apiKeys and pinnedDocs manually (resetToDefaults preserves them)
   useSettingsStore.setState({ favorites: [], apiKeys: [], pinnedDocs: {} });
+});
+
+// ============================================================================
+// lastSeenVersion — Whats-New-Gating (v12)
+// ============================================================================
+
+describe("lastSeenVersion (whats-new gating)", () => {
+  it("defaults to null (fresh install: no modal, only stamping)", () => {
+    expect(getState().lastSeenVersion).toBeNull();
+  });
+
+  it("setLastSeenVersion stores the stamped version", () => {
+    getState().setLastSeenVersion("1.0.22");
+    expect(getState().lastSeenVersion).toBe("1.0.22");
+  });
+
+  it("sanitizeLastSeenVersion keeps non-empty strings and collapses garbage to null", () => {
+    expect(sanitizeLastSeenVersion("1.0.22")).toBe("1.0.22");
+    expect(sanitizeLastSeenVersion("")).toBeNull();
+    expect(sanitizeLastSeenVersion("   ")).toBeNull();
+    expect(sanitizeLastSeenVersion(42)).toBeNull();
+    expect(sanitizeLastSeenVersion(undefined)).toBeNull();
+    expect(sanitizeLastSeenVersion(null)).toBeNull();
+  });
+
+  it("migrate fills lastSeenVersion=null for pre-v12 state and sanitizes corrupt values", () => {
+    const migrated = useSettingsStoreMigrateForTest({ locale: "de" }, 11);
+    expect(migrated.lastSeenVersion).toBeNull();
+
+    const corrupt = useSettingsStoreMigrateForTest({ lastSeenVersion: 123 }, 11);
+    expect(corrupt.lastSeenVersion).toBeNull();
+
+    const valid = useSettingsStoreMigrateForTest({ lastSeenVersion: "1.0.21" }, 11);
+    expect(valid.lastSeenVersion).toBe("1.0.21");
+  });
 });
 
 // ============================================================================
