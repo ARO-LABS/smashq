@@ -10,6 +10,7 @@ import {
   useSettingsStoreMigrateForTest,
   useSettingsStoreValidateForTest,
   remapAccentsRecord,
+  validateSessionRestore,
 } from "./settingsStore";
 
 // ============================================================================
@@ -28,6 +29,50 @@ beforeEach(() => {
   useSettingsStore.getState().resetToDefaults();
   // Also clear favorites, apiKeys and pinnedDocs manually (resetToDefaults preserves them)
   useSettingsStore.setState({ favorites: [], apiKeys: [], pinnedDocs: {} });
+});
+
+// ============================================================================
+// validateSessionRestore — createdAt-Zeitanker (wrong-session-restore fix)
+// ============================================================================
+
+describe("validateSessionRestore — createdAt anchor", () => {
+  const BASE_ENTRY = {
+    folder: "C:\\test\\a",
+    title: "x",
+    shell: "powershell",
+  };
+
+  it("keeps a valid numeric createdAt on the entry", () => {
+    const result = validateSessionRestore({
+      enabled: true,
+      sessions: [{ ...BASE_ENTRY, createdAt: 1_751_364_000_000 }],
+      activeFolder: null,
+      layoutMode: "single",
+      gridFolders: [],
+    });
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0].createdAt).toBe(1_751_364_000_000);
+  });
+
+  it("drops corrupt createdAt values (string, NaN, negative) but keeps the entry", () => {
+    const result = validateSessionRestore({
+      enabled: true,
+      sessions: [
+        { ...BASE_ENTRY, createdAt: "gestern" },
+        { ...BASE_ENTRY, folder: "C:\\test\\b", createdAt: Number.NaN },
+        { ...BASE_ENTRY, folder: "C:\\test\\c", createdAt: -5 },
+      ],
+      activeFolder: null,
+      layoutMode: "single",
+      gridFolders: [],
+    });
+
+    expect(result.sessions).toHaveLength(3);
+    for (const s of result.sessions) {
+      expect(s.createdAt).toBeUndefined();
+    }
+  });
 });
 
 // ============================================================================

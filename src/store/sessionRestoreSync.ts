@@ -41,6 +41,8 @@ export function dedupRestorableSessions(
       title: s.title,
       shell: s.shell,
       claudeSessionId: s.claudeSessionId,
+      // Time anchor for the restore-side scan fallback (see RestorableSession).
+      createdAt: s.createdAt,
     });
   }
 

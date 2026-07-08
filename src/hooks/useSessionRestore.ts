@@ -5,11 +5,10 @@ import { useSettingsStore } from "../store/settingsStore";
 import { useUIStore } from "../store/uiStore";
 import { logWarn } from "../utils/errorLogger";
 import type { SessionShell } from "../store/sessionStore";
-
-interface ClaudeSessionSummary {
-  session_id: string;
-  started_at: string;
-}
+import {
+  pickBestHistoryMatch,
+  type ClaudeHistoryEntry,
+} from "../components/sessions/hooks/claudeIdDiscovery";
 
 function generateSessionId(): string {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -77,16 +76,35 @@ async function restoreSessions(
 
       if (!resumeSessionId) {
         try {
-          const history = await wrapInvoke<ClaudeSessionSummary[]>(
+          const history = await wrapInvoke<ClaudeHistoryEntry[]>(
             "scan_claude_sessions",
             { folder: entry.folder },
           );
           if (history && history.length > 0) {
-            // Sessions are sorted by date desc — pick the newest UUID that
-            // hasn't already been claimed by an earlier restore iteration.
-            const candidate = history.find((h) => !claimedClaudeIds.has(h.session_id));
-            if (candidate) {
-              resumeSessionId = candidate.session_id;
+            if (entry.createdAt) {
+              // Time-anchored pick: resume the entry whose started_at is
+              // CLOSEST to the card's original creation time — same heuristic
+              // as live discovery. "Newest unclaimed" resumed the wrong
+              // session whenever the folder held more than one. No match
+              // within tolerance → fresh spawn instead of guessing.
+              const match = pickBestHistoryMatch(
+                history,
+                entry.createdAt,
+                (sid) => claimedClaudeIds.has(sid),
+              );
+              if (match) {
+                resumeSessionId = match.session_id;
+              }
+            } else {
+              // Legacy snapshot without createdAt (written before the anchor
+              // existed): keep the old newest-unclaimed pick. Self-extinguishes
+              // after the first post-update persist.
+              const candidate = history.find(
+                (h) => !claimedClaudeIds.has(h.session_id),
+              );
+              if (candidate) {
+                resumeSessionId = candidate.session_id;
+              }
             }
           }
         } catch {

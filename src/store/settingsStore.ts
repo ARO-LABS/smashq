@@ -205,6 +205,15 @@ export interface RestorableSession {
   title: string;
   shell: SessionShell;
   claudeSessionId?: string;      // Claude CLI Session-UUID fuer Resume
+  /**
+   * Original creation time (ms epoch) of the session card. Time anchor for
+   * the restore-side scan fallback: when no claudeSessionId was persisted
+   * (app quit before discovery finished), restore picks the history entry
+   * whose started_at is CLOSEST to this anchor instead of blindly resuming
+   * the newest session in the folder (wrong-session-restore bug).
+   * Optional: absent on pre-anchor snapshots.
+   */
+  createdAt?: number;
 }
 
 export interface SessionRestoreData {
@@ -443,11 +452,20 @@ export function validateSessionRestore(raw: unknown): SessionRestoreData {
       seenClaudeIds.add(entry.claudeSessionId);
       claudeSessionId = entry.claudeSessionId;
     }
+    // createdAt is only a heuristic anchor — corrupt values degrade to
+    // undefined (legacy behavior) instead of dropping the whole entry.
+    const createdAt =
+      typeof entry.createdAt === "number" &&
+      Number.isFinite(entry.createdAt) &&
+      entry.createdAt > 0
+        ? entry.createdAt
+        : undefined;
     cleanSessions.push({
       folder: entry.folder,
       title: entry.title,
       shell: entry.shell as RestorableSession["shell"],
       claudeSessionId,
+      createdAt,
     });
   }
   return {

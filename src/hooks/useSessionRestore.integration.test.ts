@@ -361,6 +361,9 @@ describe("useSessionRestore — renamed-title persistence into History", () => {
   // against current code.
   // -------------------------------------------------------------------------
 
+  // NOTE: The paragraph "MUST fail against current code" above described the
+  // pre-fix state — the restore-side override seed (useSessionRestore.ts) now
+  // ships, so this test is a GREEN regression guard, not a red repro.
   it("restoring a renamed session (UUID unknown at rename time) persists the rename into the override map", async () => {
     const RESUME_UUID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
@@ -404,5 +407,124 @@ describe("useSessionRestore — renamed-title persistence into History", () => {
     expect(
       useSettingsStore.getState().sessionTitleOverrides[RESUME_UUID],
     ).toBe("Mein Name");
+  });
+});
+
+describe("useSessionRestore — Zeitanker-Match beim Scan-Fallback (wrong-session bug)", () => {
+  beforeEach(() => {
+    resetAllStores();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Root-cause repro for "restore starts the WRONG session of the same project":
+  // when no claudeSessionId was persisted (app quit before discovery finished),
+  // the scan fallback used to pick the NEWEST unclaimed history entry — with
+  // several Claude sessions in the same folder that is usually not the one this
+  // card belonged to. With a persisted `createdAt` anchor the fallback must pick
+  // the entry whose started_at is CLOSEST to the card's original creation time
+  // (same heuristic as live discovery's pickBestHistoryMatch).
+  // ---------------------------------------------------------------------------
+
+  const ANCHOR = Date.parse("2026-07-01T10:00:00.000Z");
+  const CLOSEST_UUID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"; // +1.5s from anchor
+  const NEWEST_UUID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"; // +2h — newest in folder
+  const OLDER_UUID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"; // -3h
+
+  const HISTORY_DESC = [
+    { session_id: NEWEST_UUID, started_at: "2026-07-01T12:00:00.000Z" },
+    { session_id: CLOSEST_UUID, started_at: "2026-07-01T10:00:01.500Z" },
+    { session_id: OLDER_UUID, started_at: "2026-07-01T07:00:00.000Z" },
+  ];
+
+  it("entry with createdAt resumes the time-closest history entry, not the newest", async () => {
+    useSettingsStore.getState().setSessionRestore({
+      enabled: true,
+      sessions: [
+        {
+          folder: "C:\\test\\a",
+          title: "Meine Session",
+          shell: "powershell",
+          createdAt: ANCHOR,
+        },
+      ],
+      activeFolder: null,
+      layoutMode: "single",
+      gridFolders: [],
+    });
+
+    installRealIPC({
+      create_session: buildCreateSessionHandler().handler,
+      scan_claude_sessions: async () => HISTORY_DESC,
+    });
+
+    renderHook(() => useSessionRestore());
+
+    await waitFor(() => {
+      expect(useSessionStore.getState().sessions).toHaveLength(1);
+    });
+
+    expect(useSessionStore.getState().sessions[0].claudeSessionId).toBe(
+      CLOSEST_UUID,
+    );
+  });
+
+  it("entry with createdAt but no history entry within tolerance starts fresh instead of guessing", async () => {
+    useSettingsStore.getState().setSessionRestore({
+      enabled: true,
+      sessions: [
+        {
+          folder: "C:\\test\\a",
+          title: "Verwaiste Session",
+          shell: "powershell",
+          // Anchor is hours away from every history entry.
+          createdAt: Date.parse("2026-06-30T20:00:00.000Z"),
+        },
+      ],
+      activeFolder: null,
+      layoutMode: "single",
+      gridFolders: [],
+    });
+
+    installRealIPC({
+      create_session: buildCreateSessionHandler().handler,
+      scan_claude_sessions: async () => HISTORY_DESC,
+    });
+
+    renderHook(() => useSessionRestore());
+
+    await waitFor(() => {
+      expect(useSessionStore.getState().sessions).toHaveLength(1);
+    });
+
+    expect(
+      useSessionStore.getState().sessions[0].claudeSessionId,
+    ).toBeUndefined();
+  });
+
+  it("legacy entry without createdAt keeps the newest-unclaimed pick (pre-anchor snapshots)", async () => {
+    useSettingsStore.getState().setSessionRestore({
+      enabled: true,
+      sessions: [
+        { folder: "C:\\test\\a", title: "Legacy", shell: "powershell" },
+      ],
+      activeFolder: null,
+      layoutMode: "single",
+      gridFolders: [],
+    });
+
+    installRealIPC({
+      create_session: buildCreateSessionHandler().handler,
+      scan_claude_sessions: async () => HISTORY_DESC,
+    });
+
+    renderHook(() => useSessionRestore());
+
+    await waitFor(() => {
+      expect(useSessionStore.getState().sessions).toHaveLength(1);
+    });
+
+    expect(useSessionStore.getState().sessions[0].claudeSessionId).toBe(
+      NEWEST_UUID,
+    );
   });
 });
