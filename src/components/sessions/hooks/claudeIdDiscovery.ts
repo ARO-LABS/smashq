@@ -223,6 +223,25 @@ export function createClaudeIdDiscovery(): ClaudeIdDiscovery {
       .sessions.find((s) => s.id === id);
     if (!session) return;
 
+    // Claim-check (mirrors the scan path's isClaudeIdClaimed): when two fresh
+    // spawns share a folder, both Rust watchers can observe the same new jsonl
+    // within one poll window and emit the SAME uuid for different cards.
+    // Accepting the second event would mirror two cards onto one backend
+    // session AND persist the corruption — every later restart would then
+    // deterministically resume the wrong session. Ownership by the same
+    // session is fine (idempotent re-delivery).
+    const ownedByOther = useSessionStore
+      .getState()
+      .sessions.some((s) => s.claudeSessionId === claudeSessionId && s.id !== id);
+    if (ownedByOther) {
+      logWarn(
+        "useSessionEvents",
+        `claude-id-resolved für "${id}" verworfen — UUID ${claudeSessionId} gehört bereits einer anderen Session (Watcher-Race); Scan-Fallback übernimmt`,
+      );
+      return;
+    }
+    claimedIds.add(claudeSessionId);
+
     useSessionStore.getState().setClaudeSessionId(id, claudeSessionId);
 
     // Flush any rename recorded before the UUID resolved (mirrors the scan path).

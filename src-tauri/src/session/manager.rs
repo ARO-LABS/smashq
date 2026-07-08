@@ -78,6 +78,18 @@ struct SessionHandle {
     watcher_cancelled: Arc<AtomicBool>,
 }
 
+/// Outcome of one claude-id watcher poll (see `SessionManager::diff_new_uuid`).
+#[derive(Debug, PartialEq)]
+enum UuidDiff {
+    /// No new session file yet — keep polling.
+    None,
+    /// Exactly one new file: unambiguously this session's UUID.
+    One(String),
+    /// Two or more new files in one poll window (parallel fresh spawns in the
+    /// same folder) — guessing would corrupt the persisted mapping.
+    Ambiguous(usize),
+}
+
 pub struct SessionManager {
     sessions: Mutex<HashMap<String, SessionHandle>>,
 }
@@ -542,6 +554,26 @@ impl SessionManager {
     /// das Timeout erreicht ist ODER `cancel` gesetzt wurde (close_session).
     /// Emittiert `session-claude-id-resolved` nur fuer eine noch lebende
     /// Session.
+    /// Diff the current session-uuid snapshot against the pre-spawn one.
+    ///
+    /// `HashSet::difference().next()` is NON-deterministic when two fresh
+    /// spawns in the same folder land inside one poll window — two watchers
+    /// could emit swapped (or the same) UUIDs, and the corrupted mapping
+    /// would be persisted and deterministically resumed wrong on every
+    /// restart. Emit only on an unambiguous single new file; with 2+ the
+    /// frontend's time-anchored scan fallback decides instead.
+    fn diff_new_uuid(
+        current: &std::collections::HashSet<String>,
+        snapshot: &std::collections::HashSet<String>,
+    ) -> UuidDiff {
+        let mut fresh = current.difference(snapshot);
+        match (fresh.next(), fresh.next()) {
+            (None, _) => UuidDiff::None,
+            (Some(one), None) => UuidDiff::One(one.clone()),
+            (Some(_), Some(_)) => UuidDiff::Ambiguous(current.difference(snapshot).count()),
+        }
+    }
+
     fn run_id_watcher(
         app: AppHandle,
         id: String,
@@ -561,22 +593,33 @@ impl SessionManager {
                 return;
             }
             let current = super::file_reader::snapshot_session_uuids_in(&root, &folder);
-            if let Some(uuid) = current.difference(&snapshot).next() {
-                log::info!("Session {} resolved claudeSessionId={}", id, uuid);
-                if let Err(e) = app.emit(
-                    "session-claude-id-resolved",
-                    SessionClaudeIdEvent {
-                        id: id.clone(),
-                        claude_session_id: uuid.clone(),
-                    },
-                ) {
-                    log::debug!(
-                        "Session {} failed to emit session-claude-id-resolved: {}",
-                        id,
-                        e
-                    );
+            match Self::diff_new_uuid(&current, &snapshot) {
+                UuidDiff::None => {}
+                UuidDiff::One(uuid) => {
+                    log::info!("Session {} resolved claudeSessionId={}", id, uuid);
+                    if let Err(e) = app.emit(
+                        "session-claude-id-resolved",
+                        SessionClaudeIdEvent {
+                            id: id.clone(),
+                            claude_session_id: uuid,
+                        },
+                    ) {
+                        log::debug!(
+                            "Session {} failed to emit session-claude-id-resolved: {}",
+                            id,
+                            e
+                        );
+                    }
+                    return;
                 }
-                return;
+                UuidDiff::Ambiguous(n) => {
+                    log::warn!(
+                        "Session {} claude-id ambiguous: {} new session files in one poll window — skipping deterministic resolve, frontend scan fallback decides",
+                        id,
+                        n
+                    );
+                    return;
+                }
             }
             if std::time::Instant::now() >= deadline {
                 log::warn!(
@@ -908,6 +951,44 @@ mod tests {
 
     fn status(s: &str) -> String {
         SessionManager::detect_status(s)
+    }
+
+    // --- diff_new_uuid: deterministic claude-id watcher resolve ---
+
+    fn uuid_set(ids: &[&str]) -> std::collections::HashSet<String> {
+        ids.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn diff_new_uuid_resolves_single_new_file() {
+        let snapshot = uuid_set(&["old-1", "old-2"]);
+        let current = uuid_set(&["old-1", "old-2", "fresh"]);
+        assert_eq!(
+            SessionManager::diff_new_uuid(&current, &snapshot),
+            UuidDiff::One("fresh".to_string())
+        );
+    }
+
+    #[test]
+    fn diff_new_uuid_reports_no_change_while_polling() {
+        let snapshot = uuid_set(&["old-1"]);
+        let current = uuid_set(&["old-1"]);
+        assert_eq!(
+            SessionManager::diff_new_uuid(&current, &snapshot),
+            UuidDiff::None
+        );
+    }
+
+    #[test]
+    fn diff_new_uuid_refuses_to_guess_on_two_new_files() {
+        // Two parallel fresh spawns in the same folder within one poll window:
+        // any pick here could swap the mapping — must report Ambiguous.
+        let snapshot = uuid_set(&["old-1"]);
+        let current = uuid_set(&["old-1", "fresh-a", "fresh-b"]);
+        assert_eq!(
+            SessionManager::diff_new_uuid(&current, &snapshot),
+            UuidDiff::Ambiguous(2)
+        );
     }
 
     // --- Existing patterns: "waiting" ---
