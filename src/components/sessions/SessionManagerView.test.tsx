@@ -53,10 +53,6 @@ vi.mock("./FavoritePreview", () => ({
   FavoritePreview: () => <div data-testid="favorite-preview" />,
 }));
 
-vi.mock("./hooks/useResizeHandle", () => ({
-  useResizeHandle: () => ({ containerRef: { current: null }, handleResizeStart: vi.fn() }),
-}));
-
 vi.mock("./hooks/useSessionEvents", () => ({
   useSessionEvents: vi.fn(),
 }));
