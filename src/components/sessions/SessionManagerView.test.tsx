@@ -53,10 +53,6 @@ vi.mock("./FavoritePreview", () => ({
   FavoritePreview: () => <div data-testid="favorite-preview" />,
 }));
 
-vi.mock("./hooks/useResizeHandle", () => ({
-  useResizeHandle: () => ({ containerRef: { current: null }, handleResizeStart: vi.fn() }),
-}));
-
 vi.mock("./hooks/useSessionEvents", () => ({
   useSessionEvents: vi.fn(),
 }));
@@ -104,8 +100,8 @@ describe("SessionManagerView", () => {
   it("renders empty state when no sessions exist", () => {
     render(<SessionManagerView />);
 
-    const toggleBtn = screen.getByTitle("Sidebar ausblenden");
-    expect(toggleBtn).toBeTruthy();
+    const rail = screen.getByRole("button", { name: "Navigation ausblenden" });
+    expect(rail).toBeTruthy();
   });
 
   it("renders terminal when an active session exists", () => {
@@ -353,24 +349,24 @@ describe("SessionManagerView — Scroll-Regression (always-mounted Terminals)", 
 
 // ── Sidebar / Toolbar / Panel-Verhalten ──────────────────────────────────
 describe("SessionManagerView — Sidebar & Toolbar", () => {
-  it("blendet die Sidebar aus und wieder ein per Toggle-Button", () => {
+  it("klappt die Navigation per Tastatur ein und per Rail-Klick wieder aus", () => {
     render(<SessionManagerView />);
 
-    // Initial: Sidebar sichtbar → Toggle-Button bietet "ausblenden" an.
-    const collapseBtn = screen.getByTitle("Sidebar ausblenden");
+    // Initial: Nav sichtbar → Rail bietet "ausblenden" an. Enter klappt ein.
+    const rail = screen.getByRole("button", { name: "Navigation ausblenden" });
     act(() => {
-      fireEvent.click(collapseBtn);
+      fireEvent.keyDown(rail, { key: "Enter" });
     });
 
-    // Nach Klick: Sidebar collapsed → Button-Titel wechselt zu "einblenden".
-    expect(screen.getByTitle("Sidebar einblenden")).toBeTruthy();
-    expect(screen.queryByTitle("Sidebar ausblenden")).toBeNull();
+    // Nach Enter: Nav kollabiert → Rail-Label wechselt zu "einblenden".
+    expect(screen.getByRole("button", { name: "Navigation einblenden" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Navigation ausblenden" })).toBeNull();
 
-    // Erneuter Klick stellt die Sidebar wieder her.
+    // Klick auf den kollabierten Rail stellt die Nav wieder her.
     act(() => {
-      fireEvent.click(screen.getByTitle("Sidebar einblenden"));
+      fireEvent.click(screen.getByRole("button", { name: "Navigation einblenden" }));
     });
-    expect(screen.getByTitle("Sidebar ausblenden")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Navigation ausblenden" })).toBeTruthy();
   });
 
   it("zeigt KEINE Terminal-Toolbar wenn keine Session und kein Grid existiert", () => {
@@ -411,7 +407,7 @@ describe("SessionManagerView — Sidebar & Toolbar", () => {
 });
 
 describe("SessionManagerView — ConfigPanel & Preview", () => {
-  it("rendert das ConfigPanel im Single-Mode wenn configPanelOpen true ist", () => {
+  it("rendert das ConfigPanel im Single-Mode wenn nicht kollabiert", () => {
     useSessionStore.setState({
       sessions: [mockSession("s-1")],
       activeSessionId: "s-1",
@@ -419,14 +415,14 @@ describe("SessionManagerView — ConfigPanel & Preview", () => {
       gridSessionIds: [],
       focusedGridSessionId: null,
     });
-    useUIStore.setState({ previewFolder: null, configPanelOpen: true });
+    useUIStore.setState({ previewFolder: null, configPanelCollapsed: false });
 
     render(<SessionManagerView />);
 
     expect(screen.getByTestId("config-panel")).toBeTruthy();
   });
 
-  it("rendert das ConfigPanel NICHT wenn configPanelOpen false ist", () => {
+  it("rendert das ConfigPanel NICHT wenn kollabiert", () => {
     useSessionStore.setState({
       sessions: [mockSession("s-1")],
       activeSessionId: "s-1",
@@ -434,7 +430,7 @@ describe("SessionManagerView — ConfigPanel & Preview", () => {
       gridSessionIds: [],
       focusedGridSessionId: null,
     });
-    useUIStore.setState({ previewFolder: null, configPanelOpen: false });
+    useUIStore.setState({ previewFolder: null, configPanelCollapsed: true });
 
     render(<SessionManagerView />);
 
@@ -449,12 +445,36 @@ describe("SessionManagerView — ConfigPanel & Preview", () => {
       gridSessionIds: ["A", "B"],
       focusedGridSessionId: "A",
     });
-    useUIStore.setState({ previewFolder: "/grid/preview", configPanelOpen: false });
+    useUIStore.setState({ previewFolder: "/grid/preview", configPanelCollapsed: false });
 
     render(<SessionManagerView />);
 
     // Grid-Mode + previewFolder → ConfigPanel als Preview-Panel, FavoritePreview NICHT.
     expect(screen.getByTestId("config-panel")).toBeTruthy();
+    expect(screen.queryByTestId("favorite-preview")).toBeNull();
+  });
+
+  it("raeumt den Grid-Preview ab, wenn eine Session aus dem Grid maximiert wird", () => {
+    useSessionStore.setState({
+      sessions: [mockSession("A"), mockSession("B")],
+      activeSessionId: "A",
+      layoutMode: "grid",
+      gridSessionIds: ["A", "B"],
+      focusedGridSessionId: "A",
+    });
+    // Ein offener Grid-Preview darf sich nach dem Maximieren NICHT als
+    // FavoritePreview ueber die Single-Session legen (Regression: Maximieren
+    // zeigte fullscreen die Config statt der Session).
+    useUIStore.setState({ previewFolder: "/grid/preview", configPanelCollapsed: false });
+
+    render(<SessionManagerView />);
+
+    act(() => {
+      fireEvent.click(screen.getAllByLabelText("Maximieren")[0]);
+    });
+
+    expect(useSessionStore.getState().layoutMode).toBe("single");
+    expect(useUIStore.getState().previewFolder).toBeNull();
     expect(screen.queryByTestId("favorite-preview")).toBeNull();
   });
 

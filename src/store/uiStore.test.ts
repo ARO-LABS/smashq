@@ -348,29 +348,40 @@ describe("configSubTab", () => {
 
 describe("configPanel", () => {
   beforeEach(() => {
-    useUIStore.setState({ configPanelOpen: false, configPanelWidth: 400 });
+    useUIStore.setState({
+      configPanelCollapsed: true,
+      configPanelWidth: 400,
+      leftNavWidth: 240,
+      leftNavCollapsed: false,
+    });
   });
 
-  it("defaults configPanelOpen to false", () => {
-    expect(getState().configPanelOpen).toBe(false);
+  it("defaults configPanelCollapsed to true", () => {
+    expect(getState().configPanelCollapsed).toBe(true);
   });
 
-  it("toggleConfigPanel flips false → true", () => {
-    getState().toggleConfigPanel();
-    expect(getState().configPanelOpen).toBe(true);
+  it("setConfigPanelCollapsed sets explicit state", () => {
+    getState().setConfigPanelCollapsed(false);
+    expect(getState().configPanelCollapsed).toBe(false);
+    getState().setConfigPanelCollapsed(true);
+    expect(getState().configPanelCollapsed).toBe(true);
   });
 
-  it("toggleConfigPanel flips true → false", () => {
-    getState().toggleConfigPanel();
-    getState().toggleConfigPanel();
-    expect(getState().configPanelOpen).toBe(false);
+  it("setLeftNavWidth clamps below min and above max", () => {
+    getState().setLeftNavWidth(10);
+    expect(getState().leftNavWidth).toBe(180);
+    getState().setLeftNavWidth(9999);
+    expect(getState().leftNavWidth).toBe(420);
   });
 
-  it("setConfigPanelOpen sets explicit state", () => {
-    getState().setConfigPanelOpen(true);
-    expect(getState().configPanelOpen).toBe(true);
-    getState().setConfigPanelOpen(false);
-    expect(getState().configPanelOpen).toBe(false);
+  it("setLeftNavWidth passes a valid value through", () => {
+    getState().setLeftNavWidth(300);
+    expect(getState().leftNavWidth).toBe(300);
+  });
+
+  it("setLeftNavCollapsed toggles the flag", () => {
+    getState().setLeftNavCollapsed(true);
+    expect(getState().leftNavCollapsed).toBe(true);
   });
 
   it("defaults configPanelWidth to 400", () => {
@@ -449,6 +460,12 @@ describe("previewFolder", () => {
   it("openPreview sets the folder", () => {
     getState().openPreview("/projects/foo");
     expect(getState().previewFolder).toBe("/projects/foo");
+  });
+
+  it("openPreview forces the shared right panel open (uncollapses)", () => {
+    useUIStore.setState({ configPanelCollapsed: true });
+    getState().openPreview("/projects/foo");
+    expect(getState().configPanelCollapsed).toBe(false);
   });
 
   it("closePreview resets to null", () => {

@@ -215,12 +215,12 @@ const SessionCardInner = ({ session, isActive, gridSlot, onClick, onClose }: Ses
       </div>
 
       {/*
-        Grid-Indicator: 12px mini-map at bottom-right (bottom-1 right-1),
-        mirroring the real grid template so it shows WHERE the session sits
-        (2 = halves, 3 = T-shape, 4 = quadrants). The occupied cell is
-        accent-filled, the rest dim. Fades out on hover so the action chrome
-        (same bottom-right zone) owns that corner while hovering — at rest the
-        mini-map owns it. Rest-state name clearance is handled via the
+        Grid-Indicator: 12px mini-map vertically centered at the right edge
+        (right-1 top-1/2), mirroring the real grid template so it shows WHERE
+        the session sits (2 = halves, 3 = T-shape, 4 = quadrants). The occupied
+        cell is accent-filled, the rest dim. Fades out on hover so the action
+        chrome (same centered right zone) owns that spot while hovering — at
+        rest the mini-map owns it. Rest-state name clearance is handled via the
         projectName span's conditional mr-4.
       */}
       {miniMap && (
@@ -229,7 +229,7 @@ const SessionCardInner = ({ session, isActive, gridSlot, onClick, onClose }: Ses
           role="img"
           aria-label={`Im Grid: ${miniMap.position}`}
           title={`Im Grid: ${miniMap.position}`}
-          className="absolute bottom-1 right-1 grid gap-px w-3 h-3 group-hover:opacity-0 transition-opacity"
+          className="absolute right-1 top-1/2 -translate-y-1/2 grid gap-px w-3 h-3 group-hover:opacity-0 transition-opacity"
           style={{
             gridTemplateColumns: miniMap.columns,
             gridTemplateRows: miniMap.rows,
