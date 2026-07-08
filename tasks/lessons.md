@@ -7,6 +7,18 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-07-08 — Session-UI-Bugfixes: fixer Reserve-Slot war die schwaechere Loesung; xterm-Theme an App-Tokens zu koppeln ueberschreibt Programm-Farben
+
+**Kontext:** Zwei gemeldete Bugs — (1) langer Session-Titel ueberlappte die Hover-Icons in `SessionCard`, (2) App-Hell/Dunkel-Toggle faerbte laufende Terminals um. Beide gefixt im Worktree, User verifizierte live in `tauri dev`.
+
+**Erkenntnis 1 — Hover-Reveal-Layout:** Erster Fix reservierte einen FIXEN `w-[104px]`-Slot rechts, damit der `flex-1`-Titel davor truncatet. Funktioniert, aber: Magic-Number + der Slot stiehlt dem Titel PERMANENT Platz, auch ohne Hover. Der User wollte (zu Recht) die dynamische Variante: Titel voll at-rest, schrumpft nur beim Hover. Root-Cause der Ueberlappung war, dass die Icon-Leiste `position:absolute` war → fuers Flex-Layout unsichtbar → der Titel „sah" ihre Breite nicht.
+
+**Erkenntnis 2 — xterm-Theme:** Ein Redesign (a704364) hatte xterms bg/fg/cursor aus den App-Design-Tokens abgeleitet und per MutationObserver bei jedem `.dark`-Toggle neu geschrieben. Das ueberschreibt die Farb-Erwartung des laufenden Programms (Claude CLI etc.): in Light-Mode kippt der BG hell, fuer-Dunkel-gewaehlte ANSI-Farben werden unlesbar.
+
+**Korrektur:** (1) Icon-Leiste in den Flex-Flow geholt (`hidden`→`group-hover:flex`), Projektname `group-hover:hidden` — Flexbox schrumpft den Titel dann selbst, Kollision by construction unmoeglich, keine Magic-Number. (2) `theme.syncTerminalTheme` (Default false, v10→11) — off: `theme`-Option weglassen (xterm-Default), MutationObserver gated, Container-BG fix dunkel. Bei Erzeugung via `getState()` gelesen (scrollbackLines-Vertrag), nicht reaktiv → kein Recreate laufender Terminals.
+
+**Regel:** (1) Hover-Reveal-Aktionsleisten IN den Flex-Flow legen (display-swap `hidden`↔`group-hover:flex`), nicht `absolute` + fixer Reserve-Slot. Absolute Elemente sind fuers Nachbar-Layout unsichtbar → Ueberlappung; ein fixer Reserve-Slot „loest" das nur mit Magic-Number und Dauer-Platzverlust. In-Flow laesst Flexbox die Breite dynamisch aushandeln (voller Titel at-rest, `truncate` beim Hover). Trade-off ehrlich nennen: reiner Display-Swap hat keinen Opacity-Fade (Opacity reserviert keinen Layout-Platz). (2) xterm bg/fg NIE hart an ein reaktives App-Theme koppeln, das zur Laufzeit umschaltet — der laufende PTY-Prozess waehlt ANSI-Farben fuer eine ANGENOMMENE Hintergrundhelligkeit; ein Live-Umfaerben bricht dessen Kontrast. „Terminal folgt App-Theme"-Features opt-in + Default off halten. Verwandt: [[design-system-audit]], [[act-on-clear-directive]].
+
 ### 2026-07-08 — macOS-Updater-Setup: zwei tückische Klassen — Bash-Tool ≠ PowerShell-Syntax, und Secret-Name-Tippfehler den grüne Gates nie fangen
 
 **Kontext:** macOS-Auto-Updater aktiviert (Developer-ID-Cert via openssl+Browser erzeugt, 7 GitHub-Secrets, `release.yml`-`build-macos` umgebaut). Zwei Fehler, beide „still" — kein Build/Test hätte sie gefangen.
