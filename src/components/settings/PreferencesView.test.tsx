@@ -34,6 +34,30 @@ describe("PreferencesView", () => {
     });
   });
 
+  it("renders the terminal-theme-sync toggle (default off) and wires it to setTheme", async () => {
+    // Ensure a known default before rendering.
+    act(() => {
+      useSettingsStore.setState((s) => ({ theme: { ...s.theme, syncTerminalTheme: false } }));
+    });
+    render(<PreferencesView />);
+
+    const toggle = await screen.findByRole("checkbox", {
+      name: /Terminal-Farben an App-Theme koppeln/i,
+    });
+    // Default off — the reported collision stays disabled until opted in.
+    expect((toggle as HTMLInputElement).checked).toBe(false);
+
+    act(() => {
+      fireEvent.click(toggle);
+    });
+    expect(useSettingsStore.getState().theme.syncTerminalTheme).toBe(true);
+
+    // Reset so later tests see the default.
+    act(() => {
+      useSettingsStore.setState((s) => ({ theme: { ...s.theme, syncTerminalTheme: false } }));
+    });
+  });
+
   it("switches the active panel when a different category is clicked", async () => {
     render(<PreferencesView />);
     await waitFor(() => {

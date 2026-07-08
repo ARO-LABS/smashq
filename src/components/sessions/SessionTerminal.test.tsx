@@ -105,6 +105,7 @@ import { SessionTerminal } from "./SessionTerminal";
 import { logError } from "../../utils/errorLogger";
 import { writeText, readText } from "@tauri-apps/plugin-clipboard-manager";
 import { invoke } from "@tauri-apps/api/core";
+import { useSettingsStore } from "../../store/settingsStore";
 
 // ── Tests ────────────────────────────────────────────────────────────
 
@@ -645,6 +646,34 @@ describe("SessionTerminal", () => {
     expect(terminalOptions.windowsPty).toBeUndefined();
 
     setUA(originalUA);
+  });
+
+  // ── Terminal-theme opt-in (theme.syncTerminalTheme) ──────────────────
+  //
+  // Default OFF: the `theme` option is omitted so xterm keeps its own defaults
+  // and an app light/dark toggle never repaints a running program's colours.
+  // ON: the theme is derived from the live design tokens.
+
+  it("omits the theme option by default so the terminal keeps xterm defaults", () => {
+    // Store default is syncTerminalTheme: false — no explicit setup needed.
+    render(<SessionTerminal sessionId="sess-1" />);
+    expect(terminalOptions.theme).toBeUndefined();
+  });
+
+  it("sets a derived theme when syncTerminalTheme is enabled", () => {
+    useSettingsStore.setState((s) => ({ theme: { ...s.theme, syncTerminalTheme: true } }));
+    try {
+      render(<SessionTerminal sessionId="sess-1" />);
+      // Derived theme is an object with the four token-driven colour keys
+      // (canvas is unavailable in jsdom → resolveTerminalTheme returns the hex
+      // fallbacks, which is exactly the null-ctx guard we rely on).
+      expect(terminalOptions.theme).toMatchObject({
+        background: expect.any(String),
+        foreground: expect.any(String),
+      });
+    } finally {
+      useSettingsStore.setState((s) => ({ theme: { ...s.theme, syncTerminalTheme: false } }));
+    }
   });
 
   it("onData handler scrolls to bottom when viewport is at bottom (regression guard for ea3a6df)", async () => {

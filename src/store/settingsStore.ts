@@ -41,6 +41,13 @@ export interface ThemeSettings {
   accentColor: string;
   reducedMotion: boolean;
   animationSpeed: number;
+  /**
+   * Opt-in: derive the xterm terminal theme from the app's design tokens so it
+   * follows the light/dark switch. Default `false` — off, the terminal keeps
+   * xterm's own defaults and never repaints on an app-mode toggle, so a running
+   * program's colour expectations are not overridden. See SessionTerminal.tsx.
+   */
+  syncTerminalTheme: boolean;
 }
 
 export interface NotificationSettings {
@@ -353,6 +360,7 @@ const defaultTheme: ThemeSettings = {
   accentColor: "oklch(72% 0.14 230)", // accent azure
   reducedMotion: false,
   animationSpeed: 1.0,
+  syncTerminalTheme: false,
 };
 
 const defaultNotifications: NotificationSettings = {
@@ -1282,7 +1290,11 @@ export const useSettingsStore = create<SettingsState>()(
         notesWindowSize: state.notesWindowSize,
         tasksWindowSize: state.tasksWindowSize,
       }),
-      version: 10,
+      // v11: added theme.syncTerminalTheme (default false). The migrate merge
+      // `{ ...defaults.theme, ...p.theme }` fills it for existing users. No
+      // onRehydrateStorage heal needed: a missing boolean is not the data-loss
+      // (Issue #209) class — read sites default it with `?? false`.
+      version: 11,
       migrate: (persisted: unknown, fromVersion: number) => _settingsMigrate(persisted, fromVersion),
       // SYNCHRONOUS heal of the rehydrated state. This runs DURING rehydration
       // and its return value feeds the very first render — unlike

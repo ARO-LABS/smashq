@@ -91,6 +91,11 @@ export function SessionTerminal({ sessionId }: SessionTerminalProps) {
   });
 
   const addToast = useUIStore((s) => s.addToast);
+  // Reactive: the container frame colour follows the app theme only when the
+  // opt-in sync is on. Off, the frame stays fixed dark so an app light/dark
+  // toggle never bleeds into the terminal. The xterm theme itself is read once
+  // at creation (below) — like scrollbackLines it applies to the NEXT session.
+  const syncTerminalTheme = useSettingsStore((s) => s.theme.syncTerminalTheme ?? false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -146,7 +151,15 @@ export function SessionTerminal({ sessionId }: SessionTerminalProps) {
       // it and we stay conservative. On macOS/Linux the PTY is a Unix pty, not
       // ConPTY — passing this option there feeds xterm wrong reflow heuristics.
       ...(isWindows() ? { windowsPty: { backend: "conpty" as const, buildNumber: 19041 } } : {}),
-      theme: resolveTerminalTheme(),
+      // Terminal theme is opt-in (Settings → Darstellung). Default off: omit the
+      // `theme` option entirely so xterm keeps its own defaults and never
+      // overrides the running program's colour expectations. Read once at
+      // creation via getState() so toggling the setting does not recreate (and
+      // wipe) a live terminal — it applies to the next session, mirroring the
+      // scrollbackLines contract above.
+      ...(useSettingsStore.getState().theme.syncTerminalTheme
+        ? { theme: resolveTerminalTheme() }
+        : {}),
       allowProposedApi: true,
     });
 
@@ -339,6 +352,10 @@ export function SessionTerminal({ sessionId }: SessionTerminalProps) {
   useEffect(() => {
     const root = document.documentElement;
     const observer = new MutationObserver(() => {
+      // Only follow the app's light/dark switch when the user opted in. Off,
+      // the terminal is left untouched so a mode toggle cannot repaint a
+      // running program's background/foreground — the reported collision.
+      if (!useSettingsStore.getState().theme.syncTerminalTheme) return;
       const term = terminalRef.current;
       if (term) term.options.theme = resolveTerminalTheme();
     });
@@ -350,7 +367,7 @@ export function SessionTerminal({ sessionId }: SessionTerminalProps) {
     <div
       ref={containerRef}
       className="h-full w-full"
-      style={{ padding: "4px", backgroundColor: "var(--surface-base)", overflow: "hidden" }}
+      style={{ padding: "4px", backgroundColor: syncTerminalTheme ? "var(--surface-base)" : "#0d1117", overflow: "hidden" }}
     />
   );
 }

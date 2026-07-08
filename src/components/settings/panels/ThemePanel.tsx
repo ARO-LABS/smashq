@@ -41,6 +41,26 @@ export function ThemePanel() {
           </span>
         </label>
       </section>
+
+      <section className="rounded-md shadow-hairline p-4 flex flex-col gap-3 bg-surface-base">
+        <h4 className="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Terminal</h4>
+        <label className="flex items-start gap-2 cursor-pointer text-sm">
+          <input
+            type="checkbox"
+            checked={theme.syncTerminalTheme ?? false}
+            onChange={(e) => setTheme({ syncTerminalTheme: e.target.checked })}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="text-neutral-200">Terminal-Farben an App-Theme koppeln</span>
+            <span className="block text-xs text-neutral-500 mt-0.5">
+              Koppelt Hintergrund und Vordergrund des Terminals an den Hell/Dunkel-Modus.
+              Standardmäßig aus — sonst überschreibt der Moduswechsel die Farben laufender
+              Programme. Wirkt auf neu gestartete Sessions.
+            </span>
+          </span>
+        </label>
+      </section>
     </div>
   );
 }

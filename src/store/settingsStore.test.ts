@@ -73,6 +73,19 @@ describe("sanitizePreferences", () => {
     expect(migrated.preferences.frontendLogging).toBe(false);
     expect(migrated.preferences.backendFileLogging).toBe(false);
   });
+
+  it("migrate fills theme.syncTerminalTheme=false for pre-v11 state lacking the field", () => {
+    // Persisted theme from before v11 has no syncTerminalTheme key. The
+    // `{ ...defaults.theme, ...p.theme }` merge must backfill the default.
+    const migrated = useSettingsStoreMigrateForTest(
+      { theme: { mode: "light", accentColor: "oklch(72% 0.14 230)", reducedMotion: true, animationSpeed: 1 } },
+      10,
+    ) as SettingsState;
+    expect(migrated.theme.syncTerminalTheme).toBe(false);
+    // Existing keys survive the merge.
+    expect(migrated.theme.mode).toBe("light");
+    expect(migrated.theme.reducedMotion).toBe(true);
+  });
 });
 
 // ============================================================================
@@ -94,6 +107,10 @@ describe("initial state", () => {
 
   it("defaults theme.accentColor to oklch value", () => {
     expect(getState().theme.accentColor).toBe("oklch(72% 0.14 230)");
+  });
+
+  it("defaults theme.syncTerminalTheme to false (opt-in terminal theme sync)", () => {
+    expect(getState().theme.syncTerminalTheme).toBe(false);
   });
 
   it("defaults sound.enabled to false", () => {
