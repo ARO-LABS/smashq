@@ -1,6 +1,6 @@
 [package]
 name = "smashq"
-version = "1.0.21"
+version = "1.0.22"
 description = "Smashq - Manage and monitor Claude CLI sessions"
 authors = ["ARO-LABS"]
 license = "MIT"
