@@ -24,7 +24,7 @@ function Harness(props: {
   });
   return (
     <div ref={containerRef} data-testid="container">
-      <span data-testid="rail" {...r.handleProps}>
+      <span data-testid="rail" {...r.handleProps} onClick={r.onClick}>
         {r.renderWidth}/{String(r.renderCollapsed)}
       </span>
     </div>
@@ -123,6 +123,37 @@ describe("useCollapsibleResize", () => {
     fireEvent.pointerMove(rail, { clientX: 350, pointerId: 1 });
     fireEvent.pointerUp(rail, { clientX: 350, pointerId: 1 });
     expect(onCommit).toHaveBeenCalledWith({ width: 350, collapsed: false });
+  });
+
+  it("the synthetic click after a drag-to-collapse does not re-open", () => {
+    // Regression: pointerdown+up on one element fires a trailing click event.
+    // Without suppression, that click would call restore() and undo the collapse.
+    const onCommit = vi.fn();
+    const { getByTestId } = render(
+      <Harness side="left" collapsed={false} onCommit={onCommit} />,
+    );
+    stubRect(getByTestId("container"), { left: 0, right: 1000 });
+    const rail = getByTestId("rail");
+    // left width = clientX - 0. Drag to clientX 100 → raw 100 < (180 - 40)? here
+    // min is 250 so 100 < 210 → collapse.
+    fireEvent.pointerDown(rail, { clientX: 300, pointerId: 1 });
+    fireEvent.pointerMove(rail, { clientX: 100, pointerId: 1 });
+    fireEvent.pointerUp(rail, { clientX: 100, pointerId: 1 });
+    fireEvent.click(rail); // the trailing synthetic click
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(
+      expect.objectContaining({ collapsed: true }),
+    );
+  });
+
+  it("a genuine click on the collapsed rail restores the last width", () => {
+    const onCommit = vi.fn();
+    const { getByTestId } = render(
+      <Harness side="left" collapsed={true} onCommit={onCommit} />,
+    );
+    stubRect(getByTestId("container"), { left: 0, right: 1000 });
+    fireEvent.click(getByTestId("rail"));
+    expect(onCommit).toHaveBeenCalledWith({ width: 300, collapsed: false });
   });
 
   it("a click without movement does not commit (no accidental resize)", () => {

@@ -39,7 +39,13 @@ export interface UseCollapsibleResizeResult {
   /** True while a pointer drag is active — gate the width CSS transition off. */
   isDragging: boolean;
   handleProps: CollapsibleResizeHandlers;
-  /** Click-to-restore: reopen to the last expanded width. */
+  /**
+   * Click handler for the rail. Restores (reopens) when collapsed, no-op when
+   * open — and suppresses exactly one click synthesized right after a drag, so
+   * dragging past the threshold to collapse does not immediately re-open.
+   */
+  onClick: () => void;
+  /** Programmatic restore (reopen to the last expanded width). */
   restore: () => void;
 }
 
@@ -80,6 +86,9 @@ export function useCollapsibleResize(
   const [dragging, setDragging] = useState(false);
   const startXRef = useRef(0);
   const movedRef = useRef(false);
+  // Set on pointerup after a real drag so the synthetic click that the browser
+  // fires next (pointerdown+up on one element) is swallowed once.
+  const suppressClickRef = useRef(false);
   // Remember the last expanded width so a collapsed rail can restore to it.
   const lastWidthRef = useRef(width);
   if (!dragging && !collapsed) lastWidthRef.current = width;
@@ -134,8 +143,9 @@ export function useCollapsibleResize(
       const final = live;
       setLive(null);
       // A pointerdown with no movement is a click, not a resize — leave state
-      // untouched (the rail's onClick handles restore when collapsed).
+      // untouched (onClick handles restore when collapsed).
       if (wasDrag && final) {
+        suppressClickRef.current = true;
         if (!final.collapsed) lastWidthRef.current = final.width;
         onCommit(final);
       }
@@ -147,11 +157,22 @@ export function useCollapsibleResize(
     onCommit({ width: lastWidthRef.current, collapsed: false });
   }, [onCommit]);
 
+  const onClick = useCallback(() => {
+    // Swallow exactly one click if it was synthesized after a drag — otherwise
+    // dragging past the threshold to collapse would immediately re-open here.
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    if (collapsed) restore();
+  }, [collapsed, restore]);
+
   return {
     renderWidth: live?.width ?? width,
     renderCollapsed: live?.collapsed ?? collapsed,
     isDragging: dragging,
     handleProps: { onPointerDown, onPointerMove, onPointerUp },
+    onClick,
     restore,
   };
 }
