@@ -10,6 +10,7 @@ import { folderLabel } from "../../utils/pathUtils";
 import { resolveSessionAccent, accentCssVars, accentColorFor, type AccentName } from "../../utils/sessionAccent";
 import { getGridMiniMap } from "./sessionGridLayout";
 import { SessionAccentMenu } from "./SessionAccentMenu";
+import { resolveClaudeIdByAnchor } from "./hooks/claudeIdDiscovery";
 
 const X = ICONS.action.close;
 const FolderOpen = ICONS.action.folderOpen;
@@ -99,6 +100,18 @@ const SessionCardInner = ({ session, isActive, gridSlot, onClick, onClose }: Ses
       settings.setPendingTitleOverride(session.id, trimmed);
       if (session.claudeSessionId) {
         settings.flushPendingTitleOverride(session.id, session.claudeSessionId);
+      } else {
+        // UUID not discovered yet — without this the rename never reaches the
+        // History viewer (it only reads sessionTitleOverrides[uuid], never the
+        // pending map). Try a one-shot anchored resolve now; on a miss the
+        // intent stays pending and the discovery/restore seams flush later.
+        void resolveClaudeIdByAnchor(session.id).then((uuid) => {
+          if (uuid) {
+            useSettingsStore
+              .getState()
+              .flushPendingTitleOverride(session.id, uuid);
+          }
+        });
       }
     }
     setIsEditing(false);

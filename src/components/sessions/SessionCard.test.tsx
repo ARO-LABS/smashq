@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { SessionCard } from "./SessionCard";
 import { useSessionStore } from "../../store/sessionStore";
 import { useSettingsStore } from "../../store/settingsStore";
@@ -183,6 +183,114 @@ describe("SessionCard", () => {
     expect(screen.queryByLabelText("Session umbenennen")).toBeNull();
     const updated = useSessionStore.getState().sessions.find((s) => s.id === "sess-rename");
     expect(updated?.title).toBe("New Title");
+  });
+
+  it("rename BEFORE discovery resolved the UUID: anchored one-shot resolve flushes the override", async () => {
+    // Bug repro: History reads sessionTitleOverrides[uuid] only — a rename
+    // while claudeSessionId is still unknown used to strand the intent in
+    // pendingTitleOverrides until (if ever) discovery resolved. The rename
+    // itself must now trigger a time-anchored scan so History updates too.
+    const UUID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    useSessionStore.getState().addSession({
+      id: "sess-pre-uuid",
+      title: "Alter Titel",
+      folder: "C:/proj/pre-uuid",
+      shell: "powershell",
+    });
+    const stored = useSessionStore
+      .getState()
+      .sessions.find((s) => s.id === "sess-pre-uuid")!;
+    const session = makeSession({
+      id: "sess-pre-uuid",
+      title: "Alter Titel",
+      folder: "C:/proj/pre-uuid",
+      claudeSessionId: undefined,
+      createdAt: stored.createdAt,
+    });
+
+    mockedInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "scan_claude_sessions") {
+        // jsonl written ~1.5s after the card was created → inside tolerance.
+        return [
+          {
+            session_id: UUID,
+            started_at: new Date(stored.createdAt + 1_500).toISOString(),
+          },
+        ];
+      }
+      return undefined;
+    });
+
+    renderCard(session);
+    fireEvent.doubleClick(screen.getByText("Alter Titel"));
+    const input = screen.getByLabelText("Session umbenennen");
+    fireEvent.change(input, { target: { value: "Neuer Titel" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(useSettingsStore.getState().sessionTitleOverrides[UUID]).toBe(
+        "Neuer Titel",
+      );
+    });
+    // The resolve also heals the missing UUID on the runtime session.
+    expect(
+      useSessionStore.getState().sessions.find((s) => s.id === "sess-pre-uuid")
+        ?.claudeSessionId,
+    ).toBe(UUID);
+  });
+
+  it("rename before discovery does NOT guess when no history entry is near the anchor", async () => {
+    const FAR_UUID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+    useSessionStore.getState().addSession({
+      id: "sess-no-anchor",
+      title: "Alter Titel",
+      folder: "C:/proj/no-anchor",
+      shell: "powershell",
+    });
+    const stored = useSessionStore
+      .getState()
+      .sessions.find((s) => s.id === "sess-no-anchor")!;
+    const session = makeSession({
+      id: "sess-no-anchor",
+      title: "Alter Titel",
+      folder: "C:/proj/no-anchor",
+      claudeSessionId: undefined,
+      createdAt: stored.createdAt,
+    });
+
+    mockedInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "scan_claude_sessions") {
+        // Only candidate is hours away from the anchor — must not be claimed.
+        return [
+          {
+            session_id: FAR_UUID,
+            started_at: new Date(stored.createdAt - 7_200_000).toISOString(),
+          },
+        ];
+      }
+      return undefined;
+    });
+
+    renderCard(session);
+    fireEvent.doubleClick(screen.getByText("Alter Titel"));
+    const input = screen.getByLabelText("Session umbenennen");
+    fireEvent.change(input, { target: { value: "Neuer Titel" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    // Intent is parked in pendingTitleOverrides (discovery seams flush later)…
+    await waitFor(() => {
+      expect(
+        useSettingsStore.getState().pendingTitleOverrides["sess-no-anchor"],
+      ).toBe("Neuer Titel");
+    });
+    // …but nothing was guessed: no override, no UUID on the session.
+    expect(
+      useSettingsStore.getState().sessionTitleOverrides[FAR_UUID],
+    ).toBeUndefined();
+    expect(
+      useSessionStore.getState().sessions.find((s) => s.id === "sess-no-anchor")
+        ?.claudeSessionId,
+    ).toBeUndefined();
   });
 
   it("cancels rename on Escape without changing title", () => {

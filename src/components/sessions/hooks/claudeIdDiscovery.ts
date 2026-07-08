@@ -55,6 +55,51 @@ export function pickBestHistoryMatch(
 }
 
 /**
+ * One-shot, time-anchored UUID resolve for a single session.
+ *
+ * Used by rename (SessionCard.commitRename): a rename while the UUID is
+ * still unknown must not strand its intent in `pendingTitleOverrides` —
+ * the History viewer only reads `sessionTitleOverrides[uuid]`. This scans
+ * the folder's history immediately and attaches the closest unclaimed
+ * entry (same heuristic + tolerance as the retrying discovery machine).
+ *
+ * Deliberately strict: no match within tolerance → null, never a guess.
+ * The resolved UUID is written to the session, so it also feeds the
+ * `--resume` path — a loose match here would recreate the
+ * wrong-session-restore bug.
+ */
+export async function resolveClaudeIdByAnchor(
+  id: string,
+): Promise<string | null> {
+  const session = useSessionStore.getState().sessions.find((s) => s.id === id);
+  if (!session) return null;
+  if (session.claudeSessionId) return session.claudeSessionId;
+
+  try {
+    const history = await invoke<ClaudeHistoryEntry[]>("scan_claude_sessions", {
+      folder: session.folder,
+    });
+    if (!history || history.length === 0) return null;
+
+    const isClaimed = (sid: string): boolean =>
+      useSessionStore
+        .getState()
+        .sessions.some((s) => s.claudeSessionId === sid);
+    const match = pickBestHistoryMatch(history, session.createdAt, isClaimed);
+    if (!match) return null;
+
+    useSessionStore.getState().setClaudeSessionId(id, match.session_id);
+    return match.session_id;
+  } catch {
+    logWarn(
+      "claudeIdDiscovery",
+      `One-shot-Resolve für "${session.folder}" fehlgeschlagen — Rename bleibt pending`,
+    );
+    return null;
+  }
+}
+
+/**
  * The claudeSessionId-discovery state machine, lifted out of
  * `useSessionEvents` into a factory so the hook stays a thin listener
  * registrar. The factory OWNS the three mutable closures the machine needs
