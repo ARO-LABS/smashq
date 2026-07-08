@@ -6,6 +6,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Behoben
+- „Was ist neu"-Fenster erschien nach einem Update von Versionen vor 1.0.23 nicht — Bestands-Installationen wurden bei der Settings-Migration fälschlich als Neuinstallationen gewertet (fehlendes `lastSeenVersion` → null). Die Migration setzt jetzt einen Upgrade-Marker; echte Neuinstallationen bleiben unberührt.
+
 ## [1.0.23] — 2026-07-08
 
 Session-Zuordnung repariert (richtige Session beim Restore, Umbenennen erreicht

@@ -43,6 +43,24 @@ export interface WhatsNewEntry {
 }
 
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
+  // RUMPF fuer den naechsten Release — beim Release-Tag kuratieren:
+  // version/date gegen die Manifeste pruefen (exakter Match Pflicht, sonst
+  // stiller Skip) und Highlights/Watchouts aus dem CHANGELOG ergaenzen.
+  {
+    version: "1.0.24",
+    date: "2026-07-08",
+    intro: "Dieses Update behebt die Anzeige der Update-Hinweise nach einem Update von aelteren Versionen.",
+    highlights: [
+      {
+        icon: "update",
+        title: "Update-Hinweise erscheinen jetzt fuer alle",
+        text: "Das \"Was ist neu\"-Fenster oeffnete sich nach einem Update von Versionen vor 1.0.23 nicht — die App hielt Bestands-Installationen faelschlich fuer Neuinstallationen. Ab jetzt erscheint es nach jedem Update einmalig.",
+      },
+    ],
+    watchouts: [
+      "Dieses Fenster wurde beim 1.0.23-Update uebersprungen — die 1.0.23-Aenderungen (Session-Zuordnung, macOS, Azure-Design) stehen im vollstaendigen Changelog.",
+    ],
+  },
   {
     version: "1.0.23",
     date: "2026-07-08",
