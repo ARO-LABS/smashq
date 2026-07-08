@@ -61,6 +61,15 @@ describe("dedupRestorableSessions", () => {
     expect(result[1].title).toBe("second");
   });
 
+  it("carries createdAt into the persisted snapshot (restore-scan time anchor)", () => {
+    const result = dedupRestorableSessions([
+      makeSession({ id: "s1", title: "m2", createdAt: 1_751_364_000_000 }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].createdAt).toBe(1_751_364_000_000);
+  });
+
   it("never deduplicates sessions without a claudeSessionId — even if folder matches", () => {
     // Two fresh sessions in the same folder before discovery has run are
     // legitimately distinct. The restore-side claim set assigns distinct
@@ -101,7 +110,7 @@ describe("dedupRestorableSessions", () => {
 
     expect(result).toHaveLength(1);
     expect(Object.keys(result[0]).sort()).toEqual(
-      ["claudeSessionId", "folder", "shell", "title"].sort(),
+      ["claudeSessionId", "createdAt", "folder", "shell", "title"].sort(),
     );
   });
 });

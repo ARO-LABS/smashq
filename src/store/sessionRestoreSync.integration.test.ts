@@ -101,7 +101,11 @@ describe("sessionRestoreSync — Layer-B integration", () => {
     }
   });
 
-  it("persisted shape ONLY has folder, title, shell, claudeSessionId — never lastOutputSnippet/createdAt etc.", () => {
+  // createdAt moved from "forbidden" to "allowed": it is the time anchor the
+  // restore-side scan fallback needs to resume the RIGHT session when no
+  // claudeSessionId was persisted (wrong-session-restore fix). It is a plain
+  // epoch timestamp — no content leak, unlike lastOutputSnippet.
+  it("persisted shape ONLY has folder, title, shell, claudeSessionId, createdAt — never lastOutputSnippet etc.", () => {
     const session = useSessionStore.getState();
 
     session.addSession({
@@ -118,7 +122,13 @@ describe("sessionRestoreSync — Layer-B integration", () => {
     const persisted = useSettingsStore.getState().sessionRestore.sessions;
     expect(persisted).toHaveLength(1);
 
-    const allowedKeys = new Set(["folder", "title", "shell", "claudeSessionId"]);
+    const allowedKeys = new Set([
+      "folder",
+      "title",
+      "shell",
+      "claudeSessionId",
+      "createdAt",
+    ]);
     const actualKeys = Object.keys(persisted[0]);
     for (const key of actualKeys) {
       expect(allowedKeys.has(key)).toBe(true);
@@ -128,7 +138,6 @@ describe("sessionRestoreSync — Layer-B integration", () => {
     const recordView = persisted[0] as unknown as Record<string, unknown>;
     expect(recordView.lastOutputSnippet).toBeUndefined();
     expect(recordView.lastOutputAt).toBeUndefined();
-    expect(recordView.createdAt).toBeUndefined();
     expect(recordView.finishedAt).toBeUndefined();
     expect(recordView.exitCode).toBeUndefined();
     expect(recordView.status).toBeUndefined();

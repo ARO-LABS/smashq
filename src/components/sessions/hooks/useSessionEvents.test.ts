@@ -511,6 +511,55 @@ describe("useSessionEvents", () => {
       expect(mockSetClaudeSessionId).not.toHaveBeenCalled();
       expect(mockSetSessionTitleOverride).not.toHaveBeenCalled();
     });
+
+    it("rejects a UUID already owned by ANOTHER session (watcher race claim-check)", () => {
+      // Two fresh spawns in the same folder within one watcher poll window can
+      // emit the SAME uuid for both cards. The second event must be dropped —
+      // accepting it would mirror two cards onto one backend session and
+      // persist the corruption into every future restart.
+      mockSessionsData = [
+        { id: "tab-1", createdAt: 1000, folder: "C:/proj", title: "A" },
+        {
+          id: "tab-2",
+          createdAt: 1001,
+          folder: "C:/proj",
+          title: "B",
+          claudeSessionId: "deterministic-uuid",
+        },
+      ];
+
+      renderHook(() => useSessionEvents());
+      const cb = getListenCallback("session-claude-id-resolved");
+
+      cb({ payload: { id: "tab-1", claudeSessionId: "deterministic-uuid" } });
+
+      expect(mockSetClaudeSessionId).not.toHaveBeenCalled();
+      expect(mockSetSessionTitleOverride).not.toHaveBeenCalled();
+      expect(mockFlushPendingTitleOverride).not.toHaveBeenCalled();
+    });
+
+    it("still accepts a re-delivered event for the session that already owns the UUID", () => {
+      // Idempotence guard: ownership by the SAME session is not a conflict.
+      mockSessionsData = [
+        {
+          id: "tab-1",
+          createdAt: 1000,
+          folder: "C:/proj",
+          title: "A",
+          claudeSessionId: "deterministic-uuid",
+        },
+      ];
+
+      renderHook(() => useSessionEvents());
+      const cb = getListenCallback("session-claude-id-resolved");
+
+      cb({ payload: { id: "tab-1", claudeSessionId: "deterministic-uuid" } });
+
+      expect(mockSetClaudeSessionId).toHaveBeenCalledWith(
+        "tab-1",
+        "deterministic-uuid",
+      );
+    });
   });
 });
 
