@@ -7,6 +7,16 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-07-08 — macOS-Updater-Setup: zwei tückische Klassen — Bash-Tool ≠ PowerShell-Syntax, und Secret-Name-Tippfehler den grüne Gates nie fangen
+
+**Kontext:** macOS-Auto-Updater aktiviert (Developer-ID-Cert via openssl+Browser erzeugt, 7 GitHub-Secrets, `release.yml`-`build-macos` umgebaut). Zwei Fehler, beide „still" — kein Build/Test hätte sie gefangen.
+
+**Fehler 1 — PowerShell-Heredoc im Bash-Tool:** `git commit -m @'…'@` im Bash-Tool ausgeführt. Das Bash-Tool ist **git bash (POSIX sh)**, nicht PowerShell — dort ist `@'` nur `@` + einfach-quotierter String → ein `@` landete als erste Zeile der Commit-Message. **Fehler 2 — Secret-Name-Tippfehler:** User setzte das App-Passwort-Secret als `APPLE_PASSWORT` (deutsch, mit T). `tauri-action` + der Workflow erwarten die Env-Var `APPLE_PASSWORD` (englisch, mit D); der Workflow mappt `APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}` → das Mapping griff ins Leere → Build hätte **still nur signiert statt notarisiert**, ohne Fehlermeldung. Gefunden nur durch `gh secret list`-Verifikation statt der User-Aussage „ist gesetzt" zu glauben.
+
+**Korrektur:** (1) Commit-Message via Datei + `git commit -F <datei>` neu gesetzt (`--amend`, da lokal/ungepusht). (2) Typo dem User gezeigt (`gh secret list`) + Fix-Befehle: `gh secret set APPLE_PASSWORD` neu + `gh secret delete APPLE_PASSWORT`. Env-Var-Name bleibt korrekt `APPLE_PASSWORD` (Tauri-fix), nur der Secret-Name war falsch.
+
+**Regel:** (1) Im **Bash-Tool** niemals PowerShell-Syntax — Multi-line-Strings via echtes POSIX-Heredoc `<<'EOF'` oder Datei+`-F`; `@'…'@` gilt nur im PowerShell-Tool. Commit-Messages generell per `-F` (Message vorher mit Write schreiben) → null Quoting-Risiko. (2) GitHub-**Secret-Name ≠ Env-Var-Name**: der Workflow mappt beide; ein Tippfehler im Secret-Namen macht das Mapping still leer, kein Gate fängt es. Nach jedem User-„Secret ist gesetzt" mit `gh secret list` gegen den EXAKT im Workflow referenzierten Namen prüfen. (3) Tauri-Signing/Notarize-Env-Namen sind fix (`APPLE_PASSWORD`/`APPLE_ID`/`APPLE_TEAM_ID`/`APPLE_SIGNING_IDENTITY`) — die stehen links im `env:`, frei ist nur der `secrets.*`-Name rechts. Verwandt: [[bash-tool-not-powershell]], [[macos-updater-progress]], Projektregel „Nicht behaupten, verifizieren".
+
 ### 2026-07-07 — Design-System-Remediation: zwei CSS-Fallen, die grüne Gates NICHT fangen (Tailwind-Opacity auf var-Farben + OKLCH-Gamma-Crush am schwarzen Ende)
 
 **Kontext:** Token-Kette-Fix (cyan→azure Rebrand + Tailwind-Token-Mapping) plus visuelles Feedback (Dark-Mode-Surfaces „verschmolzen"). Zwei Bugs waren rein visuell — tsc/eslint/vitest/build alle grün, weil keiner davon gerenderte Pixel prüft.
