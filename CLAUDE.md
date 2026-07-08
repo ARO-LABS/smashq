@@ -80,6 +80,28 @@ npm run lint             # ESLint
 - [ ] Visuelle Pruefung bei UI-Aenderungen
 - [ ] Tauri-Commands: Input validiert? Path Traversal? Shell-Injection? Timeout? Fehler strukturiert?
 
+## Release-Prozess
+
+Ein Release wird durch einen Tag-Push (`v*`) ausgeloest — `release.yml` baut, signiert und published dann automatisch. Checkliste in dieser Reihenfolge:
+
+1. **Version bumpen** in ALLEN drei Manifesten: `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` — danach `cd src-tauri && cargo check` (zieht `Cargo.lock` nach). **Semver-Falle:** Die neue Version MUSS groesser sein als die alte — der Tauri-Updater vergleicht semver und bietet eine kleinere Version niemandem an (z.B. waere 1.0.3 nach 1.0.21 fuer alle Bestands-User unsichtbar).
+2. **`CHANGELOG.md`**: `[Unreleased]`-Inhalte in eine neue `[x.y.z] — YYYY-MM-DD`-Sektion ueberfuehren (Keep-a-Changelog, deutsch, Rubriken Hinzugefuegt/Behoben/Geaendert/Sicherheit).
+3. **`src/whatsNew.ts` kuratieren** (Whats-New-Modal, siehe unten): Rumpf-Eintrag der Zielversion mit 3-6 Highlights + 2-4 Watchouts fuellen. **`version` MUSS exakt der App-Version entsprechen** — bei Mismatch zeigt die App still KEIN Modal (bewusster Silent-Skip fuer Wartungs-Releases). Nach dem Release direkt den Rumpf fuer den Folge-Release anlegen (Vergessens-Schutz: ein unkuratierter Rumpf faellt als duennes Modal auf).
+4. **Pflege-Trigger** (siehe Arbeitsweise): `tasks/todo.md` + `tasks/lessons.md` aktualisieren.
+5. **Gates**: `npx tsc --noEmit && npm run build`, volle vitest-Suite; bei beruehrten Updater-Pfaden Triple-Check (siehe unten).
+6. **Taggen + pushen**: `git push && git tag -a vX.Y.Z -m "..." && git push origin vX.Y.Z`. Danach `gh run watch` — Jobs: `build-windows` → `refresh-design-doc` → `build-macos` (signiert + notarisiert, merged `darwin-*`-Keys in die `latest.json`).
+7. **Nach dem Lauf**: Release-Notes setzen (`gh release edit vX.Y.Z --notes-file ...`, kuratierte Highlights + „Worauf achten"), `latest.json` pruefen (windows- UND darwin-Keys vorhanden).
+
+**Stolperfalle Bot-Commit:** Der Job `refresh-design-doc` regeneriert `docs/developer-doc.html` aus der laufenden App (Playwright) und committet als `github-actions[bot]` DIREKT auf master (`[skip ci]`). Lokale Pushes waehrend/nach einem Release-Lauf brauchen daher oft `git pull --rebase`.
+
+## Whats-New-Modal (Update-Hinweise)
+
+Einmaliges „Was ist neu"-Fenster nach jedem Update. Template/Content-Trennung:
+- **Content**: `src/whatsNew.ts` — ein kuratierter Eintrag pro Release (`version` = exakter Match zur App-Version, sonst stiller Skip). Icons sind eine geschlossene `WhatsNewIconKey`-Union, gemappt auf die `ICONS`-Registry in `WhatsNewModal.tsx` — neuer Icon-Wunsch = bewusste Union-Erweiterung, kein Freitext.
+- **Template**: `src/components/shared/WhatsNewModal.tsx` (ui/Modal-Basis) — wird pro Release NICHT angefasst.
+- **Gating**: `src/hooks/useWhatsNew.ts` vergleicht `getVersion()` mit persistiertem `settingsStore.lastSeenVersion` (Schema v12). Gestempelt wird beim ANZEIGEN (Crash-sicher). `null` = echte Neuinstallation (kein Modal); die Settings-MIGRATION seedet fuer Bestands-User den Sentinel `"0.0.0"` — migrate laeuft nur bei existierendem Persist-Blob, das unterscheidet Upgrade von Neuinstallation. Diesen Sentinel-Mechanismus NICHT entfernen: ohne ihn sieht die gesamte Bestandsbasis nach einem Update kein Modal (Bug beim v1.0.23-Rollout).
+- Mount in `App.tsx` — bewusst NICHT in `AppShell` (geschuetzter Updater-Pfad).
+
 ## Auto-Updater (HARTE REGEL — kritisches Feature)
 
 Der Tauri-Auto-Updater ist der einzige Pfad, ueber den Bugfixes die installierte User-Base erreichen. Eine stille Regression hier bedeutet: User bleiben unbegrenzt auf einer kaputten Version festgenagelt, ohne sichtbaren Weg nach vorn. **Bei jeder Aenderung an einer der unten gelisteten Dateien ist Triple-Check Pflicht. Keine Ausnahme.**
