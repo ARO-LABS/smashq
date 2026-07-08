@@ -21,6 +21,7 @@ const HIGHLIGHT_ICONS: Record<WhatsNewIconKey, typeof ICONS.action.retry> = {
   design: ICONS.theme.dark,
   update: ICONS.update.available,
   terminal: ICONS.action.terminal,
+  logs: ICONS.nav.logs,
 };
 
 const WarnIcon = ICONS.toast.error;

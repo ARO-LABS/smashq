@@ -20,7 +20,8 @@ export type WhatsNewIconKey =
   | "panels"
   | "design"
   | "update"
-  | "terminal";
+  | "terminal"
+  | "logs";
 
 export interface WhatsNewHighlight {
   icon: WhatsNewIconKey;
@@ -43,25 +44,30 @@ export interface WhatsNewEntry {
 
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
   {
-    version: "1.0.22",
+    version: "1.0.23",
     date: "2026-07-08",
     intro:
-      "Dieses Update buendelt das Azure-Design, flexible Seitenpanels, den macOS-Auto-Updater und zwei Fixes in der Session-Zuordnung.",
+      "Dieses Update repariert die Session-Zuordnung, bringt macOS voll ans Laufen, macht die Seitenpanels flexibel und stellt das Design auf Azure um.",
     highlights: [
       {
         icon: "restore",
         title: "Restore setzt die richtige Session fort",
-        text: "Beim App-Start wird jede Kachel ueber einen Zeitanker ihrer urspruenglichen Claude-Session zugeordnet — nicht mehr der neuesten Session im Projektordner.",
+        text: "Beim App-Start wird jede Kachel ueber einen Zeitanker ihrer urspruenglichen Claude-Session zugeordnet — nicht mehr der neuesten im Projektordner. Parallel gestartete Sessions koennen ihre Identitaet nicht mehr vertauschen.",
       },
       {
         icon: "edit",
         title: "Umbenennen erreicht den Verlauf",
-        text: "Ein neuer Titel erscheint jetzt auch in der Verlaufs-Ansicht des Konfigurations-Panels — auch direkt nach dem Erstellen einer Session.",
+        text: "Ein neuer Titel erscheint jetzt auch in der Verlaufs-Ansicht des Konfigurations-Panels — auch direkt nach dem Erstellen einer Session. Die Leertaste funktioniert im Umbenennen-Feld wieder.",
       },
       {
-        icon: "stability",
-        title: "Stabile Zuordnung bei parallelen Sessions",
-        text: "Zwei gleichzeitig gestartete Sessions im selben Projekt koennen ihre Identitaet nicht mehr vertauschen.",
+        icon: "update",
+        title: "macOS: Sessions starten, Updates laufen",
+        text: "Sessions starten auf macOS jetzt zuverlaessig (Shell-Fallback plus PATH aus der Login-Shell). Builds sind signiert und notarisiert — Auto-Updates laufen wie unter Windows.",
+      },
+      {
+        icon: "logs",
+        title: "Protokolle mit mehr Kontrolle",
+        text: "Neue Scope- (Session/Alle) und Sortier-Steuerung, Loeschen wirkt in allen Fenstern, und der Papierkorb entfernt die Log-Datei jetzt wirklich von der Platte.",
       },
       {
         icon: "panels",
@@ -71,18 +77,13 @@ export const WHATS_NEW: readonly WhatsNewEntry[] = [
       {
         icon: "design",
         title: "Azure-Design mit klarerem Dark Mode",
-        text: "Der Akzent wechselt von Cyan auf Azure; dunkle Flaechen sind deutlicher voneinander getrennt.",
-      },
-      {
-        icon: "update",
-        title: "Auto-Updates auf macOS",
-        text: "macOS-Builds sind signiert und notarisiert — Updates laufen dort jetzt wie unter Windows ueber den eingebauten Updater.",
+        text: "Der Akzent wechselt von Cyan auf Azure (eine gewaehlte Cyan-Projektfarbe wird automatisch migriert); dunkle Flaechen sind deutlicher voneinander getrennt.",
       },
     ],
     watchouts: [
       "Findet der Restore keine eindeutige Zuordnung, startet die Session frisch, statt eine falsche fortzusetzen. Aeltere Sessions lassen sich ueber den Verlauf manuell fortsetzen.",
       "Einmalig nach dem Update: Sessions aus der Vorversion haben noch keinen Zeitanker und nutzen die bisherige Zuordnung.",
-      "Eine zuvor gewaehlte Cyan-Akzentfarbe wird automatisch auf Azure migriert.",
+      "Der Papierkorb in den Protokollen loescht die Log-Datei jetzt endgueltig (inklusive rotierter Dateien) — vorher wurde nur die Ansicht geleert.",
       "Terminal-Farben folgen dem App-Theme nur noch per Opt-in (Einstellungen) — laufende Programme behalten so ihre Farbwahl.",
     ],
   },

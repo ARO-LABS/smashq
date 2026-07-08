@@ -3,9 +3,9 @@ import { WHATS_NEW, getWhatsNewEntry } from "./whatsNew";
 
 describe("whatsNew content module", () => {
   it("getWhatsNewEntry returns the curated entry for v1.0.22", () => {
-    const entry = getWhatsNewEntry("1.0.22");
+    const entry = getWhatsNewEntry("1.0.23");
     expect(entry).not.toBeNull();
-    expect(entry?.version).toBe("1.0.22");
+    expect(entry?.version).toBe("1.0.23");
     // Curated window contract: 3-6 highlights, 2-4 watchouts — enough to be
     // useful, few enough to stay a digest instead of a second changelog.
     expect(entry!.highlights.length).toBeGreaterThanOrEqual(3);

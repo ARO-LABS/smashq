@@ -15,7 +15,7 @@ vi.mock("../utils/errorLogger", () => ({
   logWarn: vi.fn(),
 }));
 
-// "1.0.22" HAS a curated entry in whatsNew.ts; "9.9.9" has none.
+// "1.0.23" HAS a curated entry in whatsNew.ts; "9.9.9" has none.
 // Tests run against the REAL content module so the gating logic and the
 // content contract are exercised together.
 
@@ -27,20 +27,20 @@ describe("useWhatsNew", () => {
 
   it("new version WITH entry: returns the entry and stamps lastSeenVersion", async () => {
     useSettingsStore.setState({ lastSeenVersion: "1.0.21" });
-    mockGetVersion.mockResolvedValue("1.0.22");
+    mockGetVersion.mockResolvedValue("1.0.23");
 
     const { result } = renderHook(() => useWhatsNew());
 
     await waitFor(() => {
-      expect(result.current.entry?.version).toBe("1.0.22");
+      expect(result.current.entry?.version).toBe("1.0.23");
     });
     // Stamped on SHOW, not on dismiss — survives a crash before "Verstanden".
-    expect(useSettingsStore.getState().lastSeenVersion).toBe("1.0.22");
+    expect(useSettingsStore.getState().lastSeenVersion).toBe("1.0.23");
   });
 
   it("already seen version: no entry", async () => {
-    useSettingsStore.setState({ lastSeenVersion: "1.0.22" });
-    mockGetVersion.mockResolvedValue("1.0.22");
+    useSettingsStore.setState({ lastSeenVersion: "1.0.23" });
+    mockGetVersion.mockResolvedValue("1.0.23");
 
     const { result } = renderHook(() => useWhatsNew());
 
@@ -51,12 +51,12 @@ describe("useWhatsNew", () => {
   });
 
   it("fresh install (lastSeenVersion null): no modal, only the stamp", async () => {
-    mockGetVersion.mockResolvedValue("1.0.22");
+    mockGetVersion.mockResolvedValue("1.0.23");
 
     const { result } = renderHook(() => useWhatsNew());
 
     await waitFor(() => {
-      expect(useSettingsStore.getState().lastSeenVersion).toBe("1.0.22");
+      expect(useSettingsStore.getState().lastSeenVersion).toBe("1.0.23");
     });
     expect(result.current.entry).toBeNull();
   });
@@ -75,7 +75,7 @@ describe("useWhatsNew", () => {
 
   it("dismiss clears the entry", async () => {
     useSettingsStore.setState({ lastSeenVersion: "1.0.21" });
-    mockGetVersion.mockResolvedValue("1.0.22");
+    mockGetVersion.mockResolvedValue("1.0.23");
 
     const { result } = renderHook(() => useWhatsNew());
     await waitFor(() => {
