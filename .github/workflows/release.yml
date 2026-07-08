@@ -15,6 +15,9 @@ jobs:
   # wiederverwendet (kein paralleler create-release-Race mehr).
   build-windows:
     runs-on: windows-latest
+    # Normaler Lauf ~11min — 40min faengt Haenger frueh, bevor sie den
+    # (auf build-windows wartenden) macOS-Job stundenlang blockieren.
+    timeout-minutes: 40
     outputs:
       release_id: ${{ steps.tauri.outputs.releaseId }}
     steps:
@@ -34,6 +37,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          # Auch bei Fehlschlag speichern: ein Re-Run desselben Tags restored
+          # dann die kompilierten Deps statt ~10min neu zu bauen (v1.0.23:
+          # zwei Notarize-Haenger, jeder Retry kompilierte von Null).
+          cache-on-failure: true
 
       - name: Build Windows app and create release
         id: tauri
@@ -58,6 +65,8 @@ jobs:
   refresh-design-doc:
     needs: build-windows
     runs-on: ubuntu-latest
+    # Normaler Lauf <1min; best-effort-Job, darf nie lange blockieren.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -95,6 +104,12 @@ jobs:
   build-macos:
     needs: build-windows
     runs-on: macos-latest
+    # Normaler Lauf 8-13min (Universal-Compile + Notarize). Apples
+    # Notarize-Polling kann bei Runner-Netzwerkabriss ENDLOS haengen
+    # (tauri-action exponiert kein notarytool-Timeout; GitHub-Default waere
+    # 6h) — v1.0.23 hing so 4h als Zombie auf 10x-abgerechneten
+    # macOS-Minuten. 60min = klarer Fail statt Haenger, dann Re-Run.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -113,6 +128,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          # Siehe build-windows: Retry desselben Tags soll warm starten.
+          cache-on-failure: true
 
       # Developer-ID-Zertifikat in eine temporaere Keychain importieren, damit
       # `codesign` es findet. Base64-Secret dekodieren -> .p12 -> import. Die
