@@ -123,6 +123,9 @@ export function SessionList({ onNewSession, onQuickStart }: SessionListProps): J
         store.addToGrid(sessionId);
       } else {
         store.maximizeGridSession(sessionId);
+        // Maximieren = "zeig mir diese Session" → einen offenen Grid-Preview
+        // abraeumen, sonst legt sich FavoritePreview im Single-Mode drueber.
+        useUIStore.getState().closePreview();
       }
     } else {
       store.setActiveSession(sessionId);

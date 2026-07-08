@@ -76,18 +76,6 @@ export function SessionManagerView() {
     },
   });
 
-  // Grid preview shares the config width but never collapses (transient view).
-  const previewResize = useCollapsibleResize({
-    side: "right",
-    width: configPanelWidth,
-    collapsed: false,
-    min: 250,
-    max: 800,
-    railWidth: 8,
-    collapsible: false,
-    containerRef,
-    onCommit: ({ width }) => setConfigPanelWidth(width),
-  });
   useSessionEvents();
   const { handleResumeSession, handleQuickStart, handleNewSessionFromDefaults } = useSessionCreation();
 
@@ -157,7 +145,7 @@ export function SessionManagerView() {
           tabIndex={0}
           aria-label={leftNav.renderCollapsed ? "Navigation einblenden" : "Navigation ausblenden"}
           title={leftNav.renderCollapsed ? "Klicken oder ziehen zum Öffnen" : "Ziehen zum Anpassen"}
-          onClick={leftNav.renderCollapsed ? leftNav.restore : undefined}
+          onClick={leftNav.onClick}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
@@ -270,7 +258,13 @@ export function SessionManagerView() {
                         {isGridMember && (
                           <GridCellChrome
                             sessionId={session.id}
-                            onMaximize={() => maximizeGridSession(session.id)}
+                            onMaximize={() => {
+                              maximizeGridSession(session.id);
+                              // Maximieren = "zeig mir diese Session" → offenen
+                              // Grid-Preview abraeumen, sonst deckt FavoritePreview
+                              // die Session im Single-Mode zu (X-schliessen noetig).
+                              closePreview();
+                            }}
                             onRemove={() => removeFromGrid(session.id)}
                           />
                         )}
@@ -291,7 +285,7 @@ export function SessionManagerView() {
                     tabIndex={0}
                     aria-label={configResize.renderCollapsed ? "Konfiguration einblenden" : "Konfiguration ausblenden"}
                     title={configResize.renderCollapsed ? "Klicken oder ziehen zum Öffnen" : "Ziehen zum Anpassen"}
-                    onClick={configResize.renderCollapsed ? configResize.restore : undefined}
+                    onClick={configResize.onClick}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
@@ -324,28 +318,40 @@ export function SessionManagerView() {
                 </>
               )}
 
-              {/* Grid preview panel — resize only (transient view, no collapse) */}
+              {/* Grid preview panel — same resize + collapse behaviour as the
+                  single-mode config panel (shares configResize); the X closes it
+                  entirely (closePreview). */}
               {showPreviewPanelGrid && (
                 <>
                   <div
                     role="button"
                     tabIndex={0}
-                    aria-label="Vorschau-Breite anpassen"
-                    title="Ziehen zum Anpassen"
-                    {...previewResize.handleProps}
+                    aria-label={configResize.renderCollapsed ? "Vorschau einblenden" : "Vorschau ausblenden"}
+                    title={configResize.renderCollapsed ? "Klicken oder ziehen zum Öffnen" : "Ziehen zum Anpassen"}
+                    onClick={configResize.onClick}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setConfigPanelCollapsed(!configPanelCollapsed);
+                      }
+                    }}
+                    {...configResize.handleProps}
                     style={{ touchAction: "none" }}
                     className={[
-                      "w-1 shrink-0 cursor-col-resize bg-neutral-700 hover:bg-accent",
+                      "shrink-0 cursor-col-resize bg-neutral-700 hover:bg-accent",
                       "focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2",
-                      previewResize.isDragging ? "" : "transition-colors",
+                      configResize.renderCollapsed ? "w-2" : "w-1",
+                      configResize.isDragging ? "" : "transition-[width] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]",
                     ].join(" ")}
                   />
-                  <ConfigPanel
-                    folder={previewFolder!}
-                    width={previewResize.renderWidth}
-                    onResumeSession={handleResumeSession}
-                    onClose={closePreview}
-                  />
+                  {!configResize.renderCollapsed && (
+                    <ConfigPanel
+                      folder={previewFolder!}
+                      width={configResize.renderWidth}
+                      onResumeSession={handleResumeSession}
+                      onClose={closePreview}
+                    />
+                  )}
                 </>
               )}
             </div>

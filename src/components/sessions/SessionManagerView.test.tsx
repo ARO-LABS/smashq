@@ -445,12 +445,36 @@ describe("SessionManagerView — ConfigPanel & Preview", () => {
       gridSessionIds: ["A", "B"],
       focusedGridSessionId: "A",
     });
-    useUIStore.setState({ previewFolder: "/grid/preview", configPanelCollapsed: true });
+    useUIStore.setState({ previewFolder: "/grid/preview", configPanelCollapsed: false });
 
     render(<SessionManagerView />);
 
     // Grid-Mode + previewFolder → ConfigPanel als Preview-Panel, FavoritePreview NICHT.
     expect(screen.getByTestId("config-panel")).toBeTruthy();
+    expect(screen.queryByTestId("favorite-preview")).toBeNull();
+  });
+
+  it("raeumt den Grid-Preview ab, wenn eine Session aus dem Grid maximiert wird", () => {
+    useSessionStore.setState({
+      sessions: [mockSession("A"), mockSession("B")],
+      activeSessionId: "A",
+      layoutMode: "grid",
+      gridSessionIds: ["A", "B"],
+      focusedGridSessionId: "A",
+    });
+    // Ein offener Grid-Preview darf sich nach dem Maximieren NICHT als
+    // FavoritePreview ueber die Single-Session legen (Regression: Maximieren
+    // zeigte fullscreen die Config statt der Session).
+    useUIStore.setState({ previewFolder: "/grid/preview", configPanelCollapsed: false });
+
+    render(<SessionManagerView />);
+
+    act(() => {
+      fireEvent.click(screen.getAllByLabelText("Maximieren")[0]);
+    });
+
+    expect(useSessionStore.getState().layoutMode).toBe("single");
+    expect(useUIStore.getState().previewFolder).toBeNull();
     expect(screen.queryByTestId("favorite-preview")).toBeNull();
   });
 

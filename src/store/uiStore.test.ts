@@ -462,6 +462,12 @@ describe("previewFolder", () => {
     expect(getState().previewFolder).toBe("/projects/foo");
   });
 
+  it("openPreview forces the shared right panel open (uncollapses)", () => {
+    useUIStore.setState({ configPanelCollapsed: true });
+    getState().openPreview("/projects/foo");
+    expect(getState().configPanelCollapsed).toBe(false);
+  });
+
   it("closePreview resets to null", () => {
     getState().openPreview("/projects/foo");
     getState().closePreview();

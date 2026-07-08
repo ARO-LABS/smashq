@@ -188,7 +188,9 @@ export const useUIStore = create<UIState>()(
   setHasDirtyEditor: (dirty) => set({ hasDirtyEditor: dirty }),
 
   previewFolder: null,
-  openPreview: (folder) => set({ previewFolder: folder }),
+  // Opening a preview means "show it to me" — force the shared right panel open
+  // so a favorite click in grid mode never lands on a collapsed (rail-only) panel.
+  openPreview: (folder) => set({ previewFolder: folder, configPanelCollapsed: false }),
   closePreview: () => set({ previewFolder: null }),
 
   detailPanel: { isOpen: false, type: null, targetId: null },
