@@ -77,9 +77,11 @@ export function resetAllStores(): void {
   useUIStore.setState(
     {
       toasts: [],
-      configPanelOpen: false,
+      configPanelCollapsed: true,
       configSubTab: "claude-md",
       configPanelWidth: 400,
+      leftNavWidth: 240,
+      leftNavCollapsed: false,
       hasDirtyEditor: false,
       previewFolder: null,
       detailPanel: { isOpen: false, type: null, targetId: null },

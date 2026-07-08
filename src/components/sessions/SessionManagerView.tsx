@@ -1,4 +1,4 @@
-import { useState, useEffect, type CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import { markRender } from "../../utils/perfLogger";
 import { SessionList } from "./SessionList";
 import { SessionTerminal } from "./SessionTerminal";
@@ -9,11 +9,10 @@ import { ConfigPanel } from "./ConfigPanel";
 import { FavoritePreview } from "./FavoritePreview";
 import { useSessionStore, selectActiveSession } from "../../store/sessionStore";
 import { useUIStore } from "../../store/uiStore";
-import { useResizeHandle } from "./hooks/useResizeHandle";
+import { useCollapsibleResize } from "../../hooks/useCollapsibleResize";
 import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useSessionCreation } from "./hooks/useSessionCreation";
 import { GRID_AREAS, getGridStyle, SINGLE_LAYOUT_STYLE } from "./sessionGridLayout";
-import { ICONS, ICON_SIZE } from "../../utils/icons";
 import { accentFrameColorFor, resolveSessionAccent } from "../../utils/sessionAccent";
 import { useSettingsStore } from "../../store/settingsStore";
 
@@ -21,10 +20,6 @@ export function SessionManagerView() {
   const renderDone = markRender("SessionManagerView");
   useEffect(() => { renderDone.done(); });
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  const configPanelOpen = useUIStore((s) => s.configPanelOpen);
-  const toggleConfigPanel = useUIStore((s) => s.toggleConfigPanel);
   const sessions = useSessionStore((s) => s.sessions);
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const activeSession = useSessionStore(selectActiveSession);
@@ -36,12 +31,63 @@ export function SessionManagerView() {
   const maximizeGridSession = useSessionStore((s) => s.maximizeGridSession);
   const removeFromGrid = useSessionStore((s) => s.removeFromGrid);
   const configPanelWidth = useUIStore((s) => s.configPanelWidth);
+  const setConfigPanelWidth = useUIStore((s) => s.setConfigPanelWidth);
+  const configPanelCollapsed = useUIStore((s) => s.configPanelCollapsed);
+  const setConfigPanelCollapsed = useUIStore((s) => s.setConfigPanelCollapsed);
+  const leftNavWidth = useUIStore((s) => s.leftNavWidth);
+  const setLeftNavWidth = useUIStore((s) => s.setLeftNavWidth);
+  const leftNavCollapsed = useUIStore((s) => s.leftNavCollapsed);
+  const setLeftNavCollapsed = useUIStore((s) => s.setLeftNavCollapsed);
   const previewFolder = useUIStore((s) => s.previewFolder);
   const closePreview = useUIStore((s) => s.closePreview);
   const sessionAccents = useSettingsStore((s) => s.sessionAccents);
   const folderAccents = useSettingsStore((s) => s.folderAccents);
 
-  const { containerRef, handleResizeStart } = useResizeHandle();
+  // Two anchor refs for the shared resize hook: the OUTER row (left edge → left
+  // nav width) and the inner terminal row (right edge → config panel width).
+  const outerRowRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const leftNav = useCollapsibleResize({
+    side: "left",
+    width: leftNavWidth,
+    collapsed: leftNavCollapsed,
+    min: 180,
+    max: 420,
+    railWidth: 8,
+    containerRef: outerRowRef,
+    onCommit: ({ width, collapsed }) => {
+      setLeftNavWidth(width);
+      setLeftNavCollapsed(collapsed);
+    },
+  });
+
+  const configResize = useCollapsibleResize({
+    side: "right",
+    width: configPanelWidth,
+    collapsed: configPanelCollapsed,
+    min: 250,
+    max: 800,
+    railWidth: 8,
+    containerRef,
+    onCommit: ({ width, collapsed }) => {
+      setConfigPanelWidth(width);
+      setConfigPanelCollapsed(collapsed);
+    },
+  });
+
+  // Grid preview shares the config width but never collapses (transient view).
+  const previewResize = useCollapsibleResize({
+    side: "right",
+    width: configPanelWidth,
+    collapsed: false,
+    min: 250,
+    max: 800,
+    railWidth: 8,
+    collapsible: false,
+    containerRef,
+    onCommit: ({ width }) => setConfigPanelWidth(width),
+  });
   useSessionEvents();
   const { handleResumeSession, handleQuickStart, handleNewSessionFromDefaults } = useSessionCreation();
 
@@ -87,29 +133,46 @@ export function SessionManagerView() {
   }
 
   // ConfigPanel (nur Single-Modus mit aktiver Session) bzw. Preview-Panel (Grid+Single)
-  const showConfigPanelSingle = !isGrid && !showPreview && configPanelOpen && !!activeSession;
+  // Rail is always present for an active single-mode session; the PANEL body
+  // shows only when not collapsed.
+  const showConfigRail = !isGrid && !showPreview && !!activeSession;
   const showPreviewPanelGrid = isGrid && !!previewFolder;
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex flex-1 min-h-0">
-        {/* Left column: Session list (collapsible) */}
-        {!sidebarCollapsed && (
-          <div className="w-[240px] min-w-[240px] border-r border-neutral-700 flex flex-col min-h-0">
+      <div className="flex flex-1 min-h-0" ref={outerRowRef}>
+        {/* Left column: Session list — resizable + collapsible */}
+        {!leftNav.renderCollapsed && (
+          <div
+            className="border-r border-neutral-700 flex flex-col min-h-0 shrink-0"
+            style={{ width: leftNav.renderWidth, minWidth: leftNav.renderWidth }}
+          >
             <SessionList onNewSession={handleNewSessionFromDefaults} onQuickStart={handleQuickStart} />
           </div>
         )}
-        {/* Sidebar toggle — soft, transparent rail visible only on hover */}
-        <button
-          onClick={() => setSidebarCollapsed((v) => !v)}
-          className="w-3 shrink-0 flex items-center justify-center bg-transparent hover:bg-hover-overlay text-neutral-600 hover:text-neutral-300 transition-colors"
-          title={sidebarCollapsed ? "Sidebar einblenden" : "Sidebar ausblenden"}
-          aria-label={sidebarCollapsed ? "Sidebar einblenden" : "Sidebar ausblenden"}
-        >
-          {sidebarCollapsed
-            ? <ICONS.action.chevronRight className={ICON_SIZE.inline} aria-hidden="true" />
-            : <ICONS.action.chevronLeft className={ICON_SIZE.inline} aria-hidden="true" />}
-        </button>
+        {/* Left resize / collapse rail — drag to resize, drag past min to
+            collapse, click to restore when collapsed. */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label={leftNav.renderCollapsed ? "Navigation einblenden" : "Navigation ausblenden"}
+          title={leftNav.renderCollapsed ? "Klicken oder ziehen zum Öffnen" : "Ziehen zum Anpassen"}
+          onClick={leftNav.renderCollapsed ? leftNav.restore : undefined}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setLeftNavCollapsed(!leftNavCollapsed);
+            }
+          }}
+          {...leftNav.handleProps}
+          style={{ touchAction: "none" }}
+          className={[
+            "shrink-0 cursor-col-resize bg-neutral-700 hover:bg-accent",
+            "focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2",
+            leftNav.renderCollapsed ? "w-2" : "w-1",
+            leftNav.isDragging ? "" : "transition-[width] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          ].join(" ")}
+        />
 
         {/* Right column: Terminal + optional Config panel */}
         <div className="flex-1 min-w-0 flex flex-col">
@@ -149,8 +212,8 @@ export function SessionManagerView() {
                     onLayoutChange={setLayoutMode}
                     folder={activeSession?.folder}
                     sessionId={activeSessionId}
-                    configPanelOpen={configPanelOpen}
-                    onToggleConfigPanel={toggleConfigPanel}
+                    configPanelOpen={!configPanelCollapsed}
+                    onToggleConfigPanel={() => setConfigPanelCollapsed(!configPanelCollapsed)}
                   />
                 )}
                 <div
@@ -220,40 +283,66 @@ export function SessionManagerView() {
                 </div>
               </div>
 
-              {/* Resize handle + ConfigPanel (single-mode, active session) */}
-              {showConfigPanelSingle && (
+              {/* Right config: resize/collapse rail + panel (single-mode, active session) */}
+              {showConfigRail && (
                 <>
                   <div
-                    onMouseDown={handleResizeStart}
-                    className="w-1 cursor-col-resize bg-neutral-700 hover:bg-accent transition-colors shrink-0"
-                    title="Breite anpassen"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={configResize.renderCollapsed ? "Konfiguration einblenden" : "Konfiguration ausblenden"}
+                    title={configResize.renderCollapsed ? "Klicken oder ziehen zum Öffnen" : "Ziehen zum Anpassen"}
+                    onClick={configResize.renderCollapsed ? configResize.restore : undefined}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setConfigPanelCollapsed(!configPanelCollapsed);
+                      }
+                    }}
+                    {...configResize.handleProps}
+                    style={{ touchAction: "none" }}
+                    className={[
+                      "shrink-0 cursor-col-resize bg-neutral-700 hover:bg-accent",
+                      "focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2",
+                      configResize.renderCollapsed ? "w-2" : "w-1",
+                      configResize.isDragging ? "" : "transition-[width] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                    ].join(" ")}
                   />
-                  <ConfigPanel
-                    folder={activeSession?.folder ?? ""}
-                    width={configPanelWidth}
-                    // Session-Akzent inkl. Per-Session-Override — Panel-Tabs
-                    // zeigen dieselbe Farbe wie Kachel-Rahmen und Sidebar-Punkt.
-                    accent={
-                      activeSession
-                        ? resolveSessionAccent(activeSession, sessionAccents, folderAccents)
-                        : undefined
-                    }
-                    onResumeSession={handleResumeSession}
-                  />
+                  {!configResize.renderCollapsed && (
+                    <ConfigPanel
+                      folder={activeSession?.folder ?? ""}
+                      width={configResize.renderWidth}
+                      // Session-Akzent inkl. Per-Session-Override — Panel-Tabs
+                      // zeigen dieselbe Farbe wie Kachel-Rahmen und Sidebar-Punkt.
+                      accent={
+                        activeSession
+                          ? resolveSessionAccent(activeSession, sessionAccents, folderAccents)
+                          : undefined
+                      }
+                      onResumeSession={handleResumeSession}
+                    />
+                  )}
                 </>
               )}
 
-              {/* Preview panel (grid-mode) */}
+              {/* Grid preview panel — resize only (transient view, no collapse) */}
               {showPreviewPanelGrid && (
                 <>
                   <div
-                    onMouseDown={handleResizeStart}
-                    className="w-1 cursor-col-resize bg-neutral-700 hover:bg-accent transition-colors shrink-0"
-                    title="Breite anpassen"
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Vorschau-Breite anpassen"
+                    title="Ziehen zum Anpassen"
+                    {...previewResize.handleProps}
+                    style={{ touchAction: "none" }}
+                    className={[
+                      "w-1 shrink-0 cursor-col-resize bg-neutral-700 hover:bg-accent",
+                      "focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2",
+                      previewResize.isDragging ? "" : "transition-colors",
+                    ].join(" ")}
                   />
                   <ConfigPanel
                     folder={previewFolder!}
-                    width={configPanelWidth}
+                    width={previewResize.renderWidth}
                     onResumeSession={handleResumeSession}
                     onClose={closePreview}
                   />

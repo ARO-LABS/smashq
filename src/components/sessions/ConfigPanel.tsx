@@ -21,7 +21,7 @@ const X = ICONS.action.close;
 
 export function ConfigPanel({ folder, width, accent, onResumeSession, onClose }: ConfigPanelProps) {
   const configSubTab = useUIStore((s) => s.configSubTab);
-  const setConfigPanelOpen = useUIStore((s) => s.setConfigPanelOpen);
+  const setConfigPanelCollapsed = useUIStore((s) => s.setConfigPanelCollapsed);
 
   return (
     <div
@@ -36,7 +36,7 @@ export function ConfigPanel({ folder, width, accent, onResumeSession, onClose }:
           <ConfigPanelTabList folder={folder} size="md" />
         </div>
         <button
-          onClick={() => onClose ? onClose() : setConfigPanelOpen(false)}
+          onClick={() => (onClose ? onClose() : setConfigPanelCollapsed(true))}
           className="p-1.5 mr-1 text-neutral-500 hover:text-neutral-300 transition-colors"
           title="Panel schließen"
           aria-label="Konfig-Panel schließen"

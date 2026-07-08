@@ -104,8 +104,8 @@ describe("SessionManagerView", () => {
   it("renders empty state when no sessions exist", () => {
     render(<SessionManagerView />);
 
-    const toggleBtn = screen.getByTitle("Sidebar ausblenden");
-    expect(toggleBtn).toBeTruthy();
+    const rail = screen.getByRole("button", { name: "Navigation ausblenden" });
+    expect(rail).toBeTruthy();
   });
 
   it("renders terminal when an active session exists", () => {
@@ -353,24 +353,24 @@ describe("SessionManagerView — Scroll-Regression (always-mounted Terminals)", 
 
 // ── Sidebar / Toolbar / Panel-Verhalten ──────────────────────────────────
 describe("SessionManagerView — Sidebar & Toolbar", () => {
-  it("blendet die Sidebar aus und wieder ein per Toggle-Button", () => {
+  it("klappt die Navigation per Tastatur ein und per Rail-Klick wieder aus", () => {
     render(<SessionManagerView />);
 
-    // Initial: Sidebar sichtbar → Toggle-Button bietet "ausblenden" an.
-    const collapseBtn = screen.getByTitle("Sidebar ausblenden");
+    // Initial: Nav sichtbar → Rail bietet "ausblenden" an. Enter klappt ein.
+    const rail = screen.getByRole("button", { name: "Navigation ausblenden" });
     act(() => {
-      fireEvent.click(collapseBtn);
+      fireEvent.keyDown(rail, { key: "Enter" });
     });
 
-    // Nach Klick: Sidebar collapsed → Button-Titel wechselt zu "einblenden".
-    expect(screen.getByTitle("Sidebar einblenden")).toBeTruthy();
-    expect(screen.queryByTitle("Sidebar ausblenden")).toBeNull();
+    // Nach Enter: Nav kollabiert → Rail-Label wechselt zu "einblenden".
+    expect(screen.getByRole("button", { name: "Navigation einblenden" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Navigation ausblenden" })).toBeNull();
 
-    // Erneuter Klick stellt die Sidebar wieder her.
+    // Klick auf den kollabierten Rail stellt die Nav wieder her.
     act(() => {
-      fireEvent.click(screen.getByTitle("Sidebar einblenden"));
+      fireEvent.click(screen.getByRole("button", { name: "Navigation einblenden" }));
     });
-    expect(screen.getByTitle("Sidebar ausblenden")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Navigation ausblenden" })).toBeTruthy();
   });
 
   it("zeigt KEINE Terminal-Toolbar wenn keine Session und kein Grid existiert", () => {
@@ -411,7 +411,7 @@ describe("SessionManagerView — Sidebar & Toolbar", () => {
 });
 
 describe("SessionManagerView — ConfigPanel & Preview", () => {
-  it("rendert das ConfigPanel im Single-Mode wenn configPanelOpen true ist", () => {
+  it("rendert das ConfigPanel im Single-Mode wenn nicht kollabiert", () => {
     useSessionStore.setState({
       sessions: [mockSession("s-1")],
       activeSessionId: "s-1",
@@ -419,14 +419,14 @@ describe("SessionManagerView — ConfigPanel & Preview", () => {
       gridSessionIds: [],
       focusedGridSessionId: null,
     });
-    useUIStore.setState({ previewFolder: null, configPanelOpen: true });
+    useUIStore.setState({ previewFolder: null, configPanelCollapsed: false });
 
     render(<SessionManagerView />);
 
     expect(screen.getByTestId("config-panel")).toBeTruthy();
   });
 
-  it("rendert das ConfigPanel NICHT wenn configPanelOpen false ist", () => {
+  it("rendert das ConfigPanel NICHT wenn kollabiert", () => {
     useSessionStore.setState({
       sessions: [mockSession("s-1")],
       activeSessionId: "s-1",
@@ -434,7 +434,7 @@ describe("SessionManagerView — ConfigPanel & Preview", () => {
       gridSessionIds: [],
       focusedGridSessionId: null,
     });
-    useUIStore.setState({ previewFolder: null, configPanelOpen: false });
+    useUIStore.setState({ previewFolder: null, configPanelCollapsed: true });
 
     render(<SessionManagerView />);
 
@@ -449,7 +449,7 @@ describe("SessionManagerView — ConfigPanel & Preview", () => {
       gridSessionIds: ["A", "B"],
       focusedGridSessionId: "A",
     });
-    useUIStore.setState({ previewFolder: "/grid/preview", configPanelOpen: false });
+    useUIStore.setState({ previewFolder: "/grid/preview", configPanelCollapsed: true });
 
     render(<SessionManagerView />);
 

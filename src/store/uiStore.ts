@@ -50,6 +50,23 @@ export function sanitizeConfigPanelWidth(value: unknown): number {
   return Math.max(CONFIG_PANEL_WIDTH_MIN, Math.min(CONFIG_PANEL_WIDTH_MAX, value));
 }
 
+const LEFT_NAV_WIDTH_MIN = 180;
+const LEFT_NAV_WIDTH_MAX = 420;
+const LEFT_NAV_WIDTH_DEFAULT = 240;
+
+/** Clamp the left-nav width into its valid range; non-finite → default. */
+export function sanitizeLeftNavWidth(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return LEFT_NAV_WIDTH_DEFAULT;
+  }
+  return Math.max(LEFT_NAV_WIDTH_MIN, Math.min(LEFT_NAV_WIDTH_MAX, value));
+}
+
+/** Coerce an unknown persisted value into a boolean, with an explicit fallback. */
+function sanitizeBool(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
 export type ConfigSubTab =
   | "claude-md"
   | "skills"
@@ -102,12 +119,20 @@ interface UIState {
   configSubTab: ConfigSubTab;
   setConfigSubTab: (tab: ConfigSubTab) => void;
 
-  configPanelOpen: boolean;
-  toggleConfigPanel: () => void;
-  setConfigPanelOpen: (open: boolean) => void;
-
   configPanelWidth: number;
   setConfigPanelWidth: (width: number) => void;
+
+  /** Rail-only collapse state for the right config panel (default: collapsed). */
+  configPanelCollapsed: boolean;
+  setConfigPanelCollapsed: (collapsed: boolean) => void;
+
+  /** Resizable width of the left navigation column. */
+  leftNavWidth: number;
+  setLeftNavWidth: (width: number) => void;
+
+  /** Rail-only collapse state for the left navigation column. */
+  leftNavCollapsed: boolean;
+  setLeftNavCollapsed: (collapsed: boolean) => void;
 
   /** True when an inline editor has unsaved changes — triggers confirm on tab switch. */
   hasDirtyEditor: boolean;
@@ -147,12 +172,17 @@ export const useUIStore = create<UIState>()(
   configSubTab: "claude-md",
   setConfigSubTab: (tab) => set({ configSubTab: tab }),
 
-  configPanelOpen: false,
-  toggleConfigPanel: () => set((state) => ({ configPanelOpen: !state.configPanelOpen })),
-  setConfigPanelOpen: (open) => set({ configPanelOpen: open }),
-
   configPanelWidth: CONFIG_PANEL_WIDTH_DEFAULT,
   setConfigPanelWidth: (width) => set({ configPanelWidth: sanitizeConfigPanelWidth(width) }),
+
+  configPanelCollapsed: true,
+  setConfigPanelCollapsed: (collapsed) => set({ configPanelCollapsed: collapsed }),
+
+  leftNavWidth: LEFT_NAV_WIDTH_DEFAULT,
+  setLeftNavWidth: (width) => set({ leftNavWidth: sanitizeLeftNavWidth(width) }),
+
+  leftNavCollapsed: false,
+  setLeftNavCollapsed: (collapsed) => set({ leftNavCollapsed: collapsed }),
 
   hasDirtyEditor: false,
   setHasDirtyEditor: (dirty) => set({ hasDirtyEditor: dirty }),
@@ -212,16 +242,25 @@ export const useUIStore = create<UIState>()(
         libraryScopeOpen: state.libraryScopeOpen,
         librarySectionOpen: state.librarySectionOpen,
         favoriteGroupsCollapsed: state.favoriteGroupsCollapsed,
+        leftNavWidth: state.leftNavWidth,
+        leftNavCollapsed: state.leftNavCollapsed,
+        configPanelWidth: state.configPanelWidth,
+        configPanelCollapsed: state.configPanelCollapsed,
       }),
-      version: 1,
-      // Schema-bump path: coerce both persisted records to clean bool-maps so a
-      // pre-version blob (or a tampered one) cannot inject non-boolean values.
+      version: 2,
+      // Schema-bump path: coerce every persisted field so a pre-version blob
+      // (or a tampered one) cannot inject invalid values. v2 adds the panel
+      // geometry fields (absent in v1 → sanitizers fall back to defaults).
       migrate: (persisted: unknown): Partial<UIState> => {
         const p = (persisted ?? {}) as Record<string, unknown>;
         return {
           libraryScopeOpen: sanitizeBoolRecord(p.libraryScopeOpen),
           librarySectionOpen: sanitizeBoolRecord(p.librarySectionOpen),
           favoriteGroupsCollapsed: sanitizeBoolRecord(p.favoriteGroupsCollapsed),
+          leftNavWidth: sanitizeLeftNavWidth(p.leftNavWidth),
+          leftNavCollapsed: sanitizeBool(p.leftNavCollapsed, false),
+          configPanelWidth: sanitizeConfigPanelWidth(p.configPanelWidth),
+          configPanelCollapsed: sanitizeBool(p.configPanelCollapsed, true),
         };
       },
       // Same-version corruption recovery: migrate only fires on a version change,
@@ -232,10 +271,18 @@ export const useUIStore = create<UIState>()(
         const scope = sanitizeBoolRecord(state.libraryScopeOpen);
         const section = sanitizeBoolRecord(state.librarySectionOpen);
         const favGroups = sanitizeBoolRecord(state.favoriteGroupsCollapsed);
+        const leftW = sanitizeLeftNavWidth(state.leftNavWidth);
+        const leftC = sanitizeBool(state.leftNavCollapsed, false);
+        const cfgW = sanitizeConfigPanelWidth(state.configPanelWidth);
+        const cfgC = sanitizeBool(state.configPanelCollapsed, true);
         if (
           JSON.stringify(scope) !== JSON.stringify(state.libraryScopeOpen) ||
           JSON.stringify(section) !== JSON.stringify(state.librarySectionOpen) ||
-          JSON.stringify(favGroups) !== JSON.stringify(state.favoriteGroupsCollapsed)
+          JSON.stringify(favGroups) !== JSON.stringify(state.favoriteGroupsCollapsed) ||
+          leftW !== state.leftNavWidth ||
+          leftC !== state.leftNavCollapsed ||
+          cfgW !== state.configPanelWidth ||
+          cfgC !== state.configPanelCollapsed
         ) {
           // Defer to a microtask. onRehydrateStorage can run SYNCHRONOUSLY
           // inside create(persist(...)) when storage.getItem returns a sync
@@ -250,6 +297,10 @@ export const useUIStore = create<UIState>()(
               libraryScopeOpen: scope,
               librarySectionOpen: section,
               favoriteGroupsCollapsed: favGroups,
+              leftNavWidth: leftW,
+              leftNavCollapsed: leftC,
+              configPanelWidth: cfgW,
+              configPanelCollapsed: cfgC,
             }),
           );
         }

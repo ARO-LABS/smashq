@@ -19,7 +19,7 @@ vi.mock("./ConfigPanelTabList", () => ({
 
 describe("ConfigPanel", () => {
   beforeEach(() => {
-    useUIStore.setState({ configSubTab: "claude-md", configPanelOpen: true });
+    useUIStore.setState({ configSubTab: "claude-md", configPanelCollapsed: false });
   });
 
   it("renders tab list, close button, and content", () => {
@@ -30,11 +30,11 @@ describe("ConfigPanel", () => {
     expect(screen.getByLabelText("Konfig-Panel schließen")).toBeTruthy();
   });
 
-  it("calls setConfigPanelOpen(false) when close button is clicked", () => {
+  it("collapses the panel when the close button is clicked", () => {
     render(<ConfigPanel folder="/test/project" />);
 
     fireEvent.click(screen.getByLabelText("Konfig-Panel schließen"));
-    expect(useUIStore.getState().configPanelOpen).toBe(false);
+    expect(useUIStore.getState().configPanelCollapsed).toBe(true);
   });
 
   it("applies custom width when provided", () => {
