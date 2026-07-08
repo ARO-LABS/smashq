@@ -147,23 +147,33 @@ const SessionCardInner = ({ session, isActive, gridSlot, onClick, onClose }: Ses
         />
       ) : (
         <span
-          className="font-medium text-sm text-neutral-200 truncate flex-1"
+          className="font-medium text-sm text-neutral-200 truncate flex-1 min-w-0"
           onDoubleClick={(e) => { e.stopPropagation(); startRename(); }}
           title="Doppelklick zum Umbenennen"
         >
           {session.title}
         </span>
       )}
+      {/*
+        Dynamic right region — no fixed reserve. At rest the project name shows
+        (narrow) so the flex-1 title keeps maximum width. On hover it is swapped
+        for the action chrome below. Because the chrome is IN the flex flow (not
+        absolute), the wider hover state makes flexbox shrink the title, which
+        then truncates with an ellipsis — the collision is impossible by
+        construction and no magic-number reserve width is hard-coded. `mr-4`
+        clears the bottom-right grid mini-map at rest. `max-w-[96px]` only caps a
+        very long project name; it never reserves space against the title.
+      */}
       <span
-        className={`shrink-0 text-[11px] text-neutral-500 font-mono truncate max-w-[84px] group-hover:opacity-0 transition-opacity ${
+        className={`shrink-0 max-w-[96px] text-[11px] text-neutral-500 font-mono truncate group-hover:hidden ${
           miniMap ? "mr-4" : ""
         }`}
       >
         {projectName}
       </span>
 
-      {/* Hover action chrome */}
-      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-surface-base/90 rounded-sm">
+      {/* Hover action chrome — in-flow (not absolute) so the title yields to it */}
+      <div className="shrink-0 hidden group-hover:flex items-center gap-0.5">
         <DiffActionButton sessionId={session.id} errorSource="SessionCard.openDiff" />
         <button
           onClick={(e) => {

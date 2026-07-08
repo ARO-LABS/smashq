@@ -72,6 +72,37 @@ describe("SessionCard", () => {
     expect(screen.queryByText("C:/Projects/foo/bar/baz")).toBeNull();
   });
 
+  it("swaps project name for in-flow hover chrome so a long title truncates instead of overlapping", () => {
+    // Regression guard for the title/icon overlap. The dynamic fix: the title is
+    // `flex-1 min-w-0 truncate` (max width at rest), the project name is hidden
+    // on hover (`group-hover:hidden`), and the action chrome is IN the flex flow
+    // and revealed on hover (`hidden` → `group-hover:flex`). Because the chrome
+    // occupies real flow width, flexbox shrinks the title and it truncates with
+    // an ellipsis — no absolute overlay, so no overlap is possible.
+    const session = makeSession({
+      title: "Gib mir eine Zusammenfassung dieses sehr langen Titels",
+      folder: "C:/Projects/foo/bar/baz",
+    });
+    renderCard(session);
+
+    const title = screen.getByText(session.title);
+    expect(title.className).toContain("flex-1");
+    expect(title.className).toContain("min-w-0");
+    expect(title.className).toContain("truncate");
+
+    // Project name is swapped out on hover (no fixed reserve width).
+    const projectName = screen.getByText("baz");
+    expect(projectName.className).toContain("group-hover:hidden");
+    expect(projectName.className).not.toContain("w-[104px]");
+
+    // Action chrome is in-flow (shrink-0) and only shown on hover — a button
+    // proves the container; its parent carries the reveal classes.
+    const chrome = screen.getByLabelText("Session schließen").parentElement;
+    expect(chrome?.className).toContain("hidden");
+    expect(chrome?.className).toContain("group-hover:flex");
+    expect(chrome?.className).not.toContain("absolute");
+  });
+
   it("hides time-chip for running+active (no sidebar signal by design — P7.5)", () => {
     renderCard(makeSession({ status: "running" }));
     // Active sessions: sidebar intentionally signal-less per P7.5 — status comes
