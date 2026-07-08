@@ -7,6 +7,14 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-07-08 — App-Icon-Geometrie: fuer die kleinste Zielgroesse entwerfen, nicht fuer die Praesentationsgroesse
+
+**Kontext:** Bracket-Q-Logo (`[q_]`) gewaehlt und als App-Icon-Set generiert. Erste Geometrie 1:1 aus dem 88-px-Artifact-Entwurf uebernommen.
+
+**Fehler → Korrektur:** User-Korrektur: bei den kleinen Groessen (16/32 px Taskbar) waren q und Cursor kaum erkennbar. Korrektur: Klammern an die Canvas-Kanten gepusht (x 6/42 → 4/44, Hoehe 5–43 → 3–45), q-Bowl-Radius 7,5 → 9,5 (+27 %), Strichstaerken 3,5/3,8 → 4/4,6, Cursor 13×5 → 16,5×6,5, Glyphen-Skalierung im 1024er-Canvas 14 → 15.
+
+**Regel:** App-Icon-Geometrie fuer die KLEINSTE Zielgroesse entwerfen (16/32 px), nicht fuer die Groesse, in der der Entwurf praesentiert wird. Mechanik: bei 32 px wird jede 48er-Einheit auf ~0,55 px skaliert — Details unter ~2 Einheiten verschwinden im Anti-Aliasing. Verifikation immer an den GENERIERTEN kleinen PNGs (32er/30er nach `tauri icon` visuell lesen), nie am grossen SVG beurteilen. Quelle vektoriell halten (`tauri icon` akzeptiert SVG direkt) — Geometrie-Iterationen kosten dann nur einen Regenerier-Lauf.
+
 ### 2026-07-08 — Session-Identity: zwei scheinbar unabhängige Bugs teilten EINE fragile Korrelationsschicht; ein Guard-Test hatte das nötige Feld explizit verboten
 
 **Kontext:** Zwei User-Reports — (1) Rename erschien nicht in der Config-Panel-History, (2) Restore startete intermittierend die falsche Session desselben Projekts. Zwei parallele Trace-Subagents fanden: beide Bugs hängen am selben asynchronen Mapping interne Session-ID ↔ Claude-CLI-UUID. Bug 1 = Timing des Mappings (Rename-Intent strandete in `pendingTitleOverrides`), Bug 2 = Korrektheit (Restore-Fallback riet „neueste Session im Ordner", Watcher `difference().next()` nicht-deterministisch).

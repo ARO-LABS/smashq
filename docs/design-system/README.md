@@ -20,7 +20,7 @@ Design system for **Smashq** — a Tauri v2 + React desktop application for mana
   - Conventions: `CLAUDE.md`
 - **Fonts:** Google Fonts — Space Grotesk, Instrument Sans, JetBrains Mono (all 400/500/600/700)
 - **Icons:** Lucide React (`lucide-react` npm; CDN via unpkg)
-- **Logo:** None shipped in repo. Placeholder glyph (terminal-bracket + prompt) created for this system — flagged for replacement.
+- **Logo:** Bracket-Q (`[q_]`) — Marke in `assets/logo.svg` (Form B, Farbmuster F1: Glyphe `currentColor`, Cursor Akzent). App-Icon-Quelle: `/app-icon.svg` (Behandlung I1: dunkle Kachel, helle Glyphe, Azure-Cursor) → generiert `src-tauri/icons/` via `npm run tauri icon app-icon.svg`.
 
 ---
 
@@ -32,7 +32,7 @@ Design system for **Smashq** — a Tauri v2 + React desktop application for mana
 | [`SKILL.md`](SKILL.md) | Skill front-matter for portable agent use |
 | [`preview/`](preview/) | Small HTML cards that populate the Design System tab |
 | [`ui-kit/`](ui-kit/) | High-fidelity React recreations of the desktop shell + 3 core views |
-| [`assets/`](assets/) | Logo placeholder, icon references |
+| [`assets/`](assets/) | Logo (Bracket-Q), icon references |
 
 ---
 
@@ -198,8 +198,7 @@ Design system for **Smashq** — a Tauri v2 + React desktop application for mana
 
 ### Logos & imagery
 
-- **No official logo** exists in the repository. `/vite.svg` is referenced as the favicon placeholder but is just the default Vite mark.
-- A terminal-bracket placeholder glyph is shipped in this design system at `assets/logo-placeholder.svg` — flagged for replacement by the owner.
+- **Official logo: Bracket-Q** (`[q_]`) — a lowercase q between square brackets with an accent underscore-cursor. Reads as a prompt waiting for input. Mark lives at `assets/logo.svg` (glyph `currentColor`, cursor `var(--color-accent)` with light-mode fallback); favicon at `/public/logo.svg` and app-icon source at `/app-icon.svg` use the solid dark-tile treatment (I1).
 - **No generic illustrations, full-bleed images, or stock photography** are used.
 
 ---
@@ -214,6 +213,5 @@ Design system for **Smashq** — a Tauri v2 + React desktop application for mana
 
 ## CAVEATS / flagged substitutions
 
-- **No real logo** shipped with the repo. Placeholder glyph created; owner should replace with the real mark + provide light/dark variants.
 - **No font files** in the repo — the app loads from Google Fonts CDN. Same here. If self-hosting is required, fetch `.woff2` files from `fonts.google.com` for Space Grotesk, Instrument Sans, JetBrains Mono at weights 400/500/600/700.
 - **Light mode** is implemented in code but dark mode is the canonical look; most screenshots and designs in the wild will be dark.

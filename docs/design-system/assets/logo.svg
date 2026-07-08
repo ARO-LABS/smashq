@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none">
+  <!-- Smashq Marke — Bracket-Q, Form B, Farbmuster F1 (System):
+       Glyphe monochrom via currentColor, Cursor im Akzent.
+       Inline im App-Kontext erbt der Cursor --color-accent; standalone
+       greift der Light-Mode-Fallback (Azure hue 230).
+       Geometrie identisch mit /app-icon.svg (Klammern an den Kanten, q dominant). -->
+  <path d="M9 3 H4 V45 H9" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+  <path d="M39 3 H44 V45 H39" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="20.5" cy="18.5" r="9.5" stroke="currentColor" stroke-width="4.6"/>
+  <line x1="31.5" y1="10.5" x2="31.5" y2="34.5" stroke="currentColor" stroke-width="4.6" stroke-linecap="round"/>
+  <rect x="15" y="38" width="16.5" height="6.5" rx="2" fill="var(--color-accent, oklch(55% 0.16 230))"/>
+</svg>

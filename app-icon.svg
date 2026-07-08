@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Smashq app icon — Bracket-Q, Form B, Behandlung I1 (Dunkel-Solid).
+       Quelle fuer `npm run tauri icon app-icon.svg` — generiert src-tauri/icons/.
+       Geometrie fuer kleine Groessen optimiert: Klammern an den Kanten, q dominant. -->
+  <rect x="0" y="0" width="1024" height="1024" rx="225" fill="#161B22"/>
+  <g transform="translate(152 152) scale(15)" fill="none" stroke-linecap="round">
+    <path d="M9 3 H4 V45 H9" stroke="#DCE3EC" stroke-width="4"/>
+    <path d="M39 3 H44 V45 H39" stroke="#DCE3EC" stroke-width="4"/>
+    <circle cx="20.5" cy="18.5" r="9.5" stroke="#F2F5F9" stroke-width="4.6"/>
+    <line x1="31.5" y1="10.5" x2="31.5" y2="34.5" stroke="#F2F5F9" stroke-width="4.6"/>
+    <rect x="15" y="38" width="16.5" height="6.5" rx="2" fill="#35AFF2"/>
+  </g>
+</svg>
