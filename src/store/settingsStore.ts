@@ -714,7 +714,15 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
     folderAccents: remapAccentsRecord(p.folderAccents),
     notesWindowSize: sanitizeNotesWindowSize(p.notesWindowSize),
     tasksWindowSize: sanitizeTasksWindowSize(p.tasksWindowSize),
-    lastSeenVersion: sanitizeLastSeenVersion(p.lastSeenVersion),
+    // Upgrade-vs-Neuinstallation: migrate laeuft NUR, wenn bereits ein
+    // persistierter Blob existiert — also nur fuer Bestands-User. Fehlt
+    // lastSeenVersion hier (Upgrade von pre-v12), MUSS der Sentinel "0.0.0"
+    // gesetzt werden, nicht null: null liest useWhatsNew als "frische
+    // Installation" und ueberspringt das Whats-New-Modal still — beim
+    // v1.0.23-Rollout sah dadurch kein einziger Bestands-User das Fenster.
+    // Echte Neuinstallationen haben keinen Blob, migrate laeuft nie, der
+    // Store-Default null bleibt (Modal korrekt unterdrueckt).
+    lastSeenVersion: sanitizeLastSeenVersion(p.lastSeenVersion) ?? "0.0.0",
   } as unknown as SettingsState; // Actions are added by Zustand during merge
 }
 

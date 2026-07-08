@@ -55,12 +55,18 @@ describe("lastSeenVersion (whats-new gating)", () => {
     expect(sanitizeLastSeenVersion(null)).toBeNull();
   });
 
-  it("migrate fills lastSeenVersion=null for pre-v12 state and sanitizes corrupt values", () => {
+  it("migrate seeds the upgrade sentinel for pre-v12 state (existing users MUST see the modal)", () => {
+    // migrate only ever runs when a persisted blob exists — i.e. for an
+    // UPGRADING user, never for a fresh install (no blob → no migrate).
+    // A missing/corrupt lastSeenVersion here must therefore become the
+    // "0.0.0" sentinel (≠ null): null would be read as "fresh install"
+    // and silently skip the whats-new modal for the entire existing user
+    // base on their first post-update start (real bug, v1.0.23 rollout).
     const migrated = useSettingsStoreMigrateForTest({ locale: "de" }, 11);
-    expect(migrated.lastSeenVersion).toBeNull();
+    expect(migrated.lastSeenVersion).toBe("0.0.0");
 
     const corrupt = useSettingsStoreMigrateForTest({ lastSeenVersion: 123 }, 11);
-    expect(corrupt.lastSeenVersion).toBeNull();
+    expect(corrupt.lastSeenVersion).toBe("0.0.0");
 
     const valid = useSettingsStoreMigrateForTest({ lastSeenVersion: "1.0.21" }, 11);
     expect(valid.lastSeenVersion).toBe("1.0.21");
