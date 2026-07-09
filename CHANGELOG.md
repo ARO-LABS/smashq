@@ -18,6 +18,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - Terminal auf macOS stellte einzelne Symbole als leere Kästchen dar (#8): die Schriftliste bestand nur aus Windows-Schriften (Cascadia Code/Fira Code/Consolas) und fiel auf einen generischen Font zurück. Sie beginnt jetzt mit macOS-System-Monospace (SF Mono/Menlo/Monaco); Windows/Linux bleiben unverändert.
 - Terminal konnte beim Öffnen kurz falsch umbrochene Zeilen zeigen (#8): der PTY wird jetzt schon beim Einblenden sofort auf die echte Terminalgröße gesetzt, statt erst verzögert nachzuziehen.
 - „Was ist neu"-Fenster erschien nach einem Update von Versionen vor 1.0.23 nicht — Bestands-Installationen wurden bei der Settings-Migration fälschlich als Neuinstallationen gewertet (fehlendes `lastSeenVersion` → null). Die Migration setzt jetzt einen Upgrade-Marker; echte Neuinstallationen bleiben unberührt.
+- Die Layout-Mini-Map in der Session-Liste färbte die aktive Kachel immer azurblau statt in der zugewiesenen Session-Farbe (#9). Die aktive Kachel nutzt jetzt exakt die Farbe des Session-Punkts (inkl. Fehler-/Wartet-Status).
 
 ### Sicherheit
 - Der Permission-Modus wird an jeder Grenze auf ein geschlossenes Enum validiert; die claude-Kommandozeile wird nur aus festen Literalen gebaut (kein Roh-Text erreicht die Shell). (#11)
