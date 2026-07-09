@@ -231,10 +231,11 @@ const SessionCardInner = ({ session, isActive, gridSlot, onClick, onClose }: Ses
         Grid-Indicator: 12px mini-map vertically centered at the right edge
         (right-1 top-1/2), mirroring the real grid template so it shows WHERE
         the session sits (2 = halves, 3 = T-shape, 4 = quadrants). The occupied
-        cell is accent-filled, the rest dim. Fades out on hover so the action
-        chrome (same centered right zone) owns that spot while hovering — at
-        rest the mini-map owns it. Rest-state name clearance is handled via the
-        projectName span's conditional mr-4.
+        cell mirrors the dot's color (dotBackground — the assigned session
+        color, incl. error/waiting status), the rest dim. Fades out on hover
+        so the action chrome (same centered right zone) owns that spot while
+        hovering — at rest the mini-map owns it. Rest-state name clearance is
+        handled via the projectName span's conditional mr-4.
       */}
       {miniMap && (
         <div

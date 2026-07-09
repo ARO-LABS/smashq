@@ -538,7 +538,7 @@ describe("SessionCard", () => {
       expect(active.style.background).toContain("oklch");
     });
 
-    it("mini-map active cell matches the session dot color (idle)", () => {
+    it("mini-map active cell matches the session dot color (normal status)", () => {
       const { container } = render(
         <SessionCard
           session={makeSession({ folder: "C:/Projects/x", title: "t" })}
