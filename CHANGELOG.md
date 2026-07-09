@@ -7,6 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 ## [Unreleased]
 
 ### Behoben
+- Terminal auf macOS zeigte keine Farben (#8): eine aus dem Finder/Dock gestartete App erbt keine `TERM`-Umgebungsvariable, weshalb Claude Code und CLI-Tools das Terminal als farblos einstuften. Die PTY-Sessions bekommen jetzt `TERM=xterm-256color` und `COLORTERM=truecolor` gesetzt (macOS/Linux) — passend zum von xterm.js emulierten Terminal.
 - „Was ist neu"-Fenster erschien nach einem Update von Versionen vor 1.0.23 nicht — Bestands-Installationen wurden bei der Settings-Migration fälschlich als Neuinstallationen gewertet (fehlendes `lastSeenVersion` → null). Die Migration setzt jetzt einen Upgrade-Marker; echte Neuinstallationen bleiben unberührt.
 
 ## [1.0.23] — 2026-07-08

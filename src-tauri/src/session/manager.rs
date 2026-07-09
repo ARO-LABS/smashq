@@ -189,6 +189,14 @@ impl SessionManager {
         // Reference: https://github.com/anthropics/claude-code/issues/41965
         cmd.env("CLAUDE_CODE_NO_FLICKER", "0");
 
+        // Advertise a color-capable terminal to the PTY children. A macOS
+        // Finder/Dock (launchd) launch inherits no TERM, so claude & co. treat
+        // stdout as a dumb terminal and disable ANSI colors — the "keine Farben"
+        // half of issue #8. xterm.js emulates a truecolor xterm; say so.
+        for &(key, val) in terminal_env(platform) {
+            cmd.env(key, val);
+        }
+
         // Pre-spawn snapshot for deterministic claude-session-id discovery.
         // Skipped when resuming — the UUID is already known and a watcher
         // would just observe the unchanged set then time out.
@@ -891,6 +899,29 @@ fn shell_args(
     }
 }
 
+/// Terminal-Environment fuer die PTY-Children. xterm.js emuliert ein
+/// truecolor-faehiges xterm — das muss den Programmen im PTY aber aktiv
+/// mitgeteilt werden. Kritisch auf macOS/Linux: wird die App aus Finder/Dock
+/// bzw. via `.desktop` (launchd) gestartet, erbt sie KEIN `TERM` (anders als
+/// eine Shell aus Terminal.app). Ohne `TERM` faellt `supports-color` (chalk,
+/// und damit Claude Code) auf Level 0 zurueck → gar keine ANSI-Farben. Das ist
+/// dieselbe "GUI-Launch strippt die Environment"-Klasse wie beim Login-Shell-
+/// PATH-Fix in [`shell_args`]: die Login-Shell holt den PATH zurueck, aber
+/// `TERM` zu setzen ist Aufgabe des Terminal-Emulators (= wir). Siehe Issue #8.
+///
+/// Windows bleibt bewusst leer: unter ConPTY nutzt `supports-color` den
+/// OS-Version-Zweig und ignoriert `TERM`; PowerShell/cmd ebenso. Ein gesetztes
+/// `TERM` waere dort bestenfalls ein No-op — wir fassen die heute
+/// funktionierende Windows-Farbausgabe nicht an.
+fn terminal_env(platform: ShellPlatform) -> &'static [(&'static str, &'static str)] {
+    match platform {
+        ShellPlatform::Windows => &[],
+        ShellPlatform::MacOs | ShellPlatform::Linux => {
+            &[("TERM", "xterm-256color"), ("COLORTERM", "truecolor")]
+        }
+    }
+}
+
 /// Eintrag fuer die Shell-Auswahl in den Settings — nur real installierte
 /// Shells (PATH-Probe) landen hier; "auto" ergaenzt das Frontend selbst.
 #[derive(Clone, serde::Serialize)]
@@ -1119,6 +1150,52 @@ mod tests {
             src.contains(r#"cmd.env("CLAUDE_CODE_NO_FLICKER", "0")"#),
             "CLAUDE_CODE_NO_FLICKER must be set to \"0\" on the CommandBuilder \
              before spawn (commit b92cc60)"
+        );
+    }
+
+    // --- terminal_env: color-capable terminal for the PTY children (issue #8) ---
+
+    #[test]
+    fn terminal_env_unix_advertises_truecolor_xterm() {
+        // macOS/Linux GUI launch (launchd/.desktop) inherits no TERM, so the
+        // shell and claude disable ANSI color. xterm.js emulates a truecolor
+        // xterm — advertise exactly that to the PTY children.
+        for platform in [ShellPlatform::MacOs, ShellPlatform::Linux] {
+            let env = terminal_env(platform);
+            assert!(
+                env.contains(&("TERM", "xterm-256color")),
+                "TERM must advertise xterm-256color on {:?} (issue #8: no colors on macOS)",
+                platform
+            );
+            assert!(
+                env.contains(&("COLORTERM", "truecolor")),
+                "COLORTERM must advertise truecolor on {:?}",
+                platform
+            );
+        }
+    }
+
+    #[test]
+    fn terminal_env_windows_is_left_untouched() {
+        // ConPTY + supports-color's Windows (OS-version) branch don't consult
+        // TERM; keep the already-working Windows color behaviour untouched.
+        assert!(
+            terminal_env(ShellPlatform::Windows).is_empty(),
+            "Windows terminal env must stay empty — TERM is a no-op under ConPTY"
+        );
+    }
+
+    #[test]
+    fn terminal_env_is_applied_in_spawn_path() {
+        // Like the CLAUDE_CODE_NO_FLICKER guard above: the env pairs are set
+        // inside the create_session spawn path (real AppHandle + PTY, not
+        // unit-testable in isolation), so we pin the source text. Removing the
+        // loop that applies terminal_env would silently bring back issue #8.
+        let src = include_str!("manager.rs");
+        assert!(
+            src.contains("terminal_env(platform)"),
+            "terminal_env(platform) must be applied to the CommandBuilder before \
+             spawn — without TERM the macOS Finder/Dock launch shows no colors (issue #8)"
         );
     }
 

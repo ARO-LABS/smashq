@@ -7,6 +7,14 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-07-09 — GUI-Launch strippt nicht nur den PATH, auch `TERM`: ein Terminal-Emulator muss `TERM` selbst setzen
+
+**Kontext:** Issue #8 — Terminal auf macOS ohne Farben, dazu einzelne kaputte Glyphen. Reporter vermutete ein Resize-Problem („die Zeilen sind verrückt"). Das Screenshot widerlegte das: die Zeilen spannen voll und brechen nicht falsch um — der sichtbare Defekt war monochrome Ausgabe (+ Font-Tofu). Zwei Trace-Subagents (Rust-PTY + xterm.js-Frontend) konvergierten auf: die einzige am `CommandBuilder` gesetzte Env war `CLAUDE_CODE_NO_FLICKER`, `TERM`/`COLORTERM` wurden nie gesetzt.
+
+**Fehler → Korrektur:** Der Bestandscode fing den macOS-GUI-**PATH**-Verlust bereits mit einer Login-Shell (`-l`) ab, fasste `TERM` aber nie an. Mechanik: ein Finder/Dock-Start (launchd) erbt keine Terminal-Env, also kein `TERM` → `supports-color`/chalk in Claude Code laufen auf Level 0 → gar keine ANSI-Farben. Im Dev-Modus unsichtbar, weil `npm run tauri dev` die App aus einem Terminal mit gesetztem `TERM` startet — der Bug existiert nur im Finder-gestarteten Build. Korrektur: reiner Helper `terminal_env(platform)` setzt `TERM=xterm-256color` + `COLORTERM=truecolor` vor dem Spawn (macOS/Linux; Windows leer, ConPTY/`supports-color`-OS-Zweig braucht `TERM` nicht).
+
+**Regel:** Ein selbstgebauter Terminal-Emulator (xterm.js + PTY) MUSS `TERM`/`COLORTERM` für seine Kinder selbst setzen — das ist Aufgabe des Emulators, nicht der Shell. GUI-Launch-Env-Stripping ist eine wiederkehrende Klasse (erst PATH → Login-Shell, jetzt `TERM`): bei „läuft im Dev, nicht in der installierten App" zuerst fragen, welche Env-Variablen ein launchd/Finder-Start NICHT erbt. Und: eine User-Vermutung („Resize") ist eine Hypothese, kein Befund — immer gegen die Rohevidenz (Screenshot) prüfen, sonst debuggt man das falsche Symptom.
+
 ### 2026-07-08 — App-Icon-Geometrie: fuer die kleinste Zielgroesse entwerfen, nicht fuer die Praesentationsgroesse
 
 **Kontext:** Bracket-Q-Logo (`[q_]`) gewaehlt und als App-Icon-Set generiert. Erste Geometrie 1:1 aus dem 88-px-Artifact-Entwurf uebernommen.
