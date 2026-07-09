@@ -134,7 +134,15 @@ export function SessionTerminal({ sessionId }: SessionTerminalProps) {
     const term = new Terminal({
       cursorBlink: true,
       fontSize: 13,
-      fontFamily: "'Cascadia Code', 'Fira Code', 'Consolas', monospace",
+      // Stack MUSS mit macOS-System-Mono führen: Cascadia Code / Fira Code /
+      // Consolas sind auf einem Standard-macOS NICHT installiert, sonst kollabiert
+      // der Stack auf generic `monospace` und Claude-Codes Box-/Symbol-Glyphen
+      // rendern als Tofu (Issue #8). ui-monospace→SF Mono, Menlo/Monaco sind
+      // immer da. DOM-Renderer (xterm v6, kein WebGL/Canvas-Addon) → WebKit/
+      // CoreText fällt pro fehlendem Glyph automatisch weiter (z.B. ⧉ via Apple
+      // Symbols). Windows/Linux-Fonts bleiben hinten → dort unverändert.
+      fontFamily:
+        "ui-monospace, 'SF Mono', Menlo, Monaco, 'Cascadia Code', 'Fira Code', Consolas, monospace",
       scrollback: scrollbackLines,
       // Normalize bare LF (often emitted by Node child processes under PowerShell)
       // to CRLF so xterm renders lines correctly.
@@ -178,12 +186,28 @@ export function SessionTerminal({ sessionId }: SessionTerminalProps) {
     };
     terminalContainer.addEventListener("contextmenu", handleContextMenu);
 
-    // Initial fit nur wenn Container sichtbar ist (offsetWidth/Height > 0).
-    // Bei Always-Mounted-Strategie startet ein inaktives Terminal mit display:none,
-    // dann liefert fit() NaN-Dimensions. ResizeObserver triggert fit() beim Unhide.
-    if (containerRef.current.offsetWidth > 0 && containerRef.current.offsetHeight > 0) {
+    // Fit + PTY-Resize in einem. WICHTIG: der Fit MUSS auch das PTY resizen
+    // (resize_session), nicht nur xterm lokal — sonst bleibt das PTY beim
+    // Backend-Default 120×40, Claude formatiert seine TUI für 120 Spalten,
+    // während xterm schon die echte Breite rendert, und die cursor-relativen
+    // Redraws landen auf falschen Zeilen (überlappende Zeilen, Issue #8).
+    // Guard: bei 0×0 (display:none im Always-Mounted-Mount) skippen; der
+    // ResizeObserver holt fit+resize nach, sobald der Container sichtbar wird.
+    const runFit = () => {
+      const el = containerRef.current;
+      if (!term.element) return;
+      if (!el || el.offsetWidth === 0 || el.offsetHeight === 0) return;
       fitAddon.fit();
-    }
+      wrapInvoke("resize_session", {
+        id: sessionId,
+        cols: term.cols,
+        rows: term.rows,
+      }).catch((err) => logError("SessionTerminal.resize", err));
+    };
+    // Initial-Fit SYNCHRON beim Mount: schließt das Reflow-Fenster, BEVOR
+    // Claude seine ersten interaktiven Redraws macht. (Früher lief hier nur
+    // ein lokales fitAddon.fit() ohne PTY-Resize → 120×40-Desync.)
+    runFit();
     terminalRef.current = term;
 
     // Clipboard handling (xterm v6 has no built-in keydown path for either shortcut):
@@ -292,22 +316,6 @@ export function SessionTerminal({ sessionId }: SessionTerminalProps) {
         }
       },
     );
-
-    // Fit-Guard: Wenn Container 0x0 ist (z.B. display:none beim Initial-Mount
-    // durch Always-Mounted-Strategie in SessionManagerView), skippe fit().
-    // Der ResizeObserver triggert fit() automatisch sobald der Container sichtbar wird
-    // und echte Dimensions bekommt.
-    const runFit = () => {
-      const el = containerRef.current;
-      if (!term.element) return;
-      if (!el || el.offsetWidth === 0 || el.offsetHeight === 0) return;
-      fitAddon.fit();
-      wrapInvoke("resize_session", {
-        id: sessionId,
-        cols: term.cols,
-        rows: term.rows,
-      }).catch((err) => logError("SessionTerminal.resize", err));
-    };
 
     // Debounced fit — prevents layout thrashing during rapid resizes
     const debouncedFit = debounce(() => {

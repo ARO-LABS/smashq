@@ -648,6 +648,46 @@ describe("SessionTerminal", () => {
     setUA(originalUA);
   });
 
+  // ── Issue #8: macOS terminal rendering (font glyphs + reflow) ──────────
+
+  it("leads fontFamily with macOS system mono so glyphs don't tofu (issue #8)", () => {
+    // Cascadia Code / Fira Code / Consolas ship on Windows, not macOS — a
+    // Windows-only stack collapses to generic `monospace` and Claude-Code's
+    // box/symbol glyphs render as tofu. Assert system mono actually LEADS: a
+    // mere substring match would still pass with a Windows font in front.
+    render(<SessionTerminal sessionId="sess-1" />);
+    const fontFamily = terminalOptions.fontFamily as string;
+    expect(fontFamily.trimStart().startsWith("ui-monospace")).toBe(true);
+    expect(fontFamily.indexOf("ui-monospace")).toBeLessThan(
+      fontFamily.indexOf("Consolas"),
+    );
+  });
+
+  it("resizes the PTY synchronously on mount when visible (issue #8 reflow guard)", () => {
+    // The mount-time fit MUST also resize the PTY (resize_session), not just
+    // xterm locally — else the PTY stays at the backend default 120×40 while
+    // xterm renders the real width, and claude's cursor-relative redraws land
+    // on wrong rows (overlapping lines). Guard: resize_session fires at mount,
+    // WITHOUT advancing the 50ms/document.fonts.ready timer.
+    const offsetWidthSpy = vi
+      .spyOn(HTMLElement.prototype, "offsetWidth", "get")
+      .mockReturnValue(800);
+    const offsetHeightSpy = vi
+      .spyOn(HTMLElement.prototype, "offsetHeight", "get")
+      .mockReturnValue(600);
+
+    render(<SessionTerminal sessionId="sess-1" />);
+
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith("resize_session", {
+      id: "sess-1",
+      cols: 80,
+      rows: 24,
+    });
+
+    offsetWidthSpy.mockRestore();
+    offsetHeightSpy.mockRestore();
+  });
+
   // ── Terminal-theme opt-in (theme.syncTerminalTheme) ──────────────────
   //
   // Default OFF: the `theme` option is omitted so xterm keeps its own defaults

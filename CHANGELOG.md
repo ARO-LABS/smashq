@@ -8,6 +8,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ### Behoben
 - Terminal auf macOS zeigte keine Farben (#8): eine aus dem Finder/Dock gestartete App erbt keine `TERM`-Umgebungsvariable, weshalb Claude Code und CLI-Tools das Terminal als farblos einstuften. Die PTY-Sessions bekommen jetzt `TERM=xterm-256color` und `COLORTERM=truecolor` gesetzt (macOS/Linux) — passend zum von xterm.js emulierten Terminal.
+- Terminal-Ausgabe war bei langen Sessions verstümmelt und Zeilen liefen ineinander (#8): Mehrbyte-Zeichen (z. B. Rahmenlinien) wurden an internen 4-KB-Lesegrenzen zerschnitten und dabei durch Ersatzzeichen ersetzt, was die Spaltenzählung verschob. Die PTY-Ausgabe wird jetzt an gültigen UTF-8-Grenzen zusammengesetzt, unvollständige Zeichen werden über Lesegrenzen hinweg gepuffert.
+- Terminal auf macOS stellte einzelne Symbole als leere Kästchen dar (#8): die Schriftliste bestand nur aus Windows-Schriften (Cascadia Code/Fira Code/Consolas) und fiel auf einen generischen Font zurück. Sie beginnt jetzt mit macOS-System-Monospace (SF Mono/Menlo/Monaco); Windows/Linux bleiben unverändert.
+- Terminal konnte beim Öffnen kurz falsch umbrochene Zeilen zeigen (#8): der PTY wird jetzt schon beim Einblenden sofort auf die echte Terminalgröße gesetzt, statt erst verzögert nachzuziehen.
 - „Was ist neu"-Fenster erschien nach einem Update von Versionen vor 1.0.23 nicht — Bestands-Installationen wurden bei der Settings-Migration fälschlich als Neuinstallationen gewertet (fehlendes `lastSeenVersion` → null). Die Migration setzt jetzt einen Upgrade-Marker; echte Neuinstallationen bleiben unberührt.
 
 ## [1.0.23] — 2026-07-08
