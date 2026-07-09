@@ -1753,8 +1753,11 @@ mod tests {
         // PTY + AppHandle, not unit-testable in isolation), so we pin the
         // source text — like the CLAUDE_CODE_NO_FLICKER / terminal_env guards.
         let src = include_str!("manager.rs");
+        // Examine only the production portion — this test module itself mentions
+        // the literal in the assert below, so the whole-file view is tautological.
+        let prod = src.split("#[cfg(test)]").next().unwrap_or(src);
         assert!(
-            src.contains("ensure_claude_available(|exe| which_executable(exe).is_some())?"),
+            prod.contains("ensure_claude_available(|exe| which_executable(exe).is_some())?"),
             "create_session must guard on claude presence before spawning the PTY"
         );
     }
