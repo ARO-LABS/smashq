@@ -189,6 +189,14 @@ impl SessionManager {
         // Reference: https://github.com/anthropics/claude-code/issues/41965
         cmd.env("CLAUDE_CODE_NO_FLICKER", "0");
 
+        // Advertise a color-capable terminal to the PTY children. A macOS
+        // Finder/Dock (launchd) launch inherits no TERM, so claude & co. treat
+        // stdout as a dumb terminal and disable ANSI colors — the "keine Farben"
+        // half of issue #8. xterm.js emulates a truecolor xterm; say so.
+        for &(key, val) in terminal_env(platform) {
+            cmd.env(key, val);
+        }
+
         // Pre-spawn snapshot for deterministic claude-session-id discovery.
         // Skipped when resuming — the UUID is already known and a watcher
         // would just observe the unchanged set then time out.
@@ -325,28 +333,45 @@ impl SessionManager {
         thread::spawn(move || {
             log::info!("Session {} reader thread started", read_id);
             let mut buf = [0u8; 4096];
+            // Holds an incomplete trailing UTF-8 sequence that a read split at the
+            // 4096-byte boundary, so the next read can complete it (issue #8).
+            // Bounded to <4 bytes by valid_utf8_prefix_len.
+            let mut carry: Vec<u8> = Vec::new();
             // Track last emitted status to deduplicate — only emit on transitions.
             // Empty string forces the first detected status to always emit.
             let mut last_emitted_status = String::new();
+            // Emit one session-output event; a dead window is logged, not fatal.
+            let emit_output = |data: &str| {
+                if let Err(e) = read_app.emit(
+                    "session-output",
+                    SessionOutputEvent {
+                        id: read_id.clone(),
+                        data: data.to_string(),
+                    },
+                ) {
+                    log::debug!("Session {} failed to emit session-output: {}", read_id, e);
+                }
+            };
             loop {
                 match reader.read(&mut buf) {
                     Ok(0) => {
+                        // Flush a char truncated by EOF instead of dropping it.
+                        if let Some(data) = flush_pty_carry(&mut carry) {
+                            emit_output(&data);
+                        }
                         log::info!("Session {} reader: EOF reached", read_id);
                         break;
                     }
                     Ok(n) => {
-                        let data = String::from_utf8_lossy(&buf[..n]).to_string();
+                        // Reassemble a multibyte char split across the 4096-byte
+                        // read boundary (issue #8). None = the whole read was an
+                        // incomplete continuation → wait for the rest.
+                        let data = match decode_pty_chunk(&mut carry, &buf[..n]) {
+                            Some(data) => data,
+                            None => continue,
+                        };
 
-                        // Output-Event an Frontend
-                        if let Err(e) = read_app.emit(
-                            "session-output",
-                            SessionOutputEvent {
-                                id: read_id.clone(),
-                                data: data.clone(),
-                            },
-                        ) {
-                            log::debug!("Session {} failed to emit session-output: {}", read_id, e);
-                        }
+                        emit_output(&data);
 
                         // Status-Heuristik: letzte Zeile pruefen
                         let snippet = if data.len() > 200 {
@@ -385,6 +410,10 @@ impl SessionManager {
                         }
                     }
                     Err(e) => {
+                        // Flush held-back bytes before teardown, mirroring EOF.
+                        if let Some(data) = flush_pty_carry(&mut carry) {
+                            emit_output(&data);
+                        }
                         log::warn!("Session {} reader error: {}", read_id, e);
                         break;
                     }
@@ -891,6 +920,82 @@ fn shell_args(
     }
 }
 
+/// Terminal-Environment fuer die PTY-Children. xterm.js emuliert ein
+/// truecolor-faehiges xterm — das muss den Programmen im PTY aber aktiv
+/// mitgeteilt werden. Kritisch auf macOS/Linux: wird die App aus Finder/Dock
+/// bzw. via `.desktop` (launchd) gestartet, erbt sie KEIN `TERM` (anders als
+/// eine Shell aus Terminal.app). Ohne `TERM` faellt `supports-color` (chalk,
+/// und damit Claude Code) auf Level 0 zurueck → gar keine ANSI-Farben. Das ist
+/// dieselbe "GUI-Launch strippt die Environment"-Klasse wie beim Login-Shell-
+/// PATH-Fix in [`shell_args`]: die Login-Shell holt den PATH zurueck, aber
+/// `TERM` zu setzen ist Aufgabe des Terminal-Emulators (= wir). Siehe Issue #8.
+///
+/// Windows bleibt bewusst leer: unter ConPTY nutzt `supports-color` den
+/// OS-Version-Zweig und ignoriert `TERM`; PowerShell/cmd ebenso. Ein gesetztes
+/// `TERM` waere dort bestenfalls ein No-op — wir fassen die heute
+/// funktionierende Windows-Farbausgabe nicht an.
+fn terminal_env(platform: ShellPlatform) -> &'static [(&'static str, &'static str)] {
+    match platform {
+        ShellPlatform::Windows => &[],
+        ShellPlatform::MacOs | ShellPlatform::Linux => {
+            &[("TERM", "xterm-256color"), ("COLORTERM", "truecolor")]
+        }
+    }
+}
+
+/// Byte length of the leading run of `bytes` that is COMPLETE, valid UTF-8.
+/// Only an INCOMPLETE trailing multibyte sequence is held back (excluded from
+/// the returned length) so the next PTY read can complete it; a genuinely
+/// invalid byte is NOT held back (it is included so the caller's lossy decode
+/// replaces it immediately), which keeps the reader's carry buffer bounded to
+/// <4 bytes.
+///
+/// Fixes issue #8: a PTY read fills a fixed 4096-byte buffer and can split a
+/// multibyte char (e.g. box-drawing `─`, 3 bytes) across the boundary; decoding
+/// each chunk independently with `from_utf8_lossy` would turn the split bytes
+/// into U+FFFD and change the column count, desyncing Claude Code's TUI.
+fn valid_utf8_prefix_len(bytes: &[u8]) -> usize {
+    match std::str::from_utf8(bytes) {
+        Ok(_) => bytes.len(),
+        Err(e) => match e.error_len() {
+            // Valid up to here, then an INCOMPLETE trailing sequence → hold it back.
+            None => e.valid_up_to(),
+            // A genuine invalid byte → do NOT hold back (would carry forever);
+            // include everything so the lossy decode replaces it now.
+            Some(_) => bytes.len(),
+        },
+    }
+}
+
+/// Stateful UTF-8 decode step for the PTY reader thread. Prepends bytes held
+/// back from the previous read (a multibyte char the 4096-byte boundary split),
+/// returns the COMPLETE-UTF-8 prefix to emit, and leaves any new incomplete tail
+/// in `carry` for the next read. Returns `None` when there is no complete char
+/// yet (the whole read was a partial continuation) — the caller reads more.
+/// See issue #8: decoding each raw chunk independently with `from_utf8_lossy`
+/// would corrupt a split char into U+FFFD and shift the column count.
+fn decode_pty_chunk(carry: &mut Vec<u8>, chunk: &[u8]) -> Option<String> {
+    let mut bytes = std::mem::take(carry);
+    bytes.extend_from_slice(chunk);
+    let split = valid_utf8_prefix_len(&bytes);
+    *carry = bytes.split_off(split);
+    if bytes.is_empty() {
+        return None;
+    }
+    Some(String::from_utf8_lossy(&bytes).to_string())
+}
+
+/// Drain any bytes still held in `carry` (a char truncated by EOF or a read
+/// error) as a best-effort lossy decode so nothing is silently dropped. Returns
+/// `None` when the carry is empty.
+fn flush_pty_carry(carry: &mut Vec<u8>) -> Option<String> {
+    if carry.is_empty() {
+        return None;
+    }
+    let bytes = std::mem::take(carry);
+    Some(String::from_utf8_lossy(&bytes).to_string())
+}
+
 /// Eintrag fuer die Shell-Auswahl in den Settings — nur real installierte
 /// Shells (PATH-Probe) landen hier; "auto" ergaenzt das Frontend selbst.
 #[derive(Clone, serde::Serialize)]
@@ -1120,6 +1225,139 @@ mod tests {
             "CLAUDE_CODE_NO_FLICKER must be set to \"0\" on the CommandBuilder \
              before spawn (commit b92cc60)"
         );
+    }
+
+    // --- terminal_env: color-capable terminal for the PTY children (issue #8) ---
+
+    #[test]
+    fn terminal_env_unix_advertises_truecolor_xterm() {
+        // macOS/Linux GUI launch (launchd/.desktop) inherits no TERM, so the
+        // shell and claude disable ANSI color. xterm.js emulates a truecolor
+        // xterm — advertise exactly that to the PTY children.
+        for platform in [ShellPlatform::MacOs, ShellPlatform::Linux] {
+            let env = terminal_env(platform);
+            assert!(
+                env.contains(&("TERM", "xterm-256color")),
+                "TERM must advertise xterm-256color on {:?} (issue #8: no colors on macOS)",
+                platform
+            );
+            assert!(
+                env.contains(&("COLORTERM", "truecolor")),
+                "COLORTERM must advertise truecolor on {:?}",
+                platform
+            );
+        }
+    }
+
+    #[test]
+    fn terminal_env_windows_is_left_untouched() {
+        // ConPTY + supports-color's Windows (OS-version) branch don't consult
+        // TERM; keep the already-working Windows color behaviour untouched.
+        assert!(
+            terminal_env(ShellPlatform::Windows).is_empty(),
+            "Windows terminal env must stay empty — TERM is a no-op under ConPTY"
+        );
+    }
+
+    #[test]
+    fn terminal_env_is_applied_in_spawn_path() {
+        // Like the CLAUDE_CODE_NO_FLICKER guard above: the env pairs are set
+        // inside the create_session spawn path (real AppHandle + PTY, not
+        // unit-testable in isolation), so we pin the source text. Removing the
+        // loop that applies terminal_env would silently bring back issue #8.
+        let src = include_str!("manager.rs");
+        assert!(
+            src.contains("terminal_env(platform)"),
+            "terminal_env(platform) must be applied to the CommandBuilder before \
+             spawn — without TERM the macOS Finder/Dock launch shows no colors (issue #8)"
+        );
+    }
+
+    // --- valid_utf8_prefix_len: PTY read UTF-8 boundary handling (issue #8) ---
+
+    #[test]
+    fn utf8_prefix_ascii_passthrough() {
+        assert_eq!(valid_utf8_prefix_len(b"hello"), 5);
+    }
+
+    #[test]
+    fn utf8_prefix_complete_multibyte_not_split() {
+        // box-drawing ─ (U+2500) is 3 bytes; a complete char must not be held back.
+        let s = "a─b";
+        assert_eq!(valid_utf8_prefix_len(s.as_bytes()), s.len());
+    }
+
+    #[test]
+    fn utf8_prefix_holds_back_incomplete_tail() {
+        // "═" (U+2550) = E2 95 90. "x" + the first 2 of those 3 bytes: the ASCII
+        // "x" is complete (len 1); the 2 partial bytes must be held back.
+        let mut v = b"x".to_vec();
+        v.extend_from_slice(&"═".as_bytes()[..2]);
+        assert_eq!(valid_utf8_prefix_len(&v), 1);
+    }
+
+    #[test]
+    fn utf8_prefix_invalid_byte_not_carried() {
+        // A genuine invalid byte must NOT be held back (else the carry buffer
+        // would grow unbounded) — included so from_utf8_lossy replaces it now.
+        assert_eq!(valid_utf8_prefix_len(b"a\xFFb"), 3);
+    }
+
+    // --- decode_pty_chunk / flush_pty_carry: the reader's stateful carry (issue #8) ---
+
+    #[test]
+    fn decode_pty_chunk_passes_complete_input_through() {
+        let mut carry = Vec::new();
+        assert_eq!(decode_pty_chunk(&mut carry, b"hi").as_deref(), Some("hi"));
+        assert!(carry.is_empty());
+    }
+
+    #[test]
+    fn decode_pty_chunk_none_leaves_partial_in_carry() {
+        // First 2 bytes of the 4-byte "😀" (F0 9F 98 80): nothing complete yet.
+        let mut carry = Vec::new();
+        assert_eq!(decode_pty_chunk(&mut carry, &[0xF0, 0x9F]), None);
+        assert_eq!(carry, vec![0xF0, 0x9F]);
+    }
+
+    #[test]
+    fn decode_pty_chunk_reassembles_4byte_emoji_at_every_split() {
+        // "😀" = F0 9F 98 80. A read boundary can fall at any of the 3 interior
+        // positions; each must reconstruct exactly one char, never corrupting it.
+        let full = "😀".as_bytes();
+        for split_at in 1..full.len() {
+            let mut carry = Vec::new();
+            assert_eq!(
+                decode_pty_chunk(&mut carry, &full[..split_at]),
+                None,
+                "split_at={split_at}: no complete char in the first half yet"
+            );
+            assert_eq!(
+                decode_pty_chunk(&mut carry, &full[split_at..]).as_deref(),
+                Some("😀"),
+                "split_at={split_at}: second half completes the char"
+            );
+            assert!(carry.is_empty(), "split_at={split_at}: nothing left over");
+        }
+    }
+
+    #[test]
+    fn flush_pty_carry_empty_is_none() {
+        let mut carry: Vec<u8> = Vec::new();
+        assert_eq!(flush_pty_carry(&mut carry), None);
+    }
+
+    #[test]
+    fn flush_pty_carry_lossy_decodes_and_drains_partial() {
+        // A dangling partial (EOF/read-error mid-char) is flushed lossily, not
+        // silently dropped, and the carry is drained afterwards.
+        let mut carry = vec![0xE2, 0x95]; // first 2 bytes of "═"
+        let out = flush_pty_carry(&mut carry);
+        assert!(
+            out.as_deref().is_some_and(|s| !s.is_empty()),
+            "partial flushed as a replacement char"
+        );
+        assert!(carry.is_empty(), "carry drained after flush");
     }
 
     // --- detect_status: ANSI-wrapped prompts ---
