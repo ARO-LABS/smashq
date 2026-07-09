@@ -268,8 +268,9 @@ export function KanbanBoard() {
   const ownerSwitchAbortRef = useRef<AbortController | null>(null);
 
   /** Switches the browsed owner in the picker and re-lists that owner's boards.
-   *  Runs `silent` so a failing org list keeps the chooser open (empty list)
-   *  instead of ejecting the user to the full-screen error card. */
+   *  Runs `silent` so a failing org list keeps the chooser open — the classified
+   *  error renders inline via `pickerError` instead of ejecting the user to the
+   *  full-screen error card. */
   const handleOwnerChange = useCallback(
     (login: string) => {
       setSelectedOwner(login);
