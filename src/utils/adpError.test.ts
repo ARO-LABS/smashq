@@ -4,6 +4,7 @@ import {
   parseInvokeError,
   getErrorMessage,
   classifyGithubError,
+  classifyPrerequisiteError,
 } from "./adpError";
 import type { ADPError } from "../protocols/schema";
 
@@ -316,5 +317,35 @@ describe("classifyGithubError", () => {
       expect(r.title.length).toBeGreaterThan(0);
       expect(r.hint.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("classifyPrerequisiteError", () => {
+  it("classifies a claude_missing ADPError with an install hint", () => {
+    const info = classifyPrerequisiteError({
+      code: "TERMINAL_SPAWN_FAILED",
+      message: "Claude CLI wurde nicht auf dem PATH gefunden.",
+      details: "claude_missing",
+      retryable: false,
+    });
+    expect(info.kind).toBe("claude_missing");
+    expect(info.title).toBe("Claude CLI nicht gefunden");
+    expect(info.hint).toContain("npm install -g @anthropic-ai/claude-code");
+    expect(info.retryable).toBe(false);
+  });
+
+  it("preserves the legacy toast shape for an unknown error", () => {
+    // Guards the useSessionCreation integration tests: title must stay
+    // "Session-Start fehlgeschlagen" and the hint must echo the raw message.
+    const info = classifyPrerequisiteError(new Error("boom: pty spawn failed"));
+    expect(info.kind).toBe("unknown");
+    expect(info.title).toBe("Session-Start fehlgeschlagen");
+    expect(info.hint).toContain("boom: pty spawn failed");
+  });
+
+  it("treats a plain string error as unknown", () => {
+    const info = classifyPrerequisiteError("shell executable 'pwsh' not found");
+    expect(info.kind).toBe("unknown");
+    expect(info.hint).toContain("pwsh");
   });
 });

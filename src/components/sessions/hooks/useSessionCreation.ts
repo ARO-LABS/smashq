@@ -5,6 +5,7 @@ import { useSessionStore, generateUniqueDisplayId } from "../../../store/session
 import { useSettingsStore } from "../../../store/settingsStore";
 import { useUIStore } from "../../../store/uiStore";
 import { logError } from "../../../utils/errorLogger";
+import { classifyPrerequisiteError } from "../../../utils/adpError";
 import { isWindows } from "../../../utils/platform";
 import type { FavoriteFolder } from "../../../store/settingsStore";
 import type { SessionShell } from "../../../store/sessionStore";
@@ -94,10 +95,11 @@ export function useSessionCreation(): UseSessionCreationReturn {
         });
       } catch (err) {
         logError("useSessionCreation.resumeSession", err);
+        const info = classifyPrerequisiteError(err);
         useUIStore.getState().addToast({
           type: "error",
-          title: "Session-Start fehlgeschlagen",
-          message: err instanceof Error ? err.message : String(err),
+          title: info.title,
+          message: info.hint,
         });
       }
     },
@@ -138,10 +140,11 @@ export function useSessionCreation(): UseSessionCreationReturn {
       // macOS "favorite starts nothing" bug (backend rejected the shell, user
       // saw no feedback).
       logError("useSessionCreation.quickStart", err);
+      const info = classifyPrerequisiteError(err);
       useUIStore.getState().addToast({
         type: "error",
-        title: "Session-Start fehlgeschlagen",
-        message: err instanceof Error ? err.message : String(err),
+        title: info.title,
+        message: info.hint,
       });
     }
   }, []);
@@ -219,10 +222,11 @@ export function useSessionCreation(): UseSessionCreationReturn {
       }
     } catch (err) {
       logError("useSessionCreation.newSession.create", err);
+      const info = classifyPrerequisiteError(err);
       useUIStore.getState().addToast({
         type: "error",
-        title: "Session-Start fehlgeschlagen",
-        message: err instanceof Error ? err.message : String(err),
+        title: info.title,
+        message: info.hint,
       });
     }
   }, []);
