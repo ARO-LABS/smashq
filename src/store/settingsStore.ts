@@ -106,6 +106,22 @@ export function sanitizeScrollbackLines(value: unknown): number {
   return Math.max(1_000, Math.min(100_000, Math.floor(value)));
 }
 
+/** Erlaubte Permission-Modi fuer neue Sessions (Settings-UI + Persist). */
+export const PERMISSION_MODES = ["default", "auto", "plan", "bypass"] as const;
+export type PermissionMode = (typeof PERMISSION_MODES)[number];
+
+/**
+ * Coerce a persisted/UI permission-mode candidate to a known mode. Fail-safe
+ * to "default" (Claudes Nachfragen) — NIE zu "bypass" — bei Unbekanntem,
+ * falschem Typ oder fehlendem Feld. Geteilt zwischen Store-Default, migrate
+ * und merge/onRehydrate (Issue-#209-Klasse).
+ */
+export function sanitizePermissionMode(value: unknown): PermissionMode {
+  return (PERMISSION_MODES as readonly string[]).includes(value as string)
+    ? (value as PermissionMode)
+    : "default";
+}
+
 /**
  * Coerce persisted preferences into a clean AppPreferencesSettings. Strict
  * `=== true` on the bool gates: a corrupt string "true" would render the UI
@@ -278,6 +294,7 @@ export interface SettingsState {
   favoriteGroups: FavoriteGroup[];
   locale: "de" | "en";
   defaultShell: "auto" | "powershell" | "bash" | "cmd" | "zsh";
+  defaultPermissionMode: PermissionMode;
   defaultProjectPath: string;
   globalNotes: string;
   projectNotes: Record<string, string>;
@@ -322,6 +339,7 @@ export interface SettingsState {
   setPreferences: (partial: Partial<AppPreferencesSettings>) => void;
   setLocale: (locale: "de" | "en") => void;
   setDefaultShell: (shell: SettingsState["defaultShell"]) => void;
+  setDefaultPermissionMode: (mode: PermissionMode) => void;
   setDefaultProjectPath: (path: string) => void;
   setGlobalNotes: (notes: string) => void;
   setProjectNotes: (folder: string, notes: string) => void;
@@ -580,6 +598,7 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
     favoriteGroups: [] as FavoriteGroup[],
     locale: "de" as const,
     defaultShell: "auto" as const,
+    defaultPermissionMode: "default" as const,
     defaultProjectPath: "",
     globalNotes: "",
     projectNotes: {},
@@ -696,6 +715,7 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
     favoriteGroups: migratedGroups,
     locale: p.locale === "de" || p.locale === "en" ? p.locale : defaults.locale,
     defaultShell: ["auto", "powershell", "bash", "cmd", "zsh"].includes(p.defaultShell as string) ? p.defaultShell as SettingsState["defaultShell"] : defaults.defaultShell,
+    defaultPermissionMode: sanitizePermissionMode(p.defaultPermissionMode),
     defaultProjectPath: typeof p.defaultProjectPath === "string" ? p.defaultProjectPath : defaults.defaultProjectPath,
     globalNotes: typeof p.globalNotes === "string" ? p.globalNotes : defaults.globalNotes,
     projectNotes: p.projectNotes && typeof p.projectNotes === "object" && !Array.isArray(p.projectNotes) ? p.projectNotes as Record<string, string> : defaults.projectNotes,
@@ -791,6 +811,7 @@ export const useSettingsStore = create<SettingsState>()(
       favoriteGroups: [],
       locale: "de",
       defaultShell: "auto",
+      defaultPermissionMode: "default",
       defaultProjectPath: "",
       globalNotes: "",
       projectNotes: {},
@@ -1019,6 +1040,8 @@ export const useSettingsStore = create<SettingsState>()(
       setLocale: (locale) => set({ locale }),
 
       setDefaultShell: (shell) => set({ defaultShell: shell }),
+
+      setDefaultPermissionMode: (mode) => set({ defaultPermissionMode: mode }),
 
       setDefaultProjectPath: (path) => set({ defaultProjectPath: path }),
 
@@ -1293,6 +1316,7 @@ export const useSettingsStore = create<SettingsState>()(
           preferences: defaultPreferences,
           locale: "de",
           defaultShell: "auto",
+          defaultPermissionMode: "default",
           defaultProjectPath: "",
           // apiKeys, favorites, globalNotes, projectNotes, sessionRestore, sessionTitleOverrides, sessionAccents and folderAccents are intentionally NOT reset
           apiKeys: state.apiKeys,
@@ -1329,6 +1353,7 @@ export const useSettingsStore = create<SettingsState>()(
         favoriteGroups: state.favoriteGroups,
         locale: state.locale,
         defaultShell: state.defaultShell,
+        defaultPermissionMode: state.defaultPermissionMode,
         defaultProjectPath: state.defaultProjectPath,
         globalNotes: state.globalNotes,
         projectNotes: state.projectNotes,
@@ -1349,7 +1374,12 @@ export const useSettingsStore = create<SettingsState>()(
       // sanitizes via sanitizeLastSeenVersion; onRehydrateStorage heals
       // same-version corruption (non-string → null → modal shows once more,
       // harmless fail-open).
-      version: 12,
+      // v13: added defaultPermissionMode (neue Sessions starten mit gewaehltem
+      // Permission-Modus, default "default" = Claudes Nachfragen). Migrate
+      // sanitizt via sanitizePermissionMode; merge heilt same-version-Corruption.
+      // Bewusste Verhaltensaenderung: Bestands-User (bisher hart Bypass) werden
+      // auf "default" geseedet — siehe CHANGELOG.
+      version: 13,
       migrate: (persisted: unknown, fromVersion: number) => _settingsMigrate(persisted, fromVersion),
       // SYNCHRONOUS heal of the rehydrated state. This runs DURING rehydration
       // and its return value feeds the very first render — unlike
@@ -1365,6 +1395,7 @@ export const useSettingsStore = create<SettingsState>()(
           ...merged,
           favorites: validated.favorites,
           favoriteGroups: validated.favoriteGroups,
+          defaultPermissionMode: sanitizePermissionMode(merged.defaultPermissionMode),
         };
       },
       onRehydrateStorage: () => (state, error) => {

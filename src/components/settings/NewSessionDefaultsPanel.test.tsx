@@ -19,6 +19,7 @@ describe("NewSessionDefaultsPanel", () => {
     useSettingsStore.setState({
       defaultShell: "auto",
       defaultProjectPath: "",
+      defaultPermissionMode: "default",
     });
   });
 
@@ -191,5 +192,24 @@ describe("NewSessionDefaultsPanel", () => {
       expect(useSettingsStore.getState().defaultProjectPath).toBe("C:/done");
     });
     expect(btn.disabled).toBe(false);
+  });
+
+  it("renders the four permission modes and persists a selection", () => {
+    render(<NewSessionDefaultsPanel />);
+    const select = screen.getByLabelText(/Permission-Modus/i) as HTMLSelectElement;
+    expect(Array.from(select.options).map((o) => o.value)).toEqual([
+      "default",
+      "auto",
+      "plan",
+      "bypass",
+    ]);
+    fireEvent.change(select, { target: { value: "bypass" } });
+    expect(useSettingsStore.getState().defaultPermissionMode).toBe("bypass");
+  });
+
+  it("shows the hint of the active permission mode", () => {
+    useSettingsStore.setState({ defaultPermissionMode: "bypass" });
+    render(<NewSessionDefaultsPanel />);
+    expect(screen.getByText(/Überspringt alle Nachfragen/i)).toBeTruthy();
   });
 });

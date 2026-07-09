@@ -12,6 +12,8 @@ import {
   remapAccentsRecord,
   validateSessionRestore,
   sanitizeLastSeenVersion,
+  sanitizePermissionMode,
+  PERMISSION_MODES,
 } from "./settingsStore";
 
 // ============================================================================
@@ -1767,5 +1769,59 @@ describe("pendingTitleOverrides", () => {
   it("flushPendingTitleOverride is a no-op when there is no pending intent", () => {
     getState().flushPendingTitleOverride(SID, UUID);
     expect(getState().sessionTitleOverrides[UUID]).toBeUndefined();
+  });
+});
+
+// ============================================================================
+// defaultPermissionMode — persisted permission-mode default (v13)
+// ============================================================================
+
+describe("defaultPermissionMode", () => {
+  it("sanitizePermissionMode accepts all four known modes", () => {
+    for (const mode of PERMISSION_MODES) {
+      expect(sanitizePermissionMode(mode)).toBe(mode);
+    }
+  });
+
+  it("sanitizePermissionMode falls back to 'default' for junk", () => {
+    expect(sanitizePermissionMode("bypassPermissions")).toBe("default");
+    expect(sanitizePermissionMode(undefined)).toBe("default");
+    expect(sanitizePermissionMode(42)).toBe("default");
+    expect(sanitizePermissionMode(null)).toBe("default");
+    expect(sanitizePermissionMode("")).toBe("default");
+  });
+
+  it("setDefaultPermissionMode updates the store", () => {
+    useSettingsStore.getState().setDefaultPermissionMode("bypass");
+    expect(useSettingsStore.getState().defaultPermissionMode).toBe("bypass");
+  });
+
+  it("defaults to 'default' on a fresh store", () => {
+    useSettingsStore.getState().resetToDefaults();
+    expect(useSettingsStore.getState().defaultPermissionMode).toBe("default");
+  });
+
+  it("migrate seeds 'default' for a v12 blob without the field", () => {
+    const migrated = useSettingsStoreMigrateForTest(
+      { defaultShell: "zsh" },
+      12,
+    );
+    expect(migrated.defaultPermissionMode).toBe("default");
+  });
+
+  it("migrate coerces a corrupt persisted value to 'default'", () => {
+    const migrated = useSettingsStoreMigrateForTest(
+      { defaultPermissionMode: "bypassPermissions" },
+      12,
+    );
+    expect(migrated.defaultPermissionMode).toBe("default");
+  });
+
+  it("migrate preserves a valid persisted mode", () => {
+    const migrated = useSettingsStoreMigrateForTest(
+      { defaultPermissionMode: "bypass" },
+      12,
+    );
+    expect(migrated.defaultPermissionMode).toBe("bypass");
   });
 });

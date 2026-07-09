@@ -19,15 +19,17 @@ pub mod commands {
         folder: String,
         title: Option<String>,
         shell: Option<String>,
+        permission_mode: Option<String>,
         resume_session_id: Option<String>,
         initial_cols: Option<u16>,
         initial_rows: Option<u16>,
     ) -> Result<super::super::manager::SessionInfo, ADPError> {
         log::debug!(
-            "create_session called: id={}, folder={}, shell={:?}, resume={:?}, size={:?}x{:?}",
+            "create_session called: id={}, folder={}, shell={:?}, permission_mode={:?}, resume={:?}, size={:?}x{:?}",
             id,
             folder,
             shell,
+            permission_mode,
             resume_session_id,
             initial_cols,
             initial_rows
@@ -56,6 +58,8 @@ pub mod commands {
         // "auto" laesst den Manager den Plattform-Default waehlen
         // (Windows: powershell, macOS: zsh, Linux: bash).
         let shell = shell.unwrap_or_else(|| "auto".to_string());
+        // "default" = Claudes eingebautes Nachfragen (kein CLI-Flag).
+        let permission_mode = permission_mode.unwrap_or_else(|| "default".to_string());
 
         manager.create_session(
             app,
@@ -63,6 +67,7 @@ pub mod commands {
             title,
             folder,
             shell,
+            permission_mode,
             resume_session_id,
             initial_cols,
             initial_rows,

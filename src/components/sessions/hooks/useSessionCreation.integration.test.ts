@@ -234,6 +234,70 @@ describe("useSessionCreation.handleNewSessionFromDefaults — Layer-B", () => {
       expect(useSessionStore.getState().sessions[0]?.shell).toBe("powershell");
     });
   });
+
+  it("passes the global defaultPermissionMode through to create_session", async () => {
+    useSettingsStore.getState().setDefaultProjectPath("C:\\Projects\\test");
+    useSettingsStore.getState().setDefaultPermissionMode("auto");
+
+    const { handler, calls } = buildCreateSessionHandler();
+    installRealIPC({ create_session: handler });
+
+    const { result } = renderHook(() => useSessionCreation());
+    await act(async () => {
+      await result.current.handleNewSessionFromDefaults();
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].permissionMode).toBe("auto");
+  });
+
+  it("defaults permissionMode to 'default' when unset", async () => {
+    useSettingsStore.getState().setDefaultProjectPath("C:\\Projects\\test");
+
+    const { handler, calls } = buildCreateSessionHandler();
+    installRealIPC({ create_session: handler });
+
+    const { result } = renderHook(() => useSessionCreation());
+    await act(async () => {
+      await result.current.handleNewSessionFromDefaults();
+    });
+
+    expect(calls[0].permissionMode).toBe("default");
+  });
+});
+
+/**
+ * Layer-B integration tests for handleResumeSession — covers the same
+ * defaultPermissionMode pass-through as handleQuickStart/
+ * handleNewSessionFromDefaults. Folded in during the Issue #11 whole-branch
+ * review to close a test-coverage gap (this invoke was already wired for
+ * permissionMode but had zero assertions on it).
+ */
+describe("useSessionCreation.handleResumeSession — Layer-B", () => {
+  beforeEach(() => {
+    resetAllStores();
+  });
+
+  it("passes the global defaultPermissionMode through on resume", async () => {
+    useSettingsStore.getState().setDefaultPermissionMode("plan");
+
+    const { handler, calls } = buildCreateSessionHandler();
+    installRealIPC({ create_session: handler });
+
+    const { result } = renderHook(() => useSessionCreation());
+    await act(async () => {
+      await result.current.handleResumeSession(
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "/Users/me/proj",
+        "Resumed Title",
+      );
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].permissionMode).toBe("plan");
+    expect(calls[0].resumeSessionId).toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+    expect(useSessionStore.getState().sessions).toHaveLength(1);
+  });
 });
 
 /**
@@ -294,5 +358,19 @@ describe("useSessionCreation.handleQuickStart — Layer-B (macOS session-start g
     expect(calls[0].shell).toBe("auto");
     expect(calls[0].folder).toBe("/Users/me/proj");
     expect(useSessionStore.getState().sessions).toHaveLength(1);
+  });
+
+  it("passes the global defaultPermissionMode through on quick-start", async () => {
+    useSettingsStore.getState().setDefaultPermissionMode("plan");
+    const { handler, calls } = buildCreateSessionHandler();
+    installRealIPC({ create_session: handler });
+
+    const { result } = renderHook(() => useSessionCreation());
+    await act(async () => {
+      await result.current.handleQuickStart(favorite);
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].permissionMode).toBe("plan");
   });
 });

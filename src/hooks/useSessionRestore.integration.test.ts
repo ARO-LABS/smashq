@@ -284,6 +284,50 @@ describe("useSessionRestore — Layer-B integration (m2-ghost dedup contract)", 
   });
 
   // -------------------------------------------------------------------------
+  // 8. defaultPermissionMode threads into the auto-restore create_session call.
+  //    Fix for the merge-blocking gap found in the Issue #11 whole-branch
+  //    review: useSessionCreation.ts wired permissionMode into all three of
+  //    its create_session invokes, but useSessionRestore.ts's invoke (the
+  //    startup auto-resume path) was missed, so restored sessions silently
+  //    fell back to the backend default "default" regardless of the user's
+  //    global setting.
+  // -------------------------------------------------------------------------
+
+  it("threads the global defaultPermissionMode into the restore create_session call", async () => {
+    useSettingsStore.getState().setDefaultPermissionMode("plan");
+
+    useSettingsStore.getState().setSessionRestore({
+      enabled: true,
+      sessions: [
+        {
+          folder: "C:\\test\\a",
+          title: "alpha",
+          shell: "powershell",
+          claudeSessionId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        },
+      ],
+      activeFolder: null,
+      layoutMode: "single",
+      gridFolders: [],
+    });
+
+    const { handler, calls } = buildCreateSessionHandler();
+    installRealIPC({
+      create_session: handler,
+      scan_claude_sessions: async () => [],
+    });
+
+    renderHook(() => useSessionRestore());
+
+    await waitFor(() => {
+      expect(useSessionStore.getState().sessions).toHaveLength(1);
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].permissionMode).toBe("plan");
+  });
+
+  // -------------------------------------------------------------------------
   // 7. Layout restore: gridFolders + activeFolder map back to session ids.
   // -------------------------------------------------------------------------
 

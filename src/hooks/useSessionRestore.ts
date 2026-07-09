@@ -117,6 +117,8 @@ async function restoreSessions(
         claimedClaudeIds.add(resumeSessionId);
       }
 
+      const permissionMode = useSettingsStore.getState().defaultPermissionMode;
+
       const result = await wrapInvoke<{
         id: string;
         title: string;
@@ -129,6 +131,7 @@ async function restoreSessions(
         folder: entry.folder,
         title: entry.title,
         shell: entry.shell,
+        permissionMode,
         resumeSessionId,
       });
 
