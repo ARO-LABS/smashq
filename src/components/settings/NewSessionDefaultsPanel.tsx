@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { useSettingsStore, type SettingsState } from "../../store/settingsStore";
+import { useSettingsStore, type SettingsState, type PermissionMode } from "../../store/settingsStore";
 import { logError } from "../../utils/errorLogger";
 import { wrapInvoke } from "../../utils/perfLogger";
 import { ICONS, ICON_SIZE } from "../../utils/icons";
@@ -26,6 +26,13 @@ const FALLBACK_SHELL_OPTIONS: ShellOption[] = [
   { value: "cmd", label: "CMD" },
   { value: "bash", label: "Bash" },
   { value: "zsh", label: "Zsh" },
+];
+
+const PERMISSION_MODE_OPTIONS: { value: PermissionMode; label: string; hint: string }[] = [
+  { value: "default", label: "Standard (Nachfragen)", hint: "Claude fragt vor jeder Aktion nach." },
+  { value: "auto", label: "Auto", hint: "Erlaubt Aktionen automatisch, außer bei Konflikten." },
+  { value: "plan", label: "Plan", hint: "Startet im Planungsmodus ohne Änderungen." },
+  { value: "bypass", label: "Bypass / YOLO", hint: "Überspringt alle Nachfragen (bisheriges Verhalten)." },
 ];
 
 function isKnownShellValue(id: string): id is Exclude<ShellValue, "auto"> {
@@ -62,6 +69,10 @@ export function NewSessionDefaultsPanel() {
   const defaultProjectPath = useSettingsStore((s) => s.defaultProjectPath);
   const setDefaultShell = useSettingsStore((s) => s.setDefaultShell);
   const setDefaultProjectPath = useSettingsStore((s) => s.setDefaultProjectPath);
+  const defaultPermissionMode = useSettingsStore((s) => s.defaultPermissionMode);
+  const setDefaultPermissionMode = useSettingsStore((s) => s.setDefaultPermissionMode);
+  const activeModeHint =
+    PERMISSION_MODE_OPTIONS.find((o) => o.value === defaultPermissionMode)?.hint ?? "";
   const [picking, setPicking] = useState(false);
   const detectedShells = useDetectedShells();
 
@@ -123,6 +134,25 @@ export function NewSessionDefaultsPanel() {
               Angezeigt werden nur Shells, die auf diesem Gerät gefunden wurden.
             </p>
           )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="default-permission-mode" className="text-xs font-medium text-neutral-300">
+            Permission-Modus
+          </label>
+          <select
+            id="default-permission-mode"
+            value={defaultPermissionMode}
+            onChange={(e) => setDefaultPermissionMode(e.target.value as PermissionMode)}
+            className="w-full rounded-md bg-surface-raised shadow-hairline text-neutral-200 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-accent focus:ring-inset transition-shadow duration-150"
+          >
+            {PERMISSION_MODE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-neutral-500">{activeModeHint}</p>
         </div>
 
         <div className="flex flex-col gap-1.5">
