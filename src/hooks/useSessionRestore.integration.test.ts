@@ -284,6 +284,61 @@ describe("useSessionRestore — Layer-B integration (m2-ghost dedup contract)", 
   });
 
   // -------------------------------------------------------------------------
+  // 6b. All-failed claude-missing: every create_session rejects with the
+  //     structured claude_missing ADPError. The early `createdIds.length === 0`
+  //     return skips the normal toast block, so without a dedicated hint the
+  //     user would get NO explanation why none of their sessions came back —
+  //     the exact silent-failure Issue #10 targets. Assert the claude-missing
+  //     error toast fires instead.
+  // -------------------------------------------------------------------------
+
+  it("all-failed claude-missing: every create_session rejects → error toast with install hint", async () => {
+    useSettingsStore.getState().setSessionRestore({
+      enabled: true,
+      sessions: [
+        { folder: "C:\\test\\a", title: "alpha", shell: "powershell" },
+        { folder: "C:\\test\\b", title: "bravo", shell: "powershell" },
+      ],
+      activeFolder: null,
+      layoutMode: "single",
+      gridFolders: [],
+    });
+
+    installRealIPC({
+      // Mirror the backend's structured claude-missing rejection (Task 1+2).
+      create_session: async () => {
+        throw {
+          code: "TERMINAL_SPAWN_FAILED",
+          message: "Claude CLI wurde nicht auf dem PATH gefunden.",
+          details: "claude_missing",
+          retryable: false,
+        };
+      },
+      scan_claude_sessions: async () => [],
+    });
+
+    renderHook(() => useSessionRestore());
+
+    await waitFor(() => {
+      const toasts = useUIStore.getState().toasts;
+      expect(
+        toasts.some(
+          (t) => t.type === "error" && t.title === "Claude CLI nicht gefunden",
+        ),
+      ).toBe(true);
+    });
+
+    // Nothing was restored, and the hint names the concrete install command.
+    expect(useSessionStore.getState().sessions).toHaveLength(0);
+    const errorToast = useUIStore
+      .getState()
+      .toasts.find((t) => t.type === "error");
+    expect(errorToast?.message).toContain(
+      "npm install -g @anthropic-ai/claude-code",
+    );
+  });
+
+  // -------------------------------------------------------------------------
   // 8. defaultPermissionMode threads into the auto-restore create_session call.
   //    Fix for the merge-blocking gap found in the Issue #11 whole-branch
   //    review: useSessionCreation.ts wired permissionMode into all three of
