@@ -1,0 +1,26 @@
+name: Task / Chore
+description: Technische Aufgabe ohne Feature-Charakter (Refactoring, CI, Doku, Dependencies)
+title: "[Task]: "
+labels: ["chore"]
+body:
+  - type: textarea
+    id: aufgabe
+    attributes:
+      label: Aufgabe
+      description: Was ist zu tun und warum?
+    validations:
+      required: true
+  - type: textarea
+    id: done-kriterien
+    attributes:
+      label: Done-Kriterien
+      description: Woran ist erkennbar, dass die Aufgabe abgeschlossen ist?
+      placeholder: |
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: kontext
+    attributes:
+      label: Kontext (optional)
+      description: Betroffene Pfade, verwandte Issues/PRs, Links.

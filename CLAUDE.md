@@ -54,6 +54,16 @@ npm run lint             # ESLint
 - `tasks/todo.md` — 1 aktive Phase + 1 nächste Phase + flacher Backlog (umbrella-Regel)
 - `tasks/lessons.md` — Lessons Learned (Fehler → Korrektur → Regel)
 
+## GitHub Issues
+
+Issues IMMER ueber die drei Issue-Forms in `.github/ISSUE_TEMPLATE/` erstellen (Blank Issues sind deaktiviert) — auch bei `gh issue create` die Feldstruktur des passenden Templates im Body nachbilden und das Label setzen:
+
+- **Bug Report** (`bug`) — Fehler; Bugfixes sind Feature-Freeze-konform und duerfen direkt umgesetzt werden.
+- **Feature Request** (`enhancement`) — landet zunaechst im Backlog (`tasks/todo.md`), Umsetzung erst mit dem naechsten Major-Release.
+- **Task / Chore** (`chore`) — Refactoring, CI, Doku, Dependencies, Release-Pflege.
+
+Sprache: Deutsch. Bug-Reports brauchen App-Version + OS; Log-Auszug aus `%LOCALAPPDATA%\smashq\app-log.ndjson` beilegen, wenn vorhanden.
+
 ## Development Workflow
 
 - `npx tsc --noEmit` nach .ts/.tsx Aenderungen

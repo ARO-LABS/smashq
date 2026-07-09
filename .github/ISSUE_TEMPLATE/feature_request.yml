@@ -1,0 +1,30 @@
+name: Feature Request
+description: Neue Funktion oder Verbesserung vorschlagen
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        **Hinweis Feature-Freeze:** Der Session Manager ist feature-complete —
+        neue Features landen zunächst im Backlog und werden für das nächste
+        Major-Release separat geplant.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Motivation
+      description: Welches Problem löst das Feature? Warum jetzt?
+    validations:
+      required: true
+  - type: textarea
+    id: verhalten
+    attributes:
+      label: Gewünschtes Verhalten
+      description: Wie soll das Feature funktionieren?
+    validations:
+      required: true
+  - type: textarea
+    id: alternativen
+    attributes:
+      label: Alternativen (optional)
+      description: Welche anderen Lösungswege wurden erwogen?

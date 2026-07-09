@@ -1,0 +1,56 @@
+name: Bug Report
+description: Fehler in Smashq melden
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: beobachtet
+    attributes:
+      label: Was ist passiert?
+      description: Beobachtetes Verhalten beschreiben.
+    validations:
+      required: true
+  - type: textarea
+    id: erwartet
+    attributes:
+      label: Erwartetes Verhalten
+      description: Was sollte stattdessen passieren?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Schritte zur Reproduktion
+      placeholder: |
+        1. App starten
+        2. ...
+        3. Fehler tritt auf
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App-Version
+      description: Sichtbar am v-Badge unten in der Session-Leiste.
+      placeholder: z.B. 1.0.23
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Betriebssystem
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log-Auszug (optional)
+      description: >
+        NDJSON-Log unter `%LOCALAPPDATA%\smashq\app-log.ndjson` (Windows) —
+        nur vorhanden, wenn "Log-Datei (NDJSON)" in den Settings aktiv ist.
+        Relevante Zeilen hier einfügen.
+      render: json
