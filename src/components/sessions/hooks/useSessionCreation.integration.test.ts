@@ -267,6 +267,40 @@ describe("useSessionCreation.handleNewSessionFromDefaults — Layer-B", () => {
 });
 
 /**
+ * Layer-B integration tests for handleResumeSession — covers the same
+ * defaultPermissionMode pass-through as handleQuickStart/
+ * handleNewSessionFromDefaults. Folded in during the Issue #11 whole-branch
+ * review to close a test-coverage gap (this invoke was already wired for
+ * permissionMode but had zero assertions on it).
+ */
+describe("useSessionCreation.handleResumeSession — Layer-B", () => {
+  beforeEach(() => {
+    resetAllStores();
+  });
+
+  it("passes the global defaultPermissionMode through on resume", async () => {
+    useSettingsStore.getState().setDefaultPermissionMode("plan");
+
+    const { handler, calls } = buildCreateSessionHandler();
+    installRealIPC({ create_session: handler });
+
+    const { result } = renderHook(() => useSessionCreation());
+    await act(async () => {
+      await result.current.handleResumeSession(
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "/Users/me/proj",
+        "Resumed Title",
+      );
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].permissionMode).toBe("plan");
+    expect(calls[0].resumeSessionId).toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+    expect(useSessionStore.getState().sessions).toHaveLength(1);
+  });
+});
+
+/**
  * Layer-B integration tests for handleQuickStart — the favorite/Quick-Start
  * path that was the actual macOS session-start blocker. Favorites used to
  * hardcode shell "powershell" (→ absent `pwsh` on macOS), create_session
