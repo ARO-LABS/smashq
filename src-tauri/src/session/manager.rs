@@ -116,6 +116,7 @@ impl SessionManager {
         title: String,
         folder: String,
         shell: String,
+        permission_mode: String,
         resume_session_id: Option<String>,
         initial_cols: Option<u16>,
         initial_rows: Option<u16>,
@@ -125,6 +126,10 @@ impl SessionManager {
         // call catches up. Frontend can pass exact dimensions for a perfect fit.
         let cols = initial_cols.filter(|c| *c > 0).unwrap_or(120);
         let rows = initial_rows.filter(|r| *r > 0).unwrap_or(40);
+
+        // Roh-String von der Grenze sofort ins geschlossene Enum — ab hier
+        // existiert nur noch der validierte Wert.
+        let permission_mode = PermissionMode::from_pref(&permission_mode);
 
         // Resolve the user preference ("auto", legacy values, platform-foreign
         // shells) into a concrete shell for THIS platform before anything else
@@ -177,7 +182,12 @@ impl SessionManager {
             })?;
 
         let mut cmd = CommandBuilder::new(shell_exe);
-        for arg in shell_args(&shell, platform, resume_session_id.as_deref()) {
+        for arg in shell_args(
+            &shell,
+            platform,
+            resume_session_id.as_deref(),
+            permission_mode,
+        ) {
             cmd.arg(arg);
         }
         cmd.cwd(&folder);
@@ -876,10 +886,49 @@ fn resolve_available_shell(
     None
 }
 
+/// Permission-Modus, mit dem eine neue Claude-Session startet. Geschlossenes
+/// Enum — der einzige Weg, wie ein User-String die claude-Kommandozeile
+/// beeinflusst, ist `from_pref` (mappt Unbekanntes auf den sichersten Modus).
+/// So kann selbst ein manipulierter String nur einen der vier festen Flags
+/// (oder keinen) erzeugen; Shell-Injection ist strukturell ausgeschlossen —
+/// dieselbe Defense-in-depth wie der `--resume`-Charset-Guard unten.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PermissionMode {
+    Default,
+    Auto,
+    Plan,
+    Bypass,
+}
+
+impl PermissionMode {
+    /// Roh-String von der IPC-Grenze → geschlossenes Enum. Fail-safe: alles
+    /// Unbekannte (inkl. "default") wird `Default`, NIE `Bypass`.
+    pub fn from_pref(s: &str) -> Self {
+        match s {
+            "auto" => Self::Auto,
+            "plan" => Self::Plan,
+            "bypass" => Self::Bypass,
+            _ => Self::Default,
+        }
+    }
+
+    /// Nur &'static-str-Literale — kein User-Text erreicht je die Shell.
+    /// Fuehrendes Leerzeichen, damit `format!("claude{}", flag)` sauber joint.
+    fn claude_flag(self) -> &'static str {
+        match self {
+            Self::Default => "",
+            Self::Auto => " --permission-mode auto",
+            Self::Plan => " --permission-mode plan",
+            Self::Bypass => " --dangerously-skip-permissions",
+        }
+    }
+}
+
 fn shell_args(
     shell: &str,
     platform: ShellPlatform,
     resume_session_id: Option<&str>,
+    mode: PermissionMode,
 ) -> Vec<String> {
     // Defense-in-depth: only honour a resume ID with the expected charset.
     // Primary validation happens at the Tauri command boundary (commands.rs);
@@ -897,9 +946,10 @@ fn shell_args(
             resume_session_id.unwrap_or_default()
         );
     }
+    let mode_flag = mode.claude_flag();
     let claude_cmd = match valid_resume {
-        Some(id) => format!("claude --dangerously-skip-permissions --resume {}", id),
-        None => "claude --dangerously-skip-permissions".to_string(),
+        Some(id) => format!("claude{} --resume {}", mode_flag, id),
+        None => format!("claude{}", mode_flag),
     };
     match (shell, platform) {
         ("cmd", _) => vec!["/K".to_string(), claude_cmd],
@@ -1667,11 +1717,40 @@ mod tests {
         assert_eq!(shell_executable("bash", ShellPlatform::Linux), "bash");
     }
 
+    // --- PermissionMode ---
+
+    #[test]
+    fn permission_mode_from_pref_maps_known_values() {
+        assert_eq!(PermissionMode::from_pref("auto"), PermissionMode::Auto);
+        assert_eq!(PermissionMode::from_pref("plan"), PermissionMode::Plan);
+        assert_eq!(PermissionMode::from_pref("bypass"), PermissionMode::Bypass);
+        assert_eq!(
+            PermissionMode::from_pref("default"),
+            PermissionMode::Default
+        );
+    }
+
+    #[test]
+    fn permission_mode_from_pref_unknown_falls_back_to_default() {
+        // Fail-safe: garbage/empty darf NIE Bypass werden.
+        assert_eq!(PermissionMode::from_pref(""), PermissionMode::Default);
+        assert_eq!(PermissionMode::from_pref("YOLO"), PermissionMode::Default);
+        assert_eq!(
+            PermissionMode::from_pref("--dangerously"),
+            PermissionMode::Default
+        );
+    }
+
     // --- shell_args ---
 
     #[test]
     fn shell_args_powershell_no_resume() {
-        let args = shell_args("powershell", ShellPlatform::Windows, None);
+        let args = shell_args(
+            "powershell",
+            ShellPlatform::Windows,
+            None,
+            PermissionMode::Bypass,
+        );
         assert_eq!(
             args,
             vec![
@@ -1684,7 +1763,7 @@ mod tests {
 
     #[test]
     fn shell_args_cmd_no_resume() {
-        let args = shell_args("cmd", ShellPlatform::Windows, None);
+        let args = shell_args("cmd", ShellPlatform::Windows, None, PermissionMode::Bypass);
         assert_eq!(
             args,
             vec![
@@ -1696,7 +1775,12 @@ mod tests {
 
     #[test]
     fn shell_args_gitbash_windows_stays_non_login() {
-        let args = shell_args("gitbash", ShellPlatform::Windows, None);
+        let args = shell_args(
+            "gitbash",
+            ShellPlatform::Windows,
+            None,
+            PermissionMode::Bypass,
+        );
         assert_eq!(
             args,
             vec![
@@ -1711,7 +1795,7 @@ mod tests {
         // -l ist der zweite Mac-Fix: ohne Login-Shell fehlt GUI-Apps der
         // User-PATH (homebrew/npm-global) und `claude` wird nicht gefunden.
         for shell in ["zsh", "bash"] {
-            let args = shell_args(shell, ShellPlatform::MacOs, None);
+            let args = shell_args(shell, ShellPlatform::MacOs, None, PermissionMode::Bypass);
             assert_eq!(
                 args,
                 vec![
@@ -1725,14 +1809,19 @@ mod tests {
 
     #[test]
     fn shell_args_unknown_shell_falls_back_to_powershell_form() {
-        let args = shell_args("fish", ShellPlatform::Windows, None);
+        let args = shell_args("fish", ShellPlatform::Windows, None, PermissionMode::Bypass);
         assert_eq!(args[0], "-NoExit");
         assert_eq!(args[1], "-Command");
     }
 
     #[test]
     fn shell_args_valid_resume_id_appended() {
-        let args = shell_args("powershell", ShellPlatform::Windows, Some("abc-123_XY"));
+        let args = shell_args(
+            "powershell",
+            ShellPlatform::Windows,
+            Some("abc-123_XY"),
+            PermissionMode::Bypass,
+        );
         assert_eq!(
             args[2],
             "claude --dangerously-skip-permissions --resume abc-123_XY"
@@ -1741,13 +1830,23 @@ mod tests {
 
     #[test]
     fn shell_args_empty_resume_id_ignored() {
-        let args = shell_args("powershell", ShellPlatform::Windows, Some(""));
+        let args = shell_args(
+            "powershell",
+            ShellPlatform::Windows,
+            Some(""),
+            PermissionMode::Bypass,
+        );
         assert_eq!(args[2], "claude --dangerously-skip-permissions");
     }
 
     #[test]
     fn shell_args_invalid_resume_id_with_space_ignored() {
-        let args = shell_args("cmd", ShellPlatform::Windows, Some("bad id"));
+        let args = shell_args(
+            "cmd",
+            ShellPlatform::Windows,
+            Some("bad id"),
+            PermissionMode::Bypass,
+        );
         assert_eq!(args[1], "claude --dangerously-skip-permissions");
     }
 
@@ -1755,25 +1854,106 @@ mod tests {
     fn shell_args_invalid_resume_id_with_shell_metachar_ignored() {
         // Semicolon would be a command-injection vector — must be rejected.
         // Auf Unix steckt das Kommando in args[2] (nach -l -c).
-        let args = shell_args("zsh", ShellPlatform::MacOs, Some("id;rm -rf"));
+        let args = shell_args(
+            "zsh",
+            ShellPlatform::MacOs,
+            Some("id;rm -rf"),
+            PermissionMode::Bypass,
+        );
         assert_eq!(args[2], "claude --dangerously-skip-permissions");
     }
 
     #[test]
     fn shell_args_resume_id_with_dot_rejected() {
         // '.' is not in the allowed charset (alphanumeric, '-', '_').
-        let args = shell_args("powershell", ShellPlatform::Windows, Some("a.b"));
+        let args = shell_args(
+            "powershell",
+            ShellPlatform::Windows,
+            Some("a.b"),
+            PermissionMode::Bypass,
+        );
         assert_eq!(args[2], "claude --dangerously-skip-permissions");
     }
 
     #[test]
     fn shell_args_uuid_style_resume_id_accepted() {
         let uuid = "550e8400-e29b-41d4-a716-446655440000";
-        let args = shell_args("powershell", ShellPlatform::Windows, Some(uuid));
+        let args = shell_args(
+            "powershell",
+            ShellPlatform::Windows,
+            Some(uuid),
+            PermissionMode::Bypass,
+        );
         assert_eq!(
             args[2],
             format!("claude --dangerously-skip-permissions --resume {uuid}")
         );
+    }
+
+    #[test]
+    fn shell_args_default_mode_emits_no_flag() {
+        let args = shell_args(
+            "powershell",
+            ShellPlatform::Windows,
+            None,
+            PermissionMode::Default,
+        );
+        assert_eq!(args[2], "claude");
+    }
+
+    #[test]
+    fn shell_args_auto_mode_emits_permission_flag() {
+        let args = shell_args(
+            "powershell",
+            ShellPlatform::Windows,
+            None,
+            PermissionMode::Auto,
+        );
+        assert_eq!(args[2], "claude --permission-mode auto");
+    }
+
+    #[test]
+    fn shell_args_plan_mode_emits_permission_flag() {
+        let args = shell_args(
+            "powershell",
+            ShellPlatform::Windows,
+            None,
+            PermissionMode::Plan,
+        );
+        assert_eq!(args[2], "claude --permission-mode plan");
+    }
+
+    #[test]
+    fn shell_args_bypass_mode_emits_dangerous_flag() {
+        let args = shell_args(
+            "powershell",
+            ShellPlatform::Windows,
+            None,
+            PermissionMode::Bypass,
+        );
+        assert_eq!(args[2], "claude --dangerously-skip-permissions");
+    }
+
+    #[test]
+    fn shell_args_mode_and_resume_combine() {
+        let args = shell_args(
+            "powershell",
+            ShellPlatform::Windows,
+            Some("abc-123_XY"),
+            PermissionMode::Auto,
+        );
+        assert_eq!(args[2], "claude --permission-mode auto --resume abc-123_XY");
+    }
+
+    #[test]
+    fn shell_args_default_mode_and_resume_combine() {
+        let args = shell_args(
+            "powershell",
+            ShellPlatform::Windows,
+            Some("abc-123_XY"),
+            PermissionMode::Default,
+        );
+        assert_eq!(args[2], "claude --resume abc-123_XY");
     }
 
     // --- SessionManager / struct construction ---
