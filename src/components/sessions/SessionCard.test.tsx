@@ -531,9 +531,45 @@ describe("SessionCard", () => {
       // index 2 of 4 → bottom-left quadrant (area "c").
       const map = screen.getByLabelText("Im Grid: unten links");
       expect(map).toBeTruthy();
-      const active = map.querySelector('[data-active="true"]');
+      const active = map.querySelector('[data-active="true"]') as HTMLElement;
       expect(active?.getAttribute("data-cell")).toBe("c");
-      expect(active?.className).toContain("bg-accent");
+      // Aktive Zelle nutzt jetzt die Session-Farbe inline, nicht mehr bg-accent.
+      expect(active.className).not.toContain("bg-accent");
+      expect(active.style.background).toContain("oklch");
+    });
+
+    it("mini-map active cell matches the session dot color (idle)", () => {
+      const { container } = render(
+        <SessionCard
+          session={makeSession({ folder: "C:/Projects/x", title: "t" })}
+          isActive={false}
+          gridSlot={{ index: 2, count: 4 }}
+          onClick={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      );
+      const dot = container.querySelector("[data-testid='sess-dot']") as HTMLElement;
+      const active = container.querySelector('[data-active="true"]') as HTMLElement;
+      expect(active.style.background).toBe(dot.style.background);
+      expect(active.style.background).toContain("oklch");
+    });
+
+    it("mini-map active cell follows the dot into error state", () => {
+      const { container } = render(
+        <SessionCard
+          session={makeSession({ folder: "C:/Projects/x", title: "t", status: "error" })}
+          isActive={false}
+          gridSlot={{ index: 2, count: 4 }}
+          onClick={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      );
+      const active = container.querySelector('[data-active="true"]') as HTMLElement;
+      expect(active.style.background).toContain("--color-error");
+      // Inaktive Zellen bleiben neutral, ohne Inline-Farbe.
+      const inactive = container.querySelector('[data-cell]:not([data-active="true"])') as HTMLElement;
+      expect(inactive.className).toContain("bg-neutral-600");
+      expect(inactive.style.background).toBe("");
     });
 
     it("adapts the mini-map to the session count (2 sessions = halves)", () => {

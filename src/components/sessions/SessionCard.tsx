@@ -256,8 +256,8 @@ const SessionCardInner = ({ session, isActive, gridSlot, onClick, onClose }: Ses
                 key={area}
                 data-cell={area}
                 data-active={on ? "true" : undefined}
-                className={`rounded-xs ${on ? "bg-accent" : "bg-neutral-600"}`}
-                style={{ gridArea: area }}
+                className={`rounded-xs ${on ? "" : "bg-neutral-600"}`}
+                style={{ gridArea: area, background: on ? dotBackground : undefined }}
               />
             );
           })}
