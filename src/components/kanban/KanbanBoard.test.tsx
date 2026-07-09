@@ -621,6 +621,13 @@ describe("KanbanBoard — Projects v2", () => {
     // Classified error shown inline; NOT the empty-list message.
     await waitFor(() => expect(screen.getByText("Kein Zugriff")).toBeTruthy());
     expect(screen.queryByText("Keine Boards für dieses Konto.")).toBeNull();
+
+    // Pins the error to INLINE-in-chooser, not the full-screen error card:
+    // the already-loaded board is still mounted behind the open picker. If a
+    // regression routed the silent-branch error into errorInfo, the full-screen
+    // card would eject the board and "Backlog" would be gone — both assertions
+    // above would still pass, so this anchor is what actually guards the fix.
+    expect(screen.getByText("Backlog")).toBeTruthy();
   });
 
   it("drops a stale owner-switch resolve on a rapid A→B→A switch", async () => {
