@@ -1085,8 +1085,20 @@ pub fn detect_available_shells() -> Vec<ShellOption> {
         .collect()
 }
 
+/// Resolve the platform's default shell to its `(name, executable)` pair for
+/// the prerequisite check, reusing the exact `default_shell` + `shell_executable`
+/// mapping `create_session` applies to an "auto" preference — so the reported
+/// shell matches what a new session would actually launch.
+pub fn default_shell_probe() -> (&'static str, &'static str) {
+    let platform = ShellPlatform::current();
+    let shell = platform.default_shell();
+    (shell, shell_executable(shell, platform))
+}
+
 /// Check if an executable exists on PATH (simple cross-platform check).
-fn which_executable(name: &str) -> Option<std::path::PathBuf> {
+/// `pub(crate)` so `prerequisites.rs` reuses the same probe session spawning
+/// uses — one PATH lookup yields both presence and the resolved path.
+pub(crate) fn which_executable(name: &str) -> Option<std::path::PathBuf> {
     let cmd_name = if cfg!(windows) { "where" } else { "which" };
     let mut cmd = crate::util::silent_command(cmd_name);
     cmd.arg(name);
