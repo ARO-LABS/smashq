@@ -23,6 +23,14 @@
 
 **Regel:** UTF-8 (und ANSI-Sequenzen) NIE auf willkürlichen Byte-Grenzen decodieren — bei jedem Stream-Reader (PTY, Socket, Datei-Chunks) unvollständige Trailing-Bytes puffern und erst an gültigen Grenzen decodieren. Diagnose-Heuristik: **„kurz sauber, lang zerschossen" = Chunk-Grenzen-Bug**, nicht Breite/Resize. Und: wenn Fix #1 (hier: Resize) nur teilweise hilft, ist es Evidence für eine ZWEITE, unabhängige Ursache — neue Hypothese bilden, nicht denselben Fix verstärken (systematic-debugging).
 
+### 2026-07-09 — Default Permission Mode (#11): einziger claude-Start-Pfad kodierte `--dangerously-skip-permissions` fest
+
+**Fehler:** Der einzige claude-Start-Pfad (`shell_args`) kodierte `--dangerously-skip-permissions` fest — kein Weg, den Permission-Modus zu wählen.
+
+**Korrektur:** Modus als geschlossenes `PermissionMode`-Enum durch alle Grenzen (Store → 3 Invokes → Tauri-Command → shell_args); Kommandozeile nur aus `&'static str`.
+
+**Regel:** User-beeinflusste CLI-Flags NIE als Roh-String interpolieren — erst in ein geschlossenes Enum mappen (Unbekanntes → sicherster Wert), dann feste Literale emittieren. Wie beim `--resume`-Charset-Guard.
+
 ### 2026-07-08 — App-Icon-Geometrie: fuer die kleinste Zielgroesse entwerfen, nicht fuer die Praesentationsgroesse
 
 **Kontext:** Bracket-Q-Logo (`[q_]`) gewaehlt und als App-Icon-Set generiert. Erste Geometrie 1:1 aus dem 88-px-Artifact-Entwurf uebernommen.
