@@ -58,6 +58,7 @@ export function resetAllStores(): void {
       },
       defaultProjectPath: "",
       defaultShell: "auto",
+      defaultPermissionMode: "default",
       sessionTitleOverrides: {},
       favorites: [],
       globalNotes: "",

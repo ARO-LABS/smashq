@@ -68,6 +68,7 @@ export function useSessionCreation(): UseSessionCreationReturn {
       // Plattform-Default vom Backend aufloesen lassen — ein hartes
       // "powershell" liesse Resume auf macOS scheitern.
       const shell = "auto";
+      const permissionMode = useSettingsStore.getState().defaultPermissionMode;
 
       try {
         const result = await wrapInvoke<CreateSessionResult>("create_session", {
@@ -75,6 +76,7 @@ export function useSessionCreation(): UseSessionCreationReturn {
           folder: cwd,
           title,
           shell,
+          permissionMode,
           resumeSessionId,
         });
 
@@ -107,6 +109,7 @@ export function useSessionCreation(): UseSessionCreationReturn {
     const title = favorite.label;
     const folder = favorite.path;
     const shell = favorite.shell;
+    const permissionMode = useSettingsStore.getState().defaultPermissionMode;
 
     try {
       const result = await wrapInvoke<CreateSessionResult>("create_session", {
@@ -114,6 +117,7 @@ export function useSessionCreation(): UseSessionCreationReturn {
         folder,
         title,
         shell,
+        permissionMode,
       });
 
       const sessionId = result?.id ?? id;
@@ -172,6 +176,7 @@ export function useSessionCreation(): UseSessionCreationReturn {
     // Preference (inkl. "auto") unaufgeloest ans Backend — nur Rust kennt
     // die Zielplattform.
     const shell = settings.defaultShell;
+    const permissionMode = settings.defaultPermissionMode;
     const title = extractFolderName(folder);
 
     try {
@@ -180,6 +185,7 @@ export function useSessionCreation(): UseSessionCreationReturn {
         folder,
         title,
         shell,
+        permissionMode,
       });
 
       const sessionId = result?.id ?? id;
