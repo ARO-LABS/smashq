@@ -582,6 +582,47 @@ describe("KanbanBoard — Projects v2", () => {
     await waitFor(() => expect(screen.getByText("Org Board")).toBeTruthy());
   });
 
+  it("shows the classified error inline when an owner's board list fails (Issue #7 ARO-LABS)", async () => {
+    // Switching to an org the token can't access must surface the real error
+    // in the chooser, not the misleading "Keine Boards für dieses Konto.".
+    setupStatefulStore();
+    mockInvoke.mockImplementation((cmd: string, args?: unknown) => {
+      if (cmd === "list_project_owners") {
+        return Promise.resolve([
+          { login: "me", kind: "user" },
+          { login: "ARO-LABS", kind: "org" },
+        ]);
+      }
+      if (cmd === "list_user_projects") {
+        const owner = (args as { owner?: string } | undefined)?.owner;
+        if (owner === "ARO-LABS") {
+          return Promise.reject({
+            code: "SERVICE_AUTH_FAILED",
+            message: "forbidden",
+            details: "forbidden",
+            retryable: false,
+          });
+        }
+        return Promise.resolve([
+          { id: "PVT_abc123", number: 2, title: "Smashq", items_total: 5 },
+        ]);
+      }
+      return Promise.resolve(makeBoard());
+    });
+
+    render(<Board folder="/test/owner-fail" />);
+    await waitFor(() => expect(screen.getByText("Backlog")).toBeTruthy());
+
+    fireEvent.click(screen.getByText("Smashq")); // open picker → loads owners
+    const ownerSelect = await screen.findByLabelText("Konto");
+
+    fireEvent.change(ownerSelect, { target: { value: "ARO-LABS" } });
+
+    // Classified error shown inline; NOT the empty-list message.
+    await waitFor(() => expect(screen.getByText("Kein Zugriff")).toBeTruthy());
+    expect(screen.queryByText("Keine Boards für dieses Konto.")).toBeNull();
+  });
+
   it("drops a stale owner-switch resolve on a rapid A→B→A switch", async () => {
     setupStatefulStore();
     // The org list call hangs until we resolve it by hand — long after the user

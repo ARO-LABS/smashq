@@ -118,6 +118,10 @@ export function KanbanBoard() {
   const [loading, setLoading] = useState(true);
   /** Classified load error (null = no error). Drives honest, kind-specific UI. */
   const [errorInfo, setErrorInfo] = useState<GithubErrorInfo | null>(null);
+  /** Picker-scoped classified error (owner switch failed). Kept SEPARATE from
+   *  errorInfo so a failed org list renders inline in the chooser instead of
+   *  ejecting an already-visible board to the full-screen error card. */
+  const [pickerError, setPickerError] = useState<GithubErrorInfo | null>(null);
   /** Owners (viewer + orgs) for the picker dropdown; lazily loaded on first open. */
   const [owners, setOwners] = useState<ProjectOwner[]>([]);
   /** Currently browsed owner login in the picker; null until the picker loads it. */
@@ -199,7 +203,10 @@ export function KanbanBoard() {
       const listKey = `global:${owner}`;
       const cached = projectListCache.get(listKey);
       if (cached && Date.now() - cached.timestamp < PROJECT_LIST_TTL) {
-        if (!signal.aborted) setProjects(cached.projects);
+        if (!signal.aborted) {
+          setProjects(cached.projects);
+          setPickerError(null);
+        }
         return cached.projects;
       }
 
@@ -211,13 +218,16 @@ export function KanbanBoard() {
         if (signal.aborted) return result;
         projectListCache.set(listKey, { projects: result, timestamp: Date.now() });
         setProjects(result);
+        setPickerError(null);
         return result;
       } catch (err) {
         if (!signal.aborted) {
           // `silent` (owner switch inside the picker): keep the chooser visible
-          // with an empty list instead of replacing it with a full-screen error.
+          // with the classified error instead of replacing it with a
+          // full-screen error card.
           if (opts.silent) {
             setProjects([]);
+            setPickerError(classifyGithubError(err));
           } else {
             setErrorInfo(classifyGithubError(err));
             setLoading(false);
@@ -263,6 +273,7 @@ export function KanbanBoard() {
   const handleOwnerChange = useCallback(
     (login: string) => {
       setSelectedOwner(login);
+      setPickerError(null);
       ownerSwitchAbortRef.current?.abort();
       const controller = new AbortController();
       ownerSwitchAbortRef.current = controller;
@@ -553,7 +564,12 @@ export function KanbanBoard() {
           ))}
         </select>
       </label>
-      {projects.length === 0 ? (
+      {pickerError ? (
+        <div className="px-3 py-3 text-[11px] text-center">
+          <span className="block text-neutral-400">{pickerError.title}</span>
+          <span className="block text-neutral-600 mt-1">{pickerError.hint}</span>
+        </div>
+      ) : projects.length === 0 ? (
         <div className="px-3 py-3 text-[11px] text-neutral-600 text-center">
           Keine Boards für dieses Konto.
         </div>
