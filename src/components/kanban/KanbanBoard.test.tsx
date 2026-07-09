@@ -752,6 +752,49 @@ describe("KanbanBoard — Projects v2", () => {
     });
   });
 
+  it("retry after an auth failure with no board selected re-lists projects and loads the board", async () => {
+    // Issue #7: after `gh auth login` the retry button did nothing because
+    // loadBoard no-ops without a selected board. It must re-list projects,
+    // auto-select the first, and load its board.
+    setupStatefulStore();
+    let listCalls = 0;
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "list_user_projects") {
+        listCalls++;
+        if (listCalls === 1) {
+          return Promise.reject({
+            code: "SERVICE_AUTH_FAILED",
+            message: "gh auth login required",
+            details: "auth",
+            retryable: false,
+          });
+        }
+        return Promise.resolve([
+          { id: "PVT_abc123", number: 2, title: "Smashq", items_total: 5 },
+        ]);
+      }
+      if (cmd === "list_project_owners") {
+        return Promise.resolve([{ login: "me", kind: "user" }]);
+      }
+      return Promise.resolve(makeBoard());
+    });
+
+    render(<Board folder="/test/retry-auth" />);
+
+    // First list load fails → honest auth error card with a retry button.
+    await waitFor(() => {
+      expect(screen.getByText("Nicht bei GitHub angemeldet")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("Erneut versuchen"));
+
+    // Retry re-lists projects, auto-selects the first, and loads its board.
+    await waitFor(() => {
+      expect(screen.getByText("Backlog")).toBeTruthy();
+    });
+    expect(listCalls).toBeGreaterThanOrEqual(2);
+  });
+
   it("renders cross-repo repository badge for global-board items", async () => {
     // Distinct project id so the module-level board cache (keyed by project id)
     // does not serve a stale board from an earlier test.

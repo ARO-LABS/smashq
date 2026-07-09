@@ -601,7 +601,28 @@ export function KanbanBoard() {
           onClick={() => {
             const controller = new AbortController();
             setErrorInfo(null);
-            void loadBoard(controller.signal, true);
+            // After a fixed auth/scope problem the failed call may have been the
+            // project-LIST load (no board selected yet). loadBoard no-ops when
+            // resolveProject() is undefined, so retry must re-list projects and
+            // auto-select the first — mirroring the initial load effect —
+            // instead of silently doing nothing.
+            if (resolveProject()) {
+              void loadBoard(controller.signal, true);
+            } else {
+              setLoading(true);
+              void loadProjects(controller.signal).then((list) => {
+                if (controller.signal.aborted) return;
+                if (list.length === 0) {
+                  setLoading(false);
+                  return;
+                }
+                setGlobalProject({
+                  projectNumber: list[0].number,
+                  projectId: list[0].id,
+                  title: list[0].title,
+                });
+              });
+            }
           }}
           className="mt-2 px-3 py-1.5 text-xs rounded-md bg-surface-raised text-neutral-300 shadow-hairline hover:shadow-lift hover:bg-hover-overlay hover:text-neutral-100 transition-shadow duration-200"
         >
