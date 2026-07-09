@@ -15,6 +15,14 @@
 
 **Regel:** Ein selbstgebauter Terminal-Emulator (xterm.js + PTY) MUSS `TERM`/`COLORTERM` für seine Kinder selbst setzen — das ist Aufgabe des Emulators, nicht der Shell. GUI-Launch-Env-Stripping ist eine wiederkehrende Klasse (erst PATH → Login-Shell, jetzt `TERM`): bei „läuft im Dev, nicht in der installierten App" zuerst fragen, welche Env-Variablen ein launchd/Finder-Start NICHT erbt. Und: eine User-Vermutung („Resize") ist eine Hypothese, kein Befund — immer gegen die Rohevidenz (Screenshot) prüfen, sonst debuggt man das falsche Symptom.
 
+### 2026-07-09 — `from_utf8_lossy` pro Read-Chunk zerschneidet Mehrbyte-Zeichen an der Puffergrenze: an UTF-8-Grenzen zusammensetzen
+
+**Kontext:** Issue #8 (Teil 2) — nach dem Farb-Fix meldete der User weiterhin überlappende/verstümmelte Zeilen im Terminal. Erste Hypothese war ein Breiten-/Resize-Race (PTY spawnt 120×40, Frontend resized verzögert); ein Fix (synchroner `resize_session` beim Mount) half aber nur teilweise. Entscheidende Evidence kam aus zwei Beobachtungen des Users: (a) **kurzer** Willkommens-Screen sauber, **lange** Ausgabe zerschossen; (b) „durchgehend". Das ist der Fingerabdruck einer **Chunk-Grenze**, nicht einer Breite.
+
+**Fehler → Korrektur:** Der PTY-Reader-Thread las in einen `[0u8; 4096]`-Puffer und decodierte JEDEN Read unabhängig mit `String::from_utf8_lossy(&buf[..n])`. Ein Mehrbyte-Zeichen (Box-Drawing `─` = 3 Bytes), das genau auf der 4096-Byte-Grenze liegt, wird so in zwei Reads zerschnitten → beide Hälften werden zu `U+FFFD`-Ersatzzeichen → aus 1 Zeichen werden 2–3 → **Spaltenzahl verschiebt sich** → Claudes cursor-relative Redraws landen auf falschen Zeilen (Overlap). Kurze Ausgabe (< 4096 B) trifft nie eine Grenze, daher sauber. Korrektur: reiner Helper `valid_utf8_prefix_len` (längster vollständiger UTF-8-Präfix; nur unvollständige Trailing-Sequenzen zurückhalten, echte Invalid-Bytes NICHT — sonst wächst der Carry unbounded) + `decode_pty_chunk`/`flush_pty_carry` puffern unvollständige Bytes über Reads hinweg (Carry ≤ 3 Bytes).
+
+**Regel:** UTF-8 (und ANSI-Sequenzen) NIE auf willkürlichen Byte-Grenzen decodieren — bei jedem Stream-Reader (PTY, Socket, Datei-Chunks) unvollständige Trailing-Bytes puffern und erst an gültigen Grenzen decodieren. Diagnose-Heuristik: **„kurz sauber, lang zerschossen" = Chunk-Grenzen-Bug**, nicht Breite/Resize. Und: wenn Fix #1 (hier: Resize) nur teilweise hilft, ist es Evidence für eine ZWEITE, unabhängige Ursache — neue Hypothese bilden, nicht denselben Fix verstärken (systematic-debugging).
+
 ### 2026-07-08 — App-Icon-Geometrie: fuer die kleinste Zielgroesse entwerfen, nicht fuer die Praesentationsgroesse
 
 **Kontext:** Bracket-Q-Logo (`[q_]`) gewaehlt und als App-Icon-Set generiert. Erste Geometrie 1:1 aus dem 88-px-Artifact-Entwurf uebernommen.
