@@ -155,6 +155,11 @@ impl SessionManager {
             }
         };
 
+        // Every session launches `claude` (see shell_args) — guard its presence
+        // before opening a PTY, so a missing binary yields an actionable,
+        // classifiable error instead of a dead "command not found" terminal.
+        ensure_claude_available(|exe| which_executable(exe).is_some())?;
+
         log::info!(
             "Creating session id={}, shell={}, folder={}, size={}x{}",
             id,
@@ -884,6 +889,29 @@ fn resolve_available_shell(
     }
 
     None
+}
+
+/// Guard: `claude` must be resolvable on PATH before a session spawns. Without
+/// it the PTY launches a shell that instantly prints "command not found" and
+/// exits — the user is left staring at a dead terminal with no actionable hint.
+/// Fail early instead, with a structured error the frontend classifies via the
+/// `claude_missing` details string (same pattern as `gh_missing` — NO new
+/// `ADPErrorCode` variant). `TerminalSpawnFailed` matches every sibling error
+/// in `create_session`; the details string is the real discriminator.
+///
+/// Pure + injected `is_installed` probe so it is unit-testable; `create_session`
+/// passes the real `|exe| which_executable(exe).is_some()`.
+fn ensure_claude_available(is_installed: impl Fn(&str) -> bool) -> Result<(), ADPError> {
+    if is_installed("claude") {
+        Ok(())
+    } else {
+        Err(ADPError::new(
+            ADPErrorCode::TerminalSpawnFailed,
+            "Claude CLI wurde nicht auf dem PATH gefunden. Installieren mit: \
+             npm install -g @anthropic-ai/claude-code",
+        )
+        .with_details("claude_missing"))
+    }
 }
 
 /// Permission-Modus, mit dem eine neue Claude-Session startet. Geschlossenes
@@ -1700,6 +1728,34 @@ mod tests {
         assert_eq!(
             resolve_available_shell("powershell", ShellPlatform::Windows, installed),
             Some(("powershell", "powershell.exe"))
+        );
+    }
+
+    // --- ensure_claude_available (session-start prerequisite guard, #10) ---
+
+    #[test]
+    fn ensure_claude_ok_when_installed() {
+        assert!(ensure_claude_available(|_| true).is_ok());
+    }
+
+    #[test]
+    fn ensure_claude_errors_with_claude_missing_details() {
+        // Only "claude" is absent; the guard must surface a classifiable error.
+        let err = ensure_claude_available(|exe| exe != "claude").unwrap_err();
+        assert_eq!(err.code, ADPErrorCode::TerminalSpawnFailed);
+        assert_eq!(err.details.as_deref(), Some("claude_missing"));
+        assert!(!err.retryable);
+    }
+
+    #[test]
+    fn create_session_guards_missing_claude_in_spawn_path() {
+        // The guard call lives in the real create_session spawn path (needs a
+        // PTY + AppHandle, not unit-testable in isolation), so we pin the
+        // source text — like the CLAUDE_CODE_NO_FLICKER / terminal_env guards.
+        let src = include_str!("manager.rs");
+        assert!(
+            src.contains("ensure_claude_available(|exe| which_executable(exe).is_some())?"),
+            "create_session must guard on claude presence before spawning the PTY"
         );
     }
 
