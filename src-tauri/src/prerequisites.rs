@@ -9,6 +9,9 @@
 //! paths reported here match exactly what session spawning resolves. On macOS
 //! the process PATH is already hydrated from the login shell at startup
 //! (`lib.rs`), so a Finder/Dock launch sees the same PATH here as a login shell.
+//!
+//! This module also reports the host OS family and CPU architecture
+//! (`get_os_info`) for the Settings "About" panel.
 
 use crate::error::ADPError;
 use serde::Serialize;
@@ -42,6 +45,38 @@ pub struct PrerequisiteStatus {
     pub gh: ToolStatus,
     pub shell: ToolStatus,
     pub shell_name: String,
+}
+
+/// Host OS family + CPU architecture for the Settings "About" panel. Values are
+/// `std::env::consts` compile-time facts — a desktop bundle is built per target,
+/// so they accurately describe the running binary. Intentionally no OS *version*
+/// number (that would need an extra crate); the About panel shows family + arch.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OsInfo {
+    pub os: String,
+    pub arch: String,
+}
+
+/// Map `std::env::consts::OS` to a human label; unknown values pass through.
+fn display_os(os: &str) -> String {
+    match os {
+        "macos" => "macOS",
+        "windows" => "Windows",
+        "linux" => "Linux",
+        other => other,
+    }
+    .to_string()
+}
+
+/// Map `std::env::consts::ARCH` to a human label; unknown values pass through.
+fn display_arch(arch: &str) -> String {
+    match arch {
+        "aarch64" => "arm64",
+        "x86_64" => "x64",
+        other => other,
+    }
+    .to_string()
 }
 
 /// Pure builder: `probe` resolves a command name to its PATH location (`None` =
@@ -79,6 +114,16 @@ pub mod commands {
     pub async fn check_prerequisites() -> Result<PrerequisiteStatus, ADPError> {
         let (shell_name, shell_exe) = crate::session::manager::default_shell_probe();
         Ok(build_status(probe_path, shell_name, shell_exe))
+    }
+
+    /// Host OS family + CPU architecture for the Settings "About" panel.
+    /// Pure compile-time facts — no side effects, no PATH probing.
+    #[tauri::command]
+    pub fn get_os_info() -> OsInfo {
+        OsInfo {
+            os: display_os(std::env::consts::OS),
+            arch: display_arch(std::env::consts::ARCH),
+        }
     }
 }
 
@@ -133,5 +178,38 @@ mod tests {
         assert_eq!(json["git"]["path"], "/usr/bin/git");
         assert_eq!(json["claude"]["found"], false);
         assert!(json["claude"].get("path").is_none());
+    }
+
+    #[test]
+    fn display_os_maps_known_targets() {
+        assert_eq!(display_os("macos"), "macOS");
+        assert_eq!(display_os("windows"), "Windows");
+        assert_eq!(display_os("linux"), "Linux");
+    }
+
+    #[test]
+    fn display_os_passes_through_unknown() {
+        assert_eq!(display_os("freebsd"), "freebsd");
+    }
+
+    #[test]
+    fn display_arch_maps_known_targets() {
+        assert_eq!(display_arch("aarch64"), "arm64");
+        assert_eq!(display_arch("x86_64"), "x64");
+    }
+
+    #[test]
+    fn display_arch_passes_through_unknown() {
+        assert_eq!(display_arch("riscv64"), "riscv64");
+    }
+
+    #[test]
+    fn os_info_is_non_empty_and_serializes_camel_case() {
+        let info = commands::get_os_info();
+        assert!(!info.os.is_empty());
+        assert!(!info.arch.is_empty());
+        let json = serde_json::to_value(&info).unwrap();
+        assert!(json.get("os").is_some());
+        assert!(json.get("arch").is_some());
     }
 }

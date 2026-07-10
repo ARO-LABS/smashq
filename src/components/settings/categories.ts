@@ -8,6 +8,7 @@ const TerminalIcon = ICONS.action.terminal;
 const Bell = ICONS.category.notify;
 const Bug = ICONS.category.debug;
 const Cpu = ICONS.viewer.system;
+const InfoIcon = ICONS.toast.info;
 
 export interface SettingsCategory {
   id: string;
@@ -57,5 +58,11 @@ export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
     label: "Erweitert",
     icon: Bug,
     Panel: lazy(() => import("./DebugLoggingPanel").then((m) => ({ default: m.DebugLoggingPanel }))),
+  },
+  {
+    id: "about",
+    label: "Über",
+    icon: InfoIcon,
+    Panel: lazy(() => import("./panels/AboutPanel").then((m) => ({ default: m.AboutPanel }))),
   },
 ] as const;

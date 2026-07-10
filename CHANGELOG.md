@@ -8,6 +8,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ### Hinzugefügt
 - Einstellbarer **Permission-Modus für neue Sessions** (Einstellungen → Sessions): Standard (Nachfragen), Auto, Plan oder Bypass / YOLO. Gilt für neue Sessions und Resumes. (#11)
+- Neue Einstellungs-Sektion **„Über"**: zeigt App-Version, Build-Commit, Build-Datum und Plattform, mit „Diagnose kopieren" (für Bug-Reports) sowie Links zu Repository, Issues und Releases.
 
 ### Geändert
 - **Verhaltensänderung:** Neue Sessions starten jetzt standardmäßig im Modus **Standard (Nachfragen)** statt wie bisher mit `--dangerously-skip-permissions`. Wer das bisherige Verhalten will, stellt den Modus einmalig auf **Bypass / YOLO** (Einstellungen → Sessions). (#11)

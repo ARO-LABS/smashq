@@ -7,6 +7,14 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-07-10 — About-Panel OS-Info: neues Plugin vorgeschlagen, wo ein vorhandenes Muster reichte
+
+**Kontext:** Settings-„Über"-Section brauchte eine OS-/Plattform-Zeile (`macOS · arm64`). Erster Design-Vorschlag: `@tauri-apps/plugin-os` (JS-Dep + Rust-Dep + `.plugin(init())` + `os:default`-Capability).
+
+**Fehler → Korrektur:** User: „an main orientieren, kein Overengineering, keine Parallel-Funktionalität". Beim Nachsehen bot master das Muster schon: der Nachbar `SystemPanel` (#10) holt Umgebungs-Wahrheit über einen Rust-Command (`check_prerequisites`), und `utils/platform.ts` sagt explizit „The Rust backend stays the authority on platform". → Statt Plugin ein Zero-Dep-Rust-Command `get_os_info` → `{os, arch}` aus `std::env::consts`, gespiegeltes `check_prerequisites`-Muster: null neue Deps, keine Capability-Änderung, mockIPC-testbar.
+
+**Regel:** Bevor für eine kleine Info eine neue Dependency/ein Plugin eingezogen wird, im Repo nach einem bestehenden Muster für DIESELBE Datenklasse suchen und es wiederverwenden (hier: „Backend = Plattform-Autorität" per Rust-Command). Ein Plugin+Capability für einen OS-String ist Overengineering, wenn ein 10-Zeilen-`std`-Command reicht. „An main orientieren" ist ein prüfbarer Schritt, kein Bauchgefühl — konkret nach dem Nachbar-Consumer derselben Daten grep-en. Verwandt: „Root Causes statt Symptome", YAGNI.
+
 ### 2026-07-09 — Issues #7/#10: drei Test-Klassen, die grün sind, ohne etwas zu beweisen (Tautologie-Pin, nicht-diskriminierende Assertion, falsch gescoptes Test-Kommando)
 
 **Kontext:** Parallel-Umsetzung Kanban-Auth-Fix (#7, PR #17) + Prerequisite-Check (#10, PR #19), subagent-driven mit zweistufigem Review pro Task. Die Quality-Review-Stufe fing drei Fälle, in denen ein GRÜNER Test nichts bewies — alle Gates (tsc/vitest/cargo) blieben dabei durchgehend grün.

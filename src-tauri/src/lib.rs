@@ -327,6 +327,7 @@ pub fn run() {
             github::project::commands::move_project_item,
             // System prerequisite check (Issue #10)
             prerequisites::commands::check_prerequisites,
+            prerequisites::commands::get_os_info,
             // Structured NDJSON log sink (backend + frontend)
             structured_log::commands::append_frontend_logs,
             structured_log::commands::read_structured_log,
