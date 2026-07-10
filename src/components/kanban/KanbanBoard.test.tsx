@@ -582,6 +582,54 @@ describe("KanbanBoard — Projects v2", () => {
     await waitFor(() => expect(screen.getByText("Org Board")).toBeTruthy());
   });
 
+  it("shows the classified error inline when an owner's board list fails (Issue #7 ARO-LABS)", async () => {
+    // Switching to an org the token can't access must surface the real error
+    // in the chooser, not the misleading "Keine Boards für dieses Konto.".
+    setupStatefulStore();
+    mockInvoke.mockImplementation((cmd: string, args?: unknown) => {
+      if (cmd === "list_project_owners") {
+        return Promise.resolve([
+          { login: "me", kind: "user" },
+          { login: "ARO-LABS", kind: "org" },
+        ]);
+      }
+      if (cmd === "list_user_projects") {
+        const owner = (args as { owner?: string } | undefined)?.owner;
+        if (owner === "ARO-LABS") {
+          return Promise.reject({
+            code: "SERVICE_AUTH_FAILED",
+            message: "forbidden",
+            details: "forbidden",
+            retryable: false,
+          });
+        }
+        return Promise.resolve([
+          { id: "PVT_abc123", number: 2, title: "Smashq", items_total: 5 },
+        ]);
+      }
+      return Promise.resolve(makeBoard());
+    });
+
+    render(<Board folder="/test/owner-fail" />);
+    await waitFor(() => expect(screen.getByText("Backlog")).toBeTruthy());
+
+    fireEvent.click(screen.getByText("Smashq")); // open picker → loads owners
+    const ownerSelect = await screen.findByLabelText("Konto");
+
+    fireEvent.change(ownerSelect, { target: { value: "ARO-LABS" } });
+
+    // Classified error shown inline; NOT the empty-list message.
+    await waitFor(() => expect(screen.getByText("Kein Zugriff")).toBeTruthy());
+    expect(screen.queryByText("Keine Boards für dieses Konto.")).toBeNull();
+
+    // Pins the error to INLINE-in-chooser, not the full-screen error card:
+    // the already-loaded board is still mounted behind the open picker. If a
+    // regression routed the silent-branch error into errorInfo, the full-screen
+    // card would eject the board and "Backlog" would be gone — both assertions
+    // above would still pass, so this anchor is what actually guards the fix.
+    expect(screen.getByText("Backlog")).toBeTruthy();
+  });
+
   it("drops a stale owner-switch resolve on a rapid A→B→A switch", async () => {
     setupStatefulStore();
     // The org list call hangs until we resolve it by hand — long after the user
@@ -750,6 +798,49 @@ describe("KanbanBoard — Projects v2", () => {
     await waitFor(() => {
       expect(screen.getByText("Fehler beim Laden des Boards")).toBeTruthy();
     });
+  });
+
+  it("retry after an auth failure with no board selected re-lists projects and loads the board", async () => {
+    // Issue #7: after `gh auth login` the retry button did nothing because
+    // loadBoard no-ops without a selected board. It must re-list projects,
+    // auto-select the first, and load its board.
+    setupStatefulStore();
+    let listCalls = 0;
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "list_user_projects") {
+        listCalls++;
+        if (listCalls === 1) {
+          return Promise.reject({
+            code: "SERVICE_AUTH_FAILED",
+            message: "gh auth login required",
+            details: "auth",
+            retryable: false,
+          });
+        }
+        return Promise.resolve([
+          { id: "PVT_abc123", number: 2, title: "Smashq", items_total: 5 },
+        ]);
+      }
+      if (cmd === "list_project_owners") {
+        return Promise.resolve([{ login: "me", kind: "user" }]);
+      }
+      return Promise.resolve(makeBoard());
+    });
+
+    render(<Board folder="/test/retry-auth" />);
+
+    // First list load fails → honest auth error card with a retry button.
+    await waitFor(() => {
+      expect(screen.getByText("Nicht bei GitHub angemeldet")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("Erneut versuchen"));
+
+    // Retry re-lists projects, auto-selects the first, and loads its board.
+    await waitFor(() => {
+      expect(screen.getByText("Backlog")).toBeTruthy();
+    });
+    expect(listCalls).toBeGreaterThanOrEqual(2);
   });
 
   it("renders cross-repo repository badge for global-board items", async () => {

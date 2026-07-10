@@ -335,7 +335,9 @@ pub mod commands {
 
         let output = run_gh(
             &cwd_str,
-            &["project", "list", "--owner", &owner, "--format", "json"],
+            &[
+                "project", "list", "--owner", &owner, "--limit", "100", "--format", "json",
+            ],
         )?;
 
         if output.is_empty() {
