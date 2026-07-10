@@ -7,6 +7,7 @@
  */
 
 import type { ADPError } from "../protocols/schema";
+import { isMacOS } from "./platform";
 
 /**
  * Type guard: checks if an unknown error value is a structured ADPError.
@@ -164,6 +165,53 @@ export function classifyGithubError(err: unknown): GithubErrorInfo {
   return {
     kind: "unknown",
     title: "Fehler beim Laden des Boards",
+    hint: parsed.message,
+    retryable: parsed.retryable,
+  };
+}
+
+/** Distinct classes of missing-prerequisite failure at session start. */
+export type PrerequisiteErrorKind = "claude_missing" | "unknown";
+
+export interface PrerequisiteErrorInfo {
+  kind: PrerequisiteErrorKind;
+  /** Short German headline for the error toast. */
+  title: string;
+  /** German, actionable next step (install command). */
+  hint: string;
+  /** Whether retrying the same call could succeed. */
+  retryable: boolean;
+}
+
+/**
+ * Platform-aware install hint for the Claude CLI. Shared by the session-start
+ * error classifier and the System settings panel so the copy never drifts.
+ */
+export function claudeInstallHint(): string {
+  const base = "Installieren mit: npm install -g @anthropic-ai/claude-code";
+  return isMacOS() ? `${base}. Auf macOS danach PATH in ~/.zprofile prüfen.` : base;
+}
+
+/**
+ * Classifies a session-start failure. Branches on the structured `details`
+ * discriminator the backend sets (`claude_missing`, mirroring `gh_missing`),
+ * NOT on message substrings. The `unknown` branch deliberately reproduces the
+ * previous toast shape (title "Session-Start fehlgeschlagen", hint = raw
+ * message) so existing behaviour — and its tests — stay intact.
+ */
+export function classifyPrerequisiteError(err: unknown): PrerequisiteErrorInfo {
+  const parsed = parseInvokeError(err);
+  if (parsed.details === "claude_missing") {
+    return {
+      kind: "claude_missing",
+      title: "Claude CLI nicht gefunden",
+      hint: claudeInstallHint(),
+      retryable: false,
+    };
+  }
+  return {
+    kind: "unknown",
+    title: "Session-Start fehlgeschlagen",
     hint: parsed.message,
     retryable: parsed.retryable,
   };

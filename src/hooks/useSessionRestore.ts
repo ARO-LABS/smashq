@@ -4,6 +4,7 @@ import { useSessionStore, generateUniqueDisplayId } from "../store/sessionStore"
 import { useSettingsStore } from "../store/settingsStore";
 import { useUIStore } from "../store/uiStore";
 import { logWarn } from "../utils/errorLogger";
+import { classifyPrerequisiteError } from "../utils/adpError";
 import type { SessionShell } from "../store/sessionStore";
 import {
   pickBestHistoryMatch,
@@ -50,6 +51,10 @@ async function restoreSessions(
   const sessionsToRestore = restore.sessions.slice(0, MAX_SESSIONS);
   const createdIds: string[] = [];
   const errors: string[] = [];
+  // Keep the first raw error object around so an all-failed run can classify
+  // it — `errors` above only holds display titles, which drops the structured
+  // `details` discriminator the prerequisite classifier keys off.
+  let firstError: unknown;
 
   // Track Claude session UUIDs claimed across this restore run.
   // Prevents two cards from latching onto the same backend session when:
@@ -169,10 +174,27 @@ async function restoreSessions(
     } catch (err) {
       logWarn("sessionRestore", `Session für "${entry.folder}" übersprungen: ${err}`);
       errors.push(entry.title || entry.folder);
+      firstError ??= err;
     }
   }
 
-  if (createdIds.length === 0) return;
+  if (createdIds.length === 0) {
+    // Every restore failed. The layout/toast block below is skipped by the
+    // early return, so a missing Claude CLI would leave the user with an empty
+    // hub and NO explanation. Surface the actionable claude-missing hint (same
+    // structured classifier the live session-start path uses); other error
+    // kinds keep the prior silent behavior — narrowing this to the one case
+    // Issue #10 is about, not a blanket toast on every restore failure.
+    const info = classifyPrerequisiteError(firstError);
+    if (info.kind === "claude_missing") {
+      useUIStore.getState().addToast({
+        type: "error",
+        title: info.title,
+        message: info.hint,
+      });
+    }
+    return;
+  }
 
   // Build folder→sessionId lookup from successfully created sessions
   const folderToId = new Map<string, string>();

@@ -7,6 +7,7 @@ const Monitor = ICONS.nav.sessions;
 const TerminalIcon = ICONS.action.terminal;
 const Bell = ICONS.category.notify;
 const Bug = ICONS.category.debug;
+const Cpu = ICONS.viewer.system;
 
 export interface SettingsCategory {
   id: string;
@@ -44,6 +45,12 @@ export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
     label: "Benachrichtigungen",
     icon: Bell,
     Panel: lazy(() => import("./panels/NotificationsPanel").then((m) => ({ default: m.NotificationsPanel }))),
+  },
+  {
+    id: "system",
+    label: "System",
+    icon: Cpu,
+    Panel: lazy(() => import("./panels/SystemPanel").then((m) => ({ default: m.SystemPanel }))),
   },
   {
     id: "advanced",

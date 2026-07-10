@@ -14,3 +14,14 @@ export function isWindows(): boolean {
   if (typeof navigator === "undefined") return false;
   return /windows/i.test(navigator.userAgent);
 }
+
+/**
+ * Best-effort macOS detection from the webview user-agent — WKWebView reports
+ * "Macintosh". Same narrow, cosmetic-only contract as {@link isWindows}: used
+ * for the platform-specific install hints in the prerequisite UI, never for
+ * correctness-critical logic (the Rust backend stays the platform authority).
+ */
+export function isMacOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /macintosh|mac os x/i.test(navigator.userAgent);
+}

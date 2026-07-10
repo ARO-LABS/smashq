@@ -3,6 +3,7 @@ use std::sync::OnceLock;
 
 pub mod error;
 pub mod github;
+pub mod prerequisites;
 pub mod session;
 pub mod settings;
 pub mod structured_log;
@@ -324,6 +325,8 @@ pub fn run() {
             github::project::commands::list_project_owners,
             github::project::commands::get_project_board,
             github::project::commands::move_project_item,
+            // System prerequisite check (Issue #10)
+            prerequisites::commands::check_prerequisites,
             // Structured NDJSON log sink (backend + frontend)
             structured_log::commands::append_frontend_logs,
             structured_log::commands::read_structured_log,
