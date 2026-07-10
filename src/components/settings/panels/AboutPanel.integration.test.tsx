@@ -74,6 +74,24 @@ describe("AboutPanel — Layer-B", () => {
     );
   });
 
+  it("opens the commit URL when the commit hash is clicked", async () => {
+    const openCalls: string[] = [];
+    installRealIPC({
+      ...baseHandlers,
+      "plugin:shell|open": async (args) => {
+        openCalls.push(String(args.path));
+        return null;
+      },
+    });
+
+    render(<AboutPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "test" }));
+
+    await waitFor(() =>
+      expect(openCalls).toContain("https://github.com/ARO-LABS/smashq/commit/test"),
+    );
+  });
+
   it("falls back to 'unbekannt' when get_os_info fails", async () => {
     installRealIPC({
       "plugin:app|version": async () => "9.9.9",

@@ -40,13 +40,15 @@ export function AboutPanel() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    // Both reads below are Tauri IPC and only resolve inside a Tauri webview.
+    // Outside Tauri (browser dev / jsdom without mockIPC) there is no backend.
+    if (!("__TAURI_INTERNALS__" in window)) return;
+
     getVersion()
       .then(setVersion)
       .catch((err) => logError("AboutPanel.getVersion", err));
 
     // OS facts come from the backend (platform authority), mirroring SystemPanel.
-    // Outside Tauri (browser dev / jsdom without mockIPC) there is no backend.
-    if (!("__TAURI_INTERNALS__" in window)) return;
     wrapInvoke<OsInfo>("get_os_info")
       .then((info) => setPlatform(`${info.os} · ${info.arch}`))
       .catch((err) => logError("AboutPanel.getOsInfo", err));

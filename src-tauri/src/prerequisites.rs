@@ -9,6 +9,9 @@
 //! paths reported here match exactly what session spawning resolves. On macOS
 //! the process PATH is already hydrated from the login shell at startup
 //! (`lib.rs`), so a Finder/Dock launch sees the same PATH here as a login shell.
+//!
+//! This module also reports the host OS family and CPU architecture
+//! (`get_os_info`) for the Settings "About" panel.
 
 use crate::error::ADPError;
 use serde::Serialize;
