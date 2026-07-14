@@ -7,6 +7,22 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-07-14 — Flaky CI-Test: `waitFor`-Waypoint, der auch im Ladezustand schon wahr ist, gatet nicht auf den Zielzustand
+
+**Kontext:** master-CI (Push nach Merge PR #35) rot im `ConfigPanelTabList`-Test — `× hides Hooks tab … expected <button title="Hooks"> to be null` — obwohl der PR-Branch mit **byte-identischem Tree** grün war. Nichts am Code hatte sich geändert (Merge ohne weitere Commits).
+
+**Fehler → Korrektur:** Der Test wartete `waitFor(() => getByTitle("Settings"))` und prüfte DANACH synchron `queryByTitle("Hooks") == null`. Aber die Komponente zeigt während der async Presence-Detection ALLE Tabs (Anti-Flash, `presence === null`) — „Settings" ist also im Lade- UND im Zielzustand sichtbar, der Waypoint gatet nicht auf die Auflösung. Schnelle Runner (PR): Presence bis zum ersten Poll fertig → grün. Langsame Runner (Push): `waitFor` pollt mitten im Ladezustand → returned zu früh → „Hooks" noch sichtbar → FAIL. Deterministisch reproduziert mit einem Scratch-Test, dessen Presence-Promises nie auflösen (= Dauer-Ladezustand → exakt derselbe Fehler). Korrektur: die diskriminierende (negative) Assertion `queryByTitle("Hooks")).toBeNull()` INS `waitFor` — nur sie wird erst nach der Auflösung wahr. Muster stand in derselben Datei schon dokumentiert (CI run #26515714743, Test bei „shows Worktrees but hides GitHub").
+
+**Regel:** Ein `waitFor`-Waypoint MUSS ein Zustand sein, der nur im Zielzustand wahr ist — nie einer, der auch im Zwischen-/Ladezustand gilt. Bei „alle sichtbar während Loading, dann gefiltert": auf das VERSCHWINDEN des Elements warten (negative Assertion IN `waitFor`), nicht auf ein immer-sichtbares Nachbar-Element als Proxy. Diagnose-Heuristik: **identischer Tree grün-auf-PR / rot-auf-Push = Timing-Flake, keine Regression** — nicht nach einem Code-Diff suchen, der nicht existiert. Verwandt: „grüne Gates ≠ Bug gefangen".
+
+### 2026-07-14 — `cargo audit` wird ohne Code-Change rot (frische Advisory); fixe was der Lock erlaubt, ignoriere begründet nur das Unfixbare
+
+**Kontext:** Scheduled Security-Audit rot auf statischem master — 5 Vulns: crossbeam-epoch (RUSTSEC-2026-0204) + quick-xml ×2 Versionen ×2 Advisories (2026-0194/0195). Alles frische **2026er** Advisories: die Advisory-DB änderte sich, nicht der Code.
+
+**Fehler → Korrektur:** Reflex „Dependency updaten" greift nur teils. Empirisch per `cargo update --dry-run` geklärt (statt geraten): crossbeam-epoch → 0.9.20 trivial (dev-only via criterion). quick-xml auf zwei unabhängigen Pfaden: (1) tauri→**plist** — fixbar durch `plist 1.8→1.10` INNERHALB tauris `plist = "^1"` (→ quick-xml 0.41.0, **tauri/Updater unberührt**); (2) tauri-plugin-clipboard-manager→arboard→wl-clipboard-rs→wayland-client→**wayland-scanner 0.31.10**, das `quick-xml = "^0.39"` pinnt — ganze Kette version-locked, per Lock NICHT auf 0.41 bringbar. wayland-scanner parst nur Protokoll-XML zur **Build-Zeit** (trusted input) → der untrusted-XML-DoS der Advisories greift dort nicht → begründeter `--ignore RUSTSEC-2026-0194/0195` im Workflow + Tracking-Issue.
+
+**Regel:** Bei rotem Audit ohne Code-Change zuerst die Reverse-Deps tracen (`cargo tree -i <crate>@<ver>`) und Fixbarkeit per `cargo update --dry-run --precise` EMPIRISCH prüfen, nicht raten — 0.x-Minor-Bumps sind semver-breaking, ein Parent-Pin kann jeden Bump blocken. Fixe jeden Pfad, der sich innerhalb der bestehenden `^`-Ranges lösen lässt (kein Major-Bump geschützter Deps wie tauri); ignoriere per Advisory-ID NUR den Rest, der (a) per Lock unlösbar UND (b) nachweislich nicht-exploitierbar ist (hier: Build-Zeit-Codegen auf trusted XML) — immer mit Begründung im Workflow + Tracking-Issue zum Entfernen. Reine Lock-Bumps ohne Cargo.toml-Änderung sind Feature-Freeze-konform.
+
 ### 2026-07-10 — About-Panel OS-Info: neues Plugin vorgeschlagen, wo ein vorhandenes Muster reichte
 
 **Kontext:** Settings-„Über"-Section brauchte eine OS-/Plattform-Zeile (`macOS · arm64`). Erster Design-Vorschlag: `@tauri-apps/plugin-os` (JS-Dep + Rust-Dep + `.plugin(init())` + `os:default`-Capability).

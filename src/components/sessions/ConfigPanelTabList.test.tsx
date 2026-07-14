@@ -370,11 +370,16 @@ describe("ConfigPanelTabList", () => {
 
     render(<ConfigPanelTabList folder="/test" />);
 
+    // The negative check MUST live inside waitFor: while presence is loading
+    // (presence === null) ALL tabs render for anti-flash, so "Settings" is
+    // visible in BOTH the loading and resolved states and cannot gate on
+    // resolution. Only "Hooks becomes null" proves the presence filter ran.
+    // A positive-only waypoint flaked on CI (master push after #35) — the first
+    // waitFor poll passed mid-load while Hooks was still visible.
     await waitFor(() => {
-      // Settings tab appears (settings.json non-empty) — reliable waypoint.
       expect(screen.getByTitle("Settings")).toBeTruthy();
+      expect(screen.queryByTitle("Hooks")).toBeNull();
     });
-    expect(screen.queryByTitle("Hooks")).toBeNull();
   });
 
   it("hides Hooks tab when settings.json is invalid JSON", async () => {
@@ -384,10 +389,12 @@ describe("ConfigPanelTabList", () => {
 
     render(<ConfigPanelTabList folder="/test" />);
 
+    // Same race as above: gate on the Hooks tab disappearing, not on the
+    // always-visible Settings tab.
     await waitFor(() => {
       expect(screen.getByTitle("Settings")).toBeTruthy();
+      expect(screen.queryByTitle("Hooks")).toBeNull();
     });
-    expect(screen.queryByTitle("Hooks")).toBeNull();
   });
 
   // ── Tab switching ──────────────────────────────────────────────────────
