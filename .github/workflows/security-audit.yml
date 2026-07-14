@@ -61,6 +61,22 @@ jobs:
       # by default), so accepted transitive debt (gtk-rs GTK3 chain etc.) stays
       # visible without blocking. rustls-webpki was bumped to >=0.103.13 to clear
       # RUSTSEC-2026-0098/0099/0104.
+      #
+      # crossbeam-epoch (RUSTSEC-2026-0204) was bumped to >=0.9.20 in Cargo.lock.
+      # quick-xml (RUSTSEC-2026-0194/0195, "upgrade to >=0.41.0") reaches the tree
+      # on two independent paths; both were addressed as far as the lockfile allows:
+      #   1. tauri -> plist: fixed by bumping plist 1.8.0 -> 1.10.0 (within tauri's
+      #      `plist = "^1"`, so tauri 2.10.3 / the updater path is untouched), which
+      #      pulls quick-xml 0.41.0. plist MUST stay >=1.10 or this regresses.
+      #   2. tauri-plugin-clipboard-manager -> arboard -> wl-clipboard-rs ->
+      #      wayland-client -> wayland-scanner 0.31.10, which pins `quick-xml = "^0.39"`.
+      #      The whole chain is version-locked (arboard ^3, wl-clipboard-rs ^0.9.0,
+      #      wayland-client ^0.31.11), so no lockfile bump can reach 0.41 until
+      #      upstream wayland-scanner does. wayland-scanner uses quick-xml only to
+      #      parse the Wayland *protocol XML at build time* — trusted, developer-
+      #      controlled input, not the untrusted-XML DoS surface the advisories
+      #      describe. Ignored here as non-exploitable build-time debt; drop the two
+      #      --ignore flags once a reachable wayland-scanner ships quick-xml >=0.41.
       - name: Run cargo audit
         working-directory: src-tauri
-        run: cargo audit
+        run: cargo audit --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195
