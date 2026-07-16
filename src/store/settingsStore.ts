@@ -974,15 +974,22 @@ export const useSettingsStore = create<SettingsState>()(
         void broadcastPreferencesChange({ theme: partial });
       },
 
-      setNotifications: (partial) =>
+      setNotifications: (partial) => {
         set((state) => ({
           notifications: { ...state.notifications, ...partial },
-        })),
+        }));
+        // The settings window is a secondary window without disk-write rights
+        // (tauriStorage isMainWindow guard) — the broadcast is the only path
+        // by which the value reaches the persisting main window.
+        void broadcastPreferencesChange({ settingsSync: { notifications: partial } });
+      },
 
-      setSound: (partial) =>
+      setSound: (partial) => {
         set((state) => ({
           sound: { ...state.sound, ...partial },
-        })),
+        }));
+        void broadcastPreferencesChange({ settingsSync: { sound: partial } });
+      },
 
       setPipeline: (partial) =>
         set((state) => ({
@@ -1039,11 +1046,22 @@ export const useSettingsStore = create<SettingsState>()(
 
       setLocale: (locale) => set({ locale }),
 
-      setDefaultShell: (shell) => set({ defaultShell: shell }),
+      setDefaultShell: (shell) => {
+        set({ defaultShell: shell });
+        // See setNotifications: broadcast is the secondary-window persistence path.
+        void broadcastPreferencesChange({ settingsSync: { defaultShell: shell } });
+      },
 
-      setDefaultPermissionMode: (mode) => set({ defaultPermissionMode: mode }),
+      setDefaultPermissionMode: (mode) => {
+        const sanitized = sanitizePermissionMode(mode);
+        set({ defaultPermissionMode: sanitized });
+        void broadcastPreferencesChange({ settingsSync: { defaultPermissionMode: sanitized } });
+      },
 
-      setDefaultProjectPath: (path) => set({ defaultProjectPath: path }),
+      setDefaultProjectPath: (path) => {
+        set({ defaultProjectPath: path });
+        void broadcastPreferencesChange({ settingsSync: { defaultProjectPath: path } });
+      },
 
       setGlobalNotes: (notes) => {
         set({ globalNotes: notes });
