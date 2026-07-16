@@ -1,4 +1,11 @@
-import type { AppPreferencesSettings, ThemeSettings } from "../store/settingsStore";
+import type {
+  AppPreferencesSettings,
+  ThemeSettings,
+  SettingsState,
+  PermissionMode,
+  NotificationSettings,
+  SoundSettings,
+} from "../store/settingsStore";
 
 /**
  * Cross-window preferences propagation.
@@ -14,13 +21,30 @@ const EVENT_NAME = "preferences-changed";
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 /**
+ * Top-level settings fields changeable from a secondary window (the settings
+ * window always is one, see DetachedViewApp). Secondary windows must not
+ * write to disk (tauriStorage isMainWindow guard, M-01) — this sync channel
+ * is their ONLY persistence path: the main window applies the partial via
+ * raw setState and its persist middleware writes it.
+ */
+export type SettingsSyncPartial = {
+  defaultShell?: SettingsState["defaultShell"];
+  defaultPermissionMode?: PermissionMode;
+  defaultProjectPath?: string;
+  notifications?: Partial<NotificationSettings>;
+  sound?: Partial<SoundSettings>;
+};
+
+/**
  * Payload sent over the broadcast channel: a preferences partial, a theme
- * partial (so detached windows re-theme live), or a favorites-related signal.
+ * partial (so detached windows re-theme live), a top-level settings partial,
+ * or a favorites-related signal.
  */
 export type BroadcastPartial =
   | Partial<AppPreferencesSettings>
   | { favoritesUpdate: true }
-  | { theme: Partial<ThemeSettings> };
+  | { theme: Partial<ThemeSettings> }
+  | { settingsSync: SettingsSyncPartial };
 
 export interface PreferencesChangedPayload {
   partial: BroadcastPartial;

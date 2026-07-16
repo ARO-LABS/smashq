@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { broadcastPreferencesChange } from "../utils/preferencesBroadcast";
 import {
   useSettingsStore,
   type SettingsState,
@@ -15,6 +16,12 @@ import {
   sanitizePermissionMode,
   PERMISSION_MODES,
 } from "./settingsStore";
+
+// Mocked so the settingsSync tests can assert WHAT the setters broadcast.
+// Outside Tauri the real function is a no-op, so other suites are unaffected.
+vi.mock("../utils/preferencesBroadcast", () => ({
+  broadcastPreferencesChange: vi.fn(() => Promise.resolve()),
+}));
 
 // ============================================================================
 // Helpers
@@ -1823,5 +1830,64 @@ describe("defaultPermissionMode", () => {
       12,
     );
     expect(migrated.defaultPermissionMode).toBe("bypass");
+  });
+});
+
+// ============================================================================
+// settingsSync broadcast — Detached-Settings-Persistenz
+//
+// Sekundärfenster (das Settings-Fenster ist immer eines, DetachedViewApp)
+// dürfen nicht auf Platte schreiben (tauriStorage isMainWindow-Guard). Der
+// Broadcast ist ihr EINZIGER Persistenz-Pfad: das Hauptfenster wendet das
+// Partial an und persistiert. Fehlt der Broadcast, geht der Wert beim
+// Schließen des Settings-Fensters verloren — genau der gemeldete Bug.
+// ============================================================================
+
+describe("settingsSync broadcast (Detached-Settings-Persistenz)", () => {
+  beforeEach(() => {
+    vi.mocked(broadcastPreferencesChange).mockClear();
+  });
+
+  it("setDefaultPermissionMode broadcastet den Modus als settingsSync", () => {
+    getState().setDefaultPermissionMode("bypass");
+    expect(broadcastPreferencesChange).toHaveBeenCalledWith({
+      settingsSync: { defaultPermissionMode: "bypass" },
+    });
+  });
+
+  it("setDefaultPermissionMode sanitisiert ungültigen Input auf 'default'", () => {
+    getState().setDefaultPermissionMode("yolo" as never);
+    expect(getState().defaultPermissionMode).toBe("default");
+    expect(broadcastPreferencesChange).toHaveBeenCalledWith({
+      settingsSync: { defaultPermissionMode: "default" },
+    });
+  });
+
+  it("setDefaultShell broadcastet settingsSync", () => {
+    getState().setDefaultShell("zsh");
+    expect(broadcastPreferencesChange).toHaveBeenCalledWith({
+      settingsSync: { defaultShell: "zsh" },
+    });
+  });
+
+  it("setDefaultProjectPath broadcastet settingsSync", () => {
+    getState().setDefaultProjectPath("C:/pfad");
+    expect(broadcastPreferencesChange).toHaveBeenCalledWith({
+      settingsSync: { defaultProjectPath: "C:/pfad" },
+    });
+  });
+
+  it("setNotifications broadcastet das Partial", () => {
+    getState().setNotifications({ enabled: false });
+    expect(broadcastPreferencesChange).toHaveBeenCalledWith({
+      settingsSync: { notifications: { enabled: false } },
+    });
+  });
+
+  it("setSound broadcastet das Partial", () => {
+    getState().setSound({ volume: 0.5 });
+    expect(broadcastPreferencesChange).toHaveBeenCalledWith({
+      settingsSync: { sound: { volume: 0.5 } },
+    });
   });
 });
