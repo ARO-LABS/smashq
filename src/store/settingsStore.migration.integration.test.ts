@@ -260,6 +260,25 @@ describe("settingsStore — sessionAccents persistence", () => {
   });
 });
 
+describe("settingsStore — defaultPermissionMode persistence", () => {
+  it("persistiert 'bypass' über einen rehydrate-Roundtrip", async () => {
+    const store = useSettingsStore;
+    store.getState().setDefaultPermissionMode("bypass");
+    expect(store.getState().defaultPermissionMode).toBe("bypass");
+    await store.persist.rehydrate();
+    expect(store.getState().defaultPermissionMode).toBe("bypass");
+  });
+
+  it("heilt einen korrupten persistierten Wert beim Rehydrate auf 'default'", async () => {
+    const store = useSettingsStore;
+    // setState umgeht bewusst den (sanitisierenden) Setter — simuliert einen
+    // korrupten Persist-Blob, den merge() beim nächsten Rehydrate heilen muss.
+    store.setState({ defaultPermissionMode: "bypassPermissions" as never });
+    await store.persist.rehydrate();
+    expect(store.getState().defaultPermissionMode).toBe("default");
+  });
+});
+
 /**
  * Build a version-5 persist envelope carrying favorites + groups directly.
  * Version 5 == current schema → no migrate() runs, so this isolates the
