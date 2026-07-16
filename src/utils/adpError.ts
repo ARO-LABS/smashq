@@ -72,6 +72,11 @@ export interface GithubErrorInfo {
   title: string;
   /** German, actionable next step. */
   hint: string;
+  /** Shell command that fixes the error, if one exists. Kept separate from
+   *  `hint` so the UI can offer it as a copyable snippet instead of burying
+   *  it in prose. `gh auth` commands are interactive (OAuth device flow), so
+   *  they must run in a real terminal — the app cannot execute them itself. */
+  command?: string;
   /** Whether retrying the same call could succeed. */
   retryable: boolean;
 }
@@ -121,7 +126,8 @@ export function classifyGithubError(err: unknown): GithubErrorInfo {
     return {
       kind: "scope_missing",
       title: "GitHub-Scope fehlt",
-      hint: "Dem Token fehlt der nötige Scope. Ausführen: gh auth refresh -s read:project,project",
+      hint: "Dem Token fehlt der nötige Scope. Den Befehl in einem Terminal ausführen und danach erneut versuchen.",
+      command: "gh auth refresh -s read:project,project",
       retryable: false,
     };
   }
@@ -130,7 +136,8 @@ export function classifyGithubError(err: unknown): GithubErrorInfo {
     return {
       kind: "not_logged_in",
       title: "Nicht bei GitHub angemeldet",
-      hint: "Anmelden mit: gh auth login",
+      hint: "Den Befehl in einem Terminal ausführen und danach erneut versuchen.",
+      command: "gh auth login",
       retryable: false,
     };
   }

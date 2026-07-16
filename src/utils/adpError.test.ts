@@ -211,11 +211,12 @@ describe("classifyGithubError", () => {
       retryable: false,
     });
     expect(r.kind).toBe("scope_missing");
-    // The scope hint must name the concrete recovery command.
-    expect(r.hint).toContain("gh auth refresh");
+    // The recovery command lives in the structured `command` field (copyable
+    // in the UI), not buried in the hint prose.
+    expect(r.command).toBe("gh auth refresh -s read:project,project");
   });
 
-  it("flags a not-logged-in state", () => {
+  it("flags a not-logged-in state with its recovery command", () => {
     const r = classifyGithubError({
       code: "SERVICE_AUTH_FAILED",
       message: "please run: gh auth login",
@@ -223,6 +224,19 @@ describe("classifyGithubError", () => {
       retryable: false,
     });
     expect(r.kind).toBe("not_logged_in");
+    expect(r.command).toBe("gh auth login");
+  });
+
+  it("carries no command for errors without a shell fix (forbidden, unknown)", () => {
+    const forbidden = classifyGithubError({
+      code: "SERVICE_AUTH_FAILED",
+      message: "Resource not accessible",
+      details: "forbidden",
+      retryable: false,
+    });
+    expect(forbidden.command).toBeUndefined();
+    const unknown = classifyGithubError("boom");
+    expect(unknown.command).toBeUndefined();
   });
 
   it("flags a forbidden (no-access) error distinctly from scope", () => {

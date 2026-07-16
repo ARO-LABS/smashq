@@ -312,6 +312,47 @@ describe("KanbanBoard — Projects v2", () => {
     });
   });
 
+  it("offers a copy button for the scope fix command and keeps the retry path", async () => {
+    // `gh auth refresh` is interactive (OAuth device flow) — the app cannot
+    // run it itself, so the error card must offer the command as a copyable
+    // snippet PLUS the retry button for after the user ran it in a terminal.
+    setupStore();
+    mockInvoke.mockRejectedValueOnce({
+      code: "SERVICE_AUTH_FAILED",
+      message: "required scopes: read:project",
+      details: "scope",
+      retryable: false,
+    });
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+
+    render(<Board folder="/test/scope-copy" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("GitHub-Scope fehlt")).toBeTruthy();
+    });
+    expect(screen.getByText("Erneut versuchen")).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Befehl kopieren"));
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(
+        "gh auth refresh -s read:project,project"
+      );
+    });
+  });
+
+  it("shows NO copy button for errors without a fix command", async () => {
+    setupStore();
+    mockInvoke.mockRejectedValueOnce(new Error("Network error"));
+
+    render(<Board folder="/test/error-no-command" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Fehler beim Laden des Boards")).toBeTruthy();
+    });
+    expect(screen.queryByLabelText("Befehl kopieren")).toBeNull();
+  });
+
   it("does NOT show a scope hint for a not_found board (the original misclassification bug)", async () => {
     // Regression guard: a deleted board's NOT_FOUND message contains 'project'
     // but must never surface as the scope hint.
