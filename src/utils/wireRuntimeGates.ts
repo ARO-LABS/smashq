@@ -1,5 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useSettingsStore, type AppPreferencesSettings } from "../store/settingsStore";
+import {
+  useSettingsStore,
+  sanitizePermissionMode,
+  type AppPreferencesSettings,
+  type SettingsState,
+} from "../store/settingsStore";
 import {
   wireLoggingGate,
   wirePersistenceGate,
@@ -10,7 +15,11 @@ import {
 } from "./errorLogger";
 import { useLogViewerStore } from "../store/logViewerStore";
 import { setPerfEnabled } from "./perfLogger";
-import { listenForPreferencesChanges, type BroadcastPartial } from "./preferencesBroadcast";
+import {
+  listenForPreferencesChanges,
+  type BroadcastPartial,
+  type SettingsSyncPartial,
+} from "./preferencesBroadcast";
 import { useTasksStore, sanitizeTasks, type TaskItem } from "../store/tasksStore";
 import { setSuppressTasksPersist } from "../store/tasksStorage";
 import { broadcastTasksChange, listenForTasksChanges } from "./tasksBroadcast";
@@ -37,6 +46,13 @@ function applyRemotePartial(partial: BroadcastPartial): void {
     useSettingsStore.setState({ theme: next });
     return;
   }
+  // Top-level settings fields from a secondary window (settings window).
+  // Applying them here in the main window is what actually persists them —
+  // the sender window's own disk writes are dropped by the isMainWindow guard.
+  if ("settingsSync" in partial) {
+    applySettingsSync(partial.settingsSync);
+    return;
+  }
   const state = useSettingsStore.getState();
   const next = { ...state.preferences, ...partial };
   // Skip when nothing actually changes — saves a needless re-render.
@@ -45,6 +61,57 @@ function applyRemotePartial(partial: BroadcastPartial): void {
   );
   if (!changed) return;
   useSettingsStore.setState({ preferences: next });
+}
+
+const SHELL_PREFS: readonly SettingsState["defaultShell"][] = [
+  "auto",
+  "powershell",
+  "bash",
+  "cmd",
+  "zsh",
+];
+
+/**
+ * Apply a top-level settings partial from another window. Raw setState (no
+ * setter) — a setter would re-broadcast and loop the windows. Cross-window
+ * payloads are a trust boundary: enum-like fields are re-sanitized before
+ * they enter the persisted state (same stance as applyRemoteTasks).
+ * Exported for tests.
+ */
+export function applySettingsSync(sync: SettingsSyncPartial): void {
+  const state = useSettingsStore.getState();
+  const patch: Partial<SettingsState> = {};
+  if (sync.defaultPermissionMode !== undefined) {
+    const mode = sanitizePermissionMode(sync.defaultPermissionMode);
+    if (mode !== state.defaultPermissionMode) patch.defaultPermissionMode = mode;
+  }
+  if (
+    sync.defaultShell !== undefined &&
+    SHELL_PREFS.includes(sync.defaultShell) &&
+    sync.defaultShell !== state.defaultShell
+  ) {
+    patch.defaultShell = sync.defaultShell;
+  }
+  if (typeof sync.defaultProjectPath === "string" && sync.defaultProjectPath !== state.defaultProjectPath) {
+    patch.defaultProjectPath = sync.defaultProjectPath;
+  }
+  if (sync.notifications) {
+    const next = { ...state.notifications, ...sync.notifications };
+    const changed = (Object.keys(sync.notifications) as (keyof typeof next)[]).some(
+      (k) => state.notifications[k] !== next[k],
+    );
+    if (changed) patch.notifications = next;
+  }
+  if (sync.sound) {
+    const next = { ...state.sound, ...sync.sound };
+    const changed = (Object.keys(sync.sound) as (keyof typeof next)[]).some(
+      (k) => state.sound[k] !== next[k],
+    );
+    if (changed) patch.sound = next;
+  }
+  if (Object.keys(patch).length > 0) {
+    useSettingsStore.setState(patch);
+  }
 }
 
 /**
