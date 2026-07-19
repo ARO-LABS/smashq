@@ -7,6 +7,14 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-07-16 — Settings-Fenster-Persistenz: Sekundärfenster dürfen nicht schreiben — jeder Setter ohne Broadcast verliert still Daten
+
+**Kontext:** User-Report „Einstellungen speichern nicht" (Permission-Modus sprang trotz „Gespeichert" auf Standard zurück). Drei parallele Hypothesen-Subagenten (Write-Pfad, Rehydrate-Pfad, Persistenz-Mechanik) + Ground-Truth-Check der `settings.json` auf Platte (PR #40).
+
+**Fehler → Korrektur:** Die Settings-View rendert NUR in `DetachedViewApp` → immer Sekundärfenster. `tauriStorage.setItem` verwirft Writes von Nicht-Hauptfenstern still (M-01-Guard, by design); der einzige Persistenz-Pfad ist der `preferences-changed`-Broadcast, den nur `setTheme`/`setPreferences` nutzten. Fünf Setter (`setDefaultShell`, `setDefaultPermissionMode`, `setDefaultProjectPath`, `setNotifications`, `setSound`) hatten keinen Broadcast → deren Werte erreichten die Platte NIE (seit v1.0.0). Der „Gespeichert"-Indikator ist rein optimistisch (Store-Subscribe + 500 ms, kein Disk-Ack) und log darum mit. Beweis: `Documents\Smashq\settings.json` enthielt `"default"` statt des gesetzten Werts. Korrektur: `settingsSync`-Broadcast-Variante (Sender in den 5 Settern) + `applySettingsSync`-Empfänger in `wireRuntimeGates` (raw `setState`, Trust-Boundary-Sanitizing) + Roundtrip-Integrationstest.
+
+**Regel:** (1) Jeder settingsStore-Setter für ein persistiertes Feld, das aus einem Sekundärfenster erreichbar ist, MUSS broadcasten — und der Empfänger (`applySettingsSync`/`applyRemotePartial`) MUSS das Feld kennen, sonst kommt der Silent-Loss versteckt zurück (Empfänger ist nicht compile-time-exhaustiv; Guard: `Required<SettingsSyncPartial>`-Fixture-Test). (2) Bei „X speichert nicht"-Symptomen ZUERST Ground Truth auf der Platte prüfen (`Documents\Smashq\settings.json`) — der Save-Indikator beweist nichts. (3) Persistenz-Features brauchen einen Roundtrip-Test (setzen → rehydrate → Wert noch da); Setter-/Migrations-Unit-Tests decken die Mehrfenster-Architektur nicht. Verwandt: Issue-#209-Klasse (Validation in beide Hooks).
+
 ### 2026-07-14 — Flaky CI-Test: `waitFor`-Waypoint, der auch im Ladezustand schon wahr ist, gatet nicht auf den Zielzustand
 
 **Kontext:** master-CI (Push nach Merge PR #35) rot im `ConfigPanelTabList`-Test — `× hides Hooks tab … expected <button title="Hooks"> to be null` — obwohl der PR-Branch mit **byte-identischem Tree** grün war. Nichts am Code hatte sich geändert (Merge ohne weitere Commits).
