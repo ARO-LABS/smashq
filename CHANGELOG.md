@@ -6,6 +6,14 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [1.0.24] — 2026-07-19
+
+Einstellungen speichern jetzt zuverlässig (Sekundärfenster-Fix), der
+Permission-Modus für neue Sessions ist wählbar — mit neuem, sicherem
+Standard „Nachfragen" —, das Terminal läuft auf macOS sauber (Farben,
+Zeichen, Schrift), und die Einstellungen haben eine „Über"-Sektion mit
+Diagnose-Export. Kanban-Auth-Fehler zeigen ihren Fix-Befehl kopierbar an.
+
 ### Hinzugefügt
 - Einstellbarer **Permission-Modus für neue Sessions** (Einstellungen → Sessions): Standard (Nachfragen), Auto, Plan oder Bypass / YOLO. Gilt für neue Sessions und Resumes. (#11)
 - Neue Einstellungs-Sektion **„Über"**: zeigt App-Version, Build-Commit, Build-Datum und Plattform, mit „Diagnose kopieren" (für Bug-Reports) sowie Links zu Repository, Issues und Releases.

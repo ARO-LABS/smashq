@@ -43,22 +43,42 @@ export interface WhatsNewEntry {
 }
 
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
-  // RUMPF fuer den naechsten Release — beim Release-Tag kuratieren:
-  // version/date gegen die Manifeste pruefen (exakter Match Pflicht, sonst
-  // stiller Skip) und Highlights/Watchouts aus dem CHANGELOG ergaenzen.
   {
     version: "1.0.24",
-    date: "2026-07-08",
-    intro: "Dieses Update behebt die Anzeige der Update-Hinweise nach einem Update von aelteren Versionen.",
+    date: "2026-07-19",
+    intro:
+      "Dieses Update macht das Speichern von Einstellungen zuverlässig, führt einen wählbaren Permission-Modus für neue Sessions ein und repariert das Terminal auf macOS.",
     highlights: [
       {
+        icon: "stability",
+        title: "Einstellungen speichern jetzt zuverlässig",
+        text: "Standard-Terminal, Standard-Projektordner, Permission-Modus, Benachrichtigungen und Sound gingen beim Schließen des Einstellungen-Fensters verloren, obwohl „Gespeichert“ angezeigt wurde. Diese Werte erreichen jetzt zuverlässig die Festplatte.",
+      },
+      {
+        icon: "edit",
+        title: "Permission-Modus für neue Sessions wählbar",
+        text: "Unter Einstellungen → Sessions lässt sich festlegen, wie Claude startet: Standard (Nachfragen), Auto, Plan oder Bypass / YOLO. Gilt für neue Sessions und Resumes.",
+      },
+      {
+        icon: "terminal",
+        title: "macOS-Terminal repariert",
+        text: "Farben werden dargestellt, Umlaute und Rahmenzeichen kommen nicht mehr verstümmelt an, und die Schrift nutzt macOS-System-Monospace statt eines generischen Fallbacks.",
+      },
+      {
+        icon: "panels",
+        title: "Neue Einstellungs-Sektion „Über“",
+        text: "Zeigt App-Version, Build-Commit, Build-Datum und Plattform — mit „Diagnose kopieren“ für Bug-Reports sowie Links zu Repository, Issues und Releases.",
+      },
+      {
         icon: "update",
-        title: "Update-Hinweise erscheinen jetzt fuer alle",
-        text: "Das \"Was ist neu\"-Fenster oeffnete sich nach einem Update von Versionen vor 1.0.23 nicht — die App hielt Bestands-Installationen faelschlich fuer Neuinstallationen. Ab jetzt erscheint es nach jedem Update einmalig.",
+        title: "Update-Hinweise erscheinen jetzt für alle",
+        text: "Dieses „Was ist neu“-Fenster öffnete sich nach einem Update von Versionen vor 1.0.23 nicht — die App hielt Bestands-Installationen fälschlich für Neuinstallationen. Ab jetzt erscheint es nach jedem Update einmalig.",
       },
     ],
     watchouts: [
-      "Dieses Fenster wurde beim 1.0.23-Update uebersprungen — die 1.0.23-Aenderungen (Session-Zuordnung, macOS, Azure-Design) stehen im vollstaendigen Changelog.",
+      "Verhaltensänderung: Neue Sessions starten jetzt im Modus Standard (Nachfragen) statt wie bisher ohne Rückfragen. Wer das alte Verhalten will, stellt einmalig auf Bypass / YOLO um (Einstellungen → Sessions).",
+      "Einstellungen, die bisher vom Speicher-Bug betroffen waren (Benachrichtigungen, Sound, Session-Standards), einmalig prüfen und neu setzen — frühere Änderungen haben die Festplatte nie erreicht.",
+      "Dieses Fenster wurde beim 1.0.23-Update übersprungen — die 1.0.23-Änderungen (Session-Zuordnung, macOS, Azure-Design) stehen im vollständigen Changelog.",
     ],
   },
   {
