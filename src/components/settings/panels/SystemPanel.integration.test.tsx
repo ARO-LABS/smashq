@@ -7,7 +7,7 @@
  * platform fix command when a tool is absent.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { SystemPanel } from "./SystemPanel";
 import { claudeInstallHint } from "../../../utils/adpError";
@@ -57,6 +57,135 @@ describe("SystemPanel — Layer-B", () => {
         screen.getByText(/npm install -g @anthropic-ai\/claude-code/i),
       ).toBeTruthy();
     });
+  });
+
+  // ── gh-Auth/Scope-Preflight (Issue #38) ─────────────────────────────
+
+  /** All prerequisites found — the auth section is what varies per test. */
+  const allFoundPrerequisites: IPCHandler = async () => ({
+    claude: { found: true, path: "/usr/local/bin/claude" },
+    git: { found: true, path: "/usr/bin/git" },
+    gh: { found: true, path: "/usr/bin/gh" },
+    shell: { found: true, path: "/bin/zsh" },
+    shellName: "zsh",
+  });
+
+  it("shows account + scopes WITHOUT a fix command when read:project is granted (happy path)", async () => {
+    installRealIPC({
+      check_prerequisites: allFoundPrerequisites,
+      check_gh_auth_status: async () => ({
+        loggedIn: true,
+        host: "github.com",
+        account: "hossoOG",
+        scopes: ["gist", "read:org", "read:project", "repo"],
+        hasProjectScope: true,
+      }),
+    });
+
+    render(<SystemPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Angemeldet als hossoOG/)).toBeTruthy();
+    });
+    expect(screen.getByText(/read:project/)).toBeTruthy();
+    // Discriminating: with the scope granted there must be NO remedy UI.
+    expect(screen.queryByText(/gh auth refresh/)).toBeNull();
+    expect(screen.queryByText("Im Terminal öffnen")).toBeNull();
+  });
+
+  it("warns with copyable command + terminal launcher when read:project is missing (edge)", async () => {
+    installRealIPC({
+      check_prerequisites: allFoundPrerequisites,
+      check_gh_auth_status: async () => ({
+        loggedIn: true,
+        host: "github.com",
+        account: "hossoOG",
+        scopes: ["gist", "read:org", "repo", "workflow"],
+        hasProjectScope: false,
+      }),
+    });
+
+    render(<SystemPanel />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("gh auth refresh -s read:project,project"),
+      ).toBeTruthy();
+    });
+    expect(screen.getByText("Im Terminal öffnen")).toBeTruthy();
+    expect(screen.getByLabelText("Befehl kopieren")).toBeTruthy();
+  });
+
+  it("clicking the terminal launcher invokes open_system_terminal with the scope-refresh id", async () => {
+    const openCalls: Array<Record<string, unknown>> = [];
+    installRealIPC({
+      check_prerequisites: allFoundPrerequisites,
+      check_gh_auth_status: async () => ({
+        loggedIn: true,
+        host: "github.com",
+        account: "hossoOG",
+        scopes: ["repo"],
+        hasProjectScope: false,
+      }),
+      open_system_terminal: async (args) => {
+        openCalls.push({ ...args });
+        return undefined;
+      },
+    });
+
+    render(<SystemPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Im Terminal öffnen")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText("Im Terminal öffnen"));
+
+    await waitFor(() => {
+      expect(openCalls).toEqual([{ commandId: "gh_refresh_project_scope" }]);
+    });
+  });
+
+  it("offers gh auth login when not logged in", async () => {
+    installRealIPC({
+      check_prerequisites: allFoundPrerequisites,
+      check_gh_auth_status: async () => ({
+        loggedIn: false,
+        scopes: [],
+        hasProjectScope: false,
+      }),
+    });
+
+    render(<SystemPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Nicht bei GitHub angemeldet")).toBeTruthy();
+    });
+    expect(screen.getByText("gh auth login")).toBeTruthy();
+    expect(screen.getByText("Im Terminal öffnen")).toBeTruthy();
+    // No scope warning while logged out — login comes first.
+    expect(screen.queryByText(/gh auth refresh/)).toBeNull();
+  });
+
+  it("degrades to a hint when the auth check fails and keeps the prerequisite rows (edge)", async () => {
+    installRealIPC({
+      check_prerequisites: allFoundPrerequisites,
+      check_gh_auth_status: async () => {
+        throw {
+          code: "SERVICE_REQUEST_FAILED",
+          message: "gh CLI not found",
+          details: "gh_missing",
+          retryable: false,
+        };
+      },
+    });
+
+    render(<SystemPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Anmeldestatus nicht prüfbar/)).toBeTruthy();
+    });
+    // Prerequisite section must survive the failed auth probe.
+    expect(screen.getByText("/usr/local/bin/claude")).toBeTruthy();
   });
 
   // macOS branch of `claudeInstallHint()` has no coverage otherwise: jsdom's UA

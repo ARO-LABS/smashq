@@ -55,6 +55,24 @@ export function getErrorMessage(err: unknown): string {
   return parsed.message;
 }
 
+/**
+ * Closed discriminator for terminal fix commands (Issue #38). Mirrors the
+ * Rust allowlist in `src-tauri/src/github/auth.rs` (`fix_command_for`):
+ * the frontend never sends a command string to `open_system_terminal`,
+ * only one of these ids — shell injection is structurally impossible.
+ */
+export type TerminalFixCommandId = "gh_login" | "gh_refresh_project_scope";
+
+/**
+ * Display strings for the allowlisted fix commands. MUST match the Rust
+ * literals in `fix_command_for` — these are only ever shown/copied, never
+ * executed by the frontend.
+ */
+export const GH_FIX_COMMANDS: Record<TerminalFixCommandId, string> = {
+  gh_login: "gh auth login",
+  gh_refresh_project_scope: "gh auth refresh -s read:project,project",
+};
+
 /** Distinct, actionable classes of GitHub-integration failure. */
 export type GithubErrorKind =
   | "gh_missing"
@@ -77,6 +95,10 @@ export interface GithubErrorInfo {
    *  it in prose. `gh auth` commands are interactive (OAuth device flow), so
    *  they must run in a real terminal — the app cannot execute them itself. */
   command?: string;
+  /** Allowlist id for `open_system_terminal` ("Im Terminal öffnen"-Button).
+   *  Set alongside `command` when the fix can be launched in the system
+   *  terminal. The id — never the command string — crosses the IPC boundary. */
+  terminalCommandId?: TerminalFixCommandId;
   /** Whether retrying the same call could succeed. */
   retryable: boolean;
 }
@@ -127,7 +149,8 @@ export function classifyGithubError(err: unknown): GithubErrorInfo {
       kind: "scope_missing",
       title: "GitHub-Scope fehlt",
       hint: "Dem Token fehlt der nötige Scope. Den Befehl in einem Terminal ausführen und danach erneut versuchen.",
-      command: "gh auth refresh -s read:project,project",
+      command: GH_FIX_COMMANDS.gh_refresh_project_scope,
+      terminalCommandId: "gh_refresh_project_scope",
       retryable: false,
     };
   }
@@ -137,7 +160,8 @@ export function classifyGithubError(err: unknown): GithubErrorInfo {
       kind: "not_logged_in",
       title: "Nicht bei GitHub angemeldet",
       hint: "Den Befehl in einem Terminal ausführen und danach erneut versuchen.",
-      command: "gh auth login",
+      command: GH_FIX_COMMANDS.gh_login,
+      terminalCommandId: "gh_login",
       retryable: false,
     };
   }
