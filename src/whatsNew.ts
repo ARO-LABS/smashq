@@ -43,6 +43,24 @@ export interface WhatsNewEntry {
 }
 
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
+  // RUMPF fuer den naechsten Release — beim Release-Tag kuratieren:
+  // version/date gegen die Manifeste pruefen (exakter Match Pflicht, sonst
+  // stiller Skip) und Highlights/Watchouts aus dem CHANGELOG ergaenzen.
+  {
+    version: "1.0.25",
+    date: "2026-07-20",
+    intro: "Dieses Update enthält kleinere Fehlerbehebungen.",
+    highlights: [
+      {
+        icon: "stability",
+        title: "Fehlerbehebungen",
+        text: "Details stehen im vollständigen Changelog.",
+      },
+    ],
+    watchouts: [
+      "Dieser Eintrag wurde vor dem Release nicht kuratiert — Details bitte dem Changelog entnehmen.",
+    ],
+  },
   {
     version: "1.0.24",
     date: "2026-07-19",
