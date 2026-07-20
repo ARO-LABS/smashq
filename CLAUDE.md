@@ -8,7 +8,7 @@
 
 **Language**: UI und Doku auf Deutsch, Code auf Englisch
 
-> **Feature-Freeze:** Session Manager ist feature-complete (uebernommen aus der AgenticExplorer-v1.6.x-Linie; Smashq setzt die Versionierung beim Rebrand neu auf 1.0.0). Nur Bugfixes. Roadmap fuer das naechste Major-Release ist offen — neue Features werden separat geplant.
+> **Feature-Politik (Feature-Freeze beendet am 2026-07-20):** Neue Features sind wieder zugelassen — unter zwei Auflagen: (1) **ausgiebige Tests** über das Quality-Gate-Minimum hinaus (Happy-Path + Edge-Cases + bei UI-Änderungen visuelle Smoke), (2) **harmonische Integration ins Design-System** (`docs/design-system/README.md`, Pflicht-Check unten). Unterspezifizierte Issues werden NICHT auf Annahmen gebaut: Rückfrage-Kommentar ins Issue schreiben; bis zur Antwort bleibt das Issue im Backlog. (Historie: Session Manager wurde aus der AgenticExplorer-v1.6.x-Linie übernommen, Versionierung beim Rebrand neu ab 1.0.0.)
 
 ## Commands
 
@@ -58,8 +58,8 @@ npm run lint             # ESLint
 
 Issues IMMER ueber die drei Issue-Forms in `.github/ISSUE_TEMPLATE/` erstellen (Blank Issues sind deaktiviert) — auch bei `gh issue create` die Feldstruktur des passenden Templates im Body nachbilden und das Label setzen:
 
-- **Bug Report** (`bug`) — Fehler; Bugfixes sind Feature-Freeze-konform und duerfen direkt umgesetzt werden.
-- **Feature Request** (`enhancement`) — landet zunaechst im Backlog (`tasks/todo.md`), Umsetzung erst mit dem naechsten Major-Release.
+- **Bug Report** (`bug`) — Fehler; Bugfixes dürfen immer direkt umgesetzt werden.
+- **Feature Request** (`enhancement`) — umsetzbar, sobald das Issue ausreichend spezifiziert ist (Auflagen siehe Feature-Politik oben); unterspezifizierte Issues bekommen einen Rückfrage-Kommentar und warten im Backlog (`tasks/todo.md`).
 - **Task / Chore** (`chore`) — Refactoring, CI, Doku, Dependencies, Release-Pflege.
 
 Sprache: Deutsch. Bug-Reports brauchen App-Version + OS; Log-Auszug aus `%LOCALAPPDATA%\smashq\app-log.ndjson` beilegen, wenn vorhanden.

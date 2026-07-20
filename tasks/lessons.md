@@ -14,6 +14,13 @@
 **Fehler → Korrektur:** Layer B läuft über ein SEPARATES Config-File (`vitest.config.integration.ts`, Script `npm run test:integration`); `npx vitest run` sammelt diese `*.integration.test.ts`-Dateien nicht ein. Die Änderung am persistierten `RestorableSession`-Shape hatte dort einen Kontrakt-Test (Key-Whitelist), den nur die CI fing. Korrektur: Whitelist um `permissionMode` erweitert, `npm run test:integration` lokal grün nachgezogen.
 
 **Regel:** Bei Änderungen an persistierten Shapes, Stores oder IPC-Verträgen gehört `npm run test:integration` (bzw. `npm run test:all`) in die lokalen Gates — die Unit-Suite beweist Layer B nicht. Merkhilfe: Kontrakt-/Shape-Tests leben bevorzugt in `*.integration.test.ts` und sind im normalen `vitest run` unsichtbar.
+### 2026-07-20 — Parallele Subagenten teilen den Scratchpad: generische Dateinamen kollidieren still
+
+**Kontext:** Ultracode-Lauf mit 7 parallelen Worktree-Agenten (Issues → PRs #41–#47). Agent A (#18) schrieb `commitmsg.txt` in den geteilten Session-Scratchpad; Agent B (#25) überschrieb dieselbe Datei zwischen Schreiben und `git commit -F` → der Commit von A landete mit der Message von B und musste per `--amend` korrigiert werden (Inhalt war korrekt, nur die Message fremd).
+
+**Fehler → Korrektur:** Temporäre Dateien mit generischen Namen (`commitmsg.txt`, `prbody.md`) sind im Scratchpad ein Shared-Mutable-State ohne Locking — bei parallelen Agenten ein Race. Korrektur im Lauf: `--amend` mit richtiger Message; die Worktrees selbst waren sauber isoliert, nur der Scratchpad nicht.
+
+**Regel:** In parallelen Multi-Agent-Läufen temporäre Dateien IMMER eindeutig benennen (Issue-Nr./Agent-Präfix, z.B. `commitmsg-issue18.txt`) oder gleich in den eigenen isolierten Worktree legen statt in den geteilten Scratchpad. Nach jedem `git commit -F` die tatsächliche Message per `git log -1 --format=%B` gegen die Erwartung prüfen — der Commit-Exit-Code beweist nur, dass EINE Message ankam, nicht WELCHE.
 
 ### 2026-07-16 — Settings-Fenster-Persistenz: Sekundärfenster dürfen nicht schreiben — jeder Setter ohne Broadcast verliert still Daten
 
