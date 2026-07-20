@@ -8,6 +8,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ### Hinzugefügt
 - Dokumentation „Betrieb hinter Corporate Proxy" im README: Proxy-Mechanismus und relevante Umgebungsvariablen für Auto-Updater, `gh`-Integration und Claude-CLI-Sessions, inkl. bekannter Lücken (kein OS-Proxy/PAC im Updater, macOS-GUI-Start ohne Shell-Profil-Variablen). (#25)
+- **Session-Neustart-Icon** auf der Session-Kachel (Hover-Leiste): beendet die laufende Session und startet eine frische Session im selben Projektordner mit denselben Einstellungen (Shell, Permission-Modus). Bewusst ohne `--resume` — Fortsetzen bleibt ein eigener Flow. (#13)
 
 ### Sicherheit
 - Dependabot-High-Alerts behoben (#16): Build-Tooling `vite` auf 6.4.3 gehoben (inkl. `overrides`, damit auch die von vitest genutzten Kopien die gepatchte Version verwenden — schließt `server.fs.deny`-Bypass unter Windows und NTLMv2-Hash-Leak via launch-editor). Die Laufzeit-Abhängigkeit `linkify-it` (≥ 5.0.1, quadratische Komplexität in `match`) und `form-data` (≥ 4.0.6, CRLF-Injection) sind im Lockfile bereits auf gepatchten Versionen fixiert und wurden verifiziert.

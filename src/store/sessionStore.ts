@@ -1,4 +1,7 @@
 import { create } from "zustand";
+// Type-only import — erased at compile time, so the settingsStore→sessionStore
+// type dependency in the other direction cannot form a runtime cycle.
+import type { PermissionMode } from "./settingsStore";
 import { logWarn } from "../utils/errorLogger";
 import { recordPerf } from "../utils/perfLogger";
 import {
@@ -32,6 +35,14 @@ export interface ClaudeSession {
   folder: string;
   shell: SessionShell;
   claudeSessionId?: string;      // Claude CLI Session-UUID fuer Resume
+  /**
+   * Permission-Mode, mit dem die Session erzeugt wurde. Gespeichert, damit ein
+   * Neustart (Issue #13) die Session mit DENSELBEN Einstellungen reproduziert —
+   * auch wenn der Settings-Default sich zwischenzeitlich geaendert hat.
+   * Optional: Legacy-Sessions ohne Feld fallen beim Neustart auf den aktuellen
+   * Default zurueck.
+   */
+  permissionMode?: PermissionMode;
   status: SessionStatus;
   createdAt: number;
   finishedAt: number | null;
@@ -103,6 +114,7 @@ export interface SessionState {
     folder: string;
     shell: SessionShell;
     claudeSessionId?: string;
+    permissionMode?: PermissionMode;
     isGitRepo?: boolean;
     snapshotCommit?: string;
   }) => void;
@@ -163,6 +175,7 @@ export const useSessionStore = create<SessionState>((set) => ({
         folder: params.folder,
         shell: params.shell,
         claudeSessionId: params.claudeSessionId,
+        permissionMode: params.permissionMode,
         status: "starting",
         createdAt: Date.now(),
         finishedAt: null,

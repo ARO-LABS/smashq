@@ -90,6 +90,7 @@ export function useSessionCreation(): UseSessionCreationReturn {
           folder: result?.folder ?? cwd,
           shell: (result?.shell ?? concreteShellFallback(shell)) as SessionShell,
           claudeSessionId: resumeSessionId,
+          permissionMode,
           isGitRepo: result?.isGitRepo,
           snapshotCommit: result?.snapshotCommit,
         });
@@ -130,6 +131,7 @@ export function useSessionCreation(): UseSessionCreationReturn {
         displayId: generateUniqueDisplayId(sessions),
         folder: result?.folder ?? folder,
         shell: (result?.shell ?? concreteShellFallback(shell)) as SessionShell,
+        permissionMode,
         isGitRepo: result?.isGitRepo,
         snapshotCommit: result?.snapshotCommit,
       });
@@ -199,6 +201,7 @@ export function useSessionCreation(): UseSessionCreationReturn {
         displayId: generateUniqueDisplayId(sessions),
         folder: result?.folder ?? folder,
         shell: (result?.shell ?? concreteShellFallback(shell)) as SessionShell,
+        permissionMode,
         isGitRepo: result?.isGitRepo,
         snapshotCommit: result?.snapshotCommit,
       });

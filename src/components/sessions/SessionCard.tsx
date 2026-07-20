@@ -11,10 +11,12 @@ import { resolveSessionAccent, accentCssVars, accentColorFor, type AccentName } 
 import { getGridMiniMap } from "./sessionGridLayout";
 import { SessionAccentMenu } from "./SessionAccentMenu";
 import { resolveClaudeIdByAnchor } from "./hooks/claudeIdDiscovery";
+import { restartSession } from "./hooks/sessionRestart";
 
 const X = ICONS.action.close;
 const FolderOpen = ICONS.action.folderOpen;
 const Terminal = ICONS.action.terminal;
+const Restart = ICONS.action.retry;
 
 interface SessionCardProps {
   session: ClaudeSession;
@@ -213,6 +215,20 @@ const SessionCardInner = ({ session, isActive, gridSlot, onClick, onClose }: Ses
           title="Terminal im Ordner öffnen"
         >
           <Terminal className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            // Fire-and-forget: restartSession guards double-clicks itself
+            // (module-level in-flight set) and surfaces failures via toast —
+            // the card unmounts mid-restart, so no local state may be used.
+            void restartSession(session.id);
+          }}
+          className="p-1 text-neutral-400 hover:text-accent hover:bg-hover-overlay transition-colors"
+          aria-label="Session neu starten"
+          title="Session neu starten"
+        >
+          <Restart className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={(e) => {

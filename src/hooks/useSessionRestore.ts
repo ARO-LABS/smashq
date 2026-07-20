@@ -152,6 +152,7 @@ async function restoreSessions(
         folder: result?.folder ?? entry.folder,
         shell: (result?.shell ?? entry.shell) as SessionShell,
         claudeSessionId: resumeSessionId,
+        permissionMode,
         isGitRepo: result?.isGitRepo,
         snapshotCommit: result?.snapshotCommit,
       });

@@ -625,6 +625,78 @@ describe("SessionCard", () => {
     });
   });
 
+  // ── Restart button (Issue #13) ───────────────────────────────────────
+
+  describe("restart button", () => {
+    it("restarts via close_session + fresh create_session in the same folder with the stored settings", async () => {
+      const session = makeSession({
+        id: "sess-restart",
+        folder: "C:/Projects/demo",
+        shell: "gitbash",
+      });
+      useSessionStore.setState({ sessions: [], activeSessionId: null });
+      useSessionStore.getState().addSession({
+        id: session.id,
+        title: session.title,
+        folder: session.folder,
+        shell: session.shell,
+        permissionMode: "plan",
+      });
+      mockedInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
+        if (cmd === "create_session") {
+          const a = args as { id: string; title: string; folder: string; shell: string };
+          return { id: a.id, title: a.title, folder: a.folder, shell: a.shell };
+        }
+        return undefined;
+      });
+      renderCard(session);
+
+      fireEvent.click(screen.getByLabelText("Session neu starten"));
+
+      await waitFor(() => {
+        expect(mockedInvoke).toHaveBeenCalledWith("close_session", { id: "sess-restart" });
+        expect(mockedInvoke).toHaveBeenCalledWith(
+          "create_session",
+          expect.objectContaining({
+            folder: "C:/Projects/demo",
+            shell: "gitbash",
+            permissionMode: "plan",
+          }),
+        );
+      });
+      // Fresh session, no resume: the create call must NOT carry a resumeSessionId.
+      const createArgs = mockedInvoke.mock.calls.find(([cmd]) => cmd === "create_session")?.[1] as
+        | { resumeSessionId?: string }
+        | undefined;
+      expect(createArgs?.resumeSessionId).toBeUndefined();
+      // Old card gone, fresh one in the store.
+      const sessions = useSessionStore.getState().sessions;
+      expect(sessions.find((s) => s.id === "sess-restart")).toBeUndefined();
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].status).toBe("starting");
+    });
+
+    it("does not trigger onClick or onClose when the restart button is clicked", () => {
+      const onClick = vi.fn();
+      const onClose = vi.fn();
+      const session = makeSession({ id: "sess-restart-guard" });
+      useSessionStore.setState({ sessions: [], activeSessionId: null });
+      useSessionStore.getState().addSession({
+        id: session.id,
+        title: session.title,
+        folder: session.folder,
+        shell: session.shell,
+      });
+      mockedInvoke.mockResolvedValue(undefined);
+      renderCard(session, { onClick, onClose });
+
+      fireEvent.click(screen.getByLabelText("Session neu starten"));
+
+      expect(onClick).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+  });
+
   // ── Rename edge cases ────────────────────────────────────────────────
 
   describe("rename edge cases", () => {
