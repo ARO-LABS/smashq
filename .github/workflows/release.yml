@@ -79,7 +79,13 @@ jobs:
           $pfxPath = Join-Path $env:RUNNER_TEMP "codesign.pfx"
           [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
           $password = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
-          $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $password
+          # Eine .pfx kann eine ganze Zertifikatskette enthalten — Import-PfxCertificate
+          # liefert dann MEHRERE Zertifikate und .Thumbprint wäre ein Array (ungültiger
+          # Wert für certificateThumbprint, signtool schlägt fehl). Deshalb: auf das
+          # Leaf-Zertifikat mit Private Key filtern und exakt eines nehmen.
+          $certs = @(Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $password)
+          $cert = $certs | Where-Object { $_.HasPrivateKey } | Select-Object -First 1
+          if (-not $cert) { throw "Kein Zertifikat mit Private Key in der .pfx gefunden." }
           Remove-Item $pfxPath
           $env:CERT_THUMBPRINT = $cert.Thumbprint
           node -e "const fs = require('fs'); const p = 'src-tauri/tauri.conf.json'; const c = JSON.parse(fs.readFileSync(p, 'utf8')); c.bundle.windows = { ...(c.bundle.windows ?? {}), certificateThumbprint: process.env.CERT_THUMBPRINT, digestAlgorithm: 'sha256', timestampUrl: 'http://timestamp.digicert.com' }; fs.writeFileSync(p, JSON.stringify(c, null, 2) + '\n');"
