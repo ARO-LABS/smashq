@@ -20,6 +20,12 @@ jobs:
     timeout-minutes: 40
     outputs:
       release_id: ${{ steps.tauri.outputs.releaseId }}
+    env:
+      # Secret-Präsenz-Guard für Windows Code Signing (Issue #22): secrets.*
+      # ist in step-level `if:` nicht direkt nutzbar, deshalb dieser
+      # Zwischenschritt auf Job-Ebene. Ohne gesetztes Secret ist der Wert
+      # "false" und der Signing-Step unten wird übersprungen (exaktes No-op).
+      HAS_WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -41,6 +47,43 @@ jobs:
           # dann die kompilierten Deps statt ~10min neu zu bauen (v1.0.23:
           # zwei Notarize-Haenger, jeder Retry kompilierte von Null).
           cache-on-failure: true
+
+      # -----------------------------------------------------------------------
+      # Windows Code Signing (Authenticode) — VORBEREITUNG (Issue #22).
+      # Aktuell existiert noch KEIN Zertifikat: solange die Secrets fehlen,
+      # wird dieser Step übersprungen und der Workflow verhält sich exakt wie
+      # bisher. Sobald ein Zertifikat vorliegt, hinterlegt der Maintainer im
+      # Repo zwei Secrets:
+      #
+      #   WINDOWS_CERTIFICATE          — Code-Signing-Zertifikat inkl. Private
+      #                                  Key als Base64-kodierte .pfx-Datei
+      #                                  (erzeugen z.B. mit
+      #                                  `base64 -w0 zertifikat.pfx`).
+      #   WINDOWS_CERTIFICATE_PASSWORD — Passwort der .pfx-Datei.
+      #
+      # Der Step importiert die .pfx in den User-Zertifikatsspeicher des
+      # Runners und trägt certificateThumbprint / digestAlgorithm /
+      # timestampUrl zur Laufzeit in src-tauri/tauri.conf.json ein (nur im
+      # CI-Workspace, nie im Repo). `tauri build` signiert damit .exe und
+      # NSIS-Installer via signtool, BEVOR die Updater-Artefakte entstehen —
+      # die Minisign-Signatur (TAURI_SIGNING_PRIVATE_KEY) und latest.json
+      # bleiben unberührt und gültig.
+      # Referenz: https://v2.tauri.app/distribute/sign/windows/
+      - name: Import Windows code signing certificate (optional)
+        if: env.HAS_WINDOWS_CERTIFICATE == 'true'
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: pwsh
+        run: |
+          $pfxPath = Join-Path $env:RUNNER_TEMP "codesign.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $password = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+          $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $password
+          Remove-Item $pfxPath
+          $env:CERT_THUMBPRINT = $cert.Thumbprint
+          node -e "const fs = require('fs'); const p = 'src-tauri/tauri.conf.json'; const c = JSON.parse(fs.readFileSync(p, 'utf8')); c.bundle.windows = { ...(c.bundle.windows ?? {}), certificateThumbprint: process.env.CERT_THUMBPRINT, digestAlgorithm: 'sha256', timestampUrl: 'http://timestamp.digicert.com' }; fs.writeFileSync(p, JSON.stringify(c, null, 2) + '\n');"
+          Write-Host "Zertifikat importiert (Thumbprint: $($cert.Thumbprint)), tauri.conf.json fuer signtool gepatcht."
 
       - name: Build Windows app and create release
         id: tauri
