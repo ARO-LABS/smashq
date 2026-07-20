@@ -1305,13 +1305,16 @@ mod tests {
     #[test]
     fn claude_flicker_env_is_set_in_spawn_path() {
         let src = include_str!("manager.rs");
+        // Examine only the production portion — this test module itself mentions
+        // the literals below, so the whole-file view would be tautological.
+        let prod = src.split("#[cfg(test)]").next().unwrap_or(src);
         assert!(
-            src.contains("CLAUDE_CODE_NO_FLICKER"),
+            prod.contains("CLAUDE_CODE_NO_FLICKER"),
             "CLAUDE_CODE_NO_FLICKER env var setting removed from manager.rs — \
              this is a scroll-history regression guard, see commit b92cc60"
         );
         assert!(
-            src.contains(r#"cmd.env("CLAUDE_CODE_NO_FLICKER", "0")"#),
+            prod.contains(r#"cmd.env("CLAUDE_CODE_NO_FLICKER", "0")"#),
             "CLAUDE_CODE_NO_FLICKER must be set to \"0\" on the CommandBuilder \
              before spawn (commit b92cc60)"
         );
@@ -1356,8 +1359,11 @@ mod tests {
         // unit-testable in isolation), so we pin the source text. Removing the
         // loop that applies terminal_env would silently bring back issue #8.
         let src = include_str!("manager.rs");
+        // Examine only the production portion — this test module itself mentions
+        // the literal below, so the whole-file view would be tautological.
+        let prod = src.split("#[cfg(test)]").next().unwrap_or(src);
         assert!(
-            src.contains("terminal_env(platform)"),
+            prod.contains("terminal_env(platform)"),
             "terminal_env(platform) must be applied to the CommandBuilder before \
              spawn — without TERM the macOS Finder/Dock launch shows no colors (issue #8)"
         );
@@ -2079,13 +2085,16 @@ mod tests {
     #[test]
     fn close_session_invokes_killer() {
         let src = include_str!("manager.rs");
+        // Examine only the production portion — this test module itself mentions
+        // the literals below, so the whole-file view would be tautological.
+        let prod = src.split("#[cfg(test)]").next().unwrap_or(src);
         assert!(
-            src.contains("removed.killer.kill()"),
+            prod.contains("removed.killer.kill()"),
             "close_session must explicitly kill the child via the stored killer \
              — dropping the master alone does not terminate grandchildren"
         );
         assert!(
-            src.contains("let killer = child.clone_killer();"),
+            prod.contains("let killer = child.clone_killer();"),
             "a killer handle must be cloned from the child at spawn time so \
              close_session can terminate the shell deterministically"
         );
