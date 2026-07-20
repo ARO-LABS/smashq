@@ -6,6 +6,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Hinzugefügt
+- Dokumentation „Betrieb hinter Corporate Proxy" im README: Proxy-Mechanismus und relevante Umgebungsvariablen für Auto-Updater, `gh`-Integration und Claude-CLI-Sessions, inkl. bekannter Lücken (kein OS-Proxy/PAC im Updater, macOS-GUI-Start ohne Shell-Profil-Variablen). Reale Verifikation hinter einem Corporate Proxy steht noch aus. (#25)
+
 ## [1.0.24] — 2026-07-19
 
 Einstellungen speichern jetzt zuverlässig (Sekundärfenster-Fix), der
