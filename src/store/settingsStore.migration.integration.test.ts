@@ -279,6 +279,28 @@ describe("settingsStore — defaultPermissionMode persistence", () => {
   });
 });
 
+describe("settingsStore — autoUpdateEnabled persistence (Issue #21)", () => {
+  it("persistiert false über einen rehydrate-Roundtrip", async () => {
+    const store = useSettingsStore;
+    store.getState().setAutoUpdateEnabled(false);
+    expect(store.getState().autoUpdateEnabled).toBe(false);
+    await store.persist.rehydrate();
+    // Diskriminiert: fehlt das Feld in partialize, kommt nach dem Rehydrate
+    // der Default true zurück und der Test schlägt fehl.
+    expect(store.getState().autoUpdateEnabled).toBe(false);
+  });
+
+  it("heilt einen korrupten persistierten Wert beim Rehydrate auf true (Update-Kanal offen)", async () => {
+    const store = useSettingsStore;
+    // setState umgeht den sanitisierenden Setter — simuliert einen manipulierten
+    // Persist-Blob bei GLEICHER Schema-Version (migrate feuert nicht, nur
+    // merge/onRehydrateStorage können heilen — Issue-#209-Klasse).
+    store.setState({ autoUpdateEnabled: "false" as never });
+    await store.persist.rehydrate();
+    expect(store.getState().autoUpdateEnabled).toBe(true);
+  });
+});
+
 /**
  * Build a version-5 persist envelope carrying favorites + groups directly.
  * Version 5 == current schema → no migrate() runs, so this isolates the

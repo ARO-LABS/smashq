@@ -14,6 +14,7 @@ import {
   validateSessionRestore,
   sanitizeLastSeenVersion,
   sanitizePermissionMode,
+  sanitizeAutoUpdateEnabled,
   PERMISSION_MODES,
 } from "./settingsStore";
 
@@ -1948,5 +1949,61 @@ describe("settingsSync broadcast (Detached-Settings-Persistenz)", () => {
     expect(broadcastPreferencesChange).toHaveBeenCalledWith({
       settingsSync: { sound: { volume: 0.5 } },
     });
+  });
+
+  it("setAutoUpdateEnabled broadcastet settingsSync (Sekundärfenster-Persistenzpfad)", () => {
+    getState().setAutoUpdateEnabled(false);
+    expect(getState().autoUpdateEnabled).toBe(false);
+    expect(broadcastPreferencesChange).toHaveBeenCalledWith({
+      settingsSync: { autoUpdateEnabled: false },
+    });
+  });
+});
+
+// ============================================================================
+// autoUpdateEnabled — automatischer Update-Check (v14, Issue #21)
+// ============================================================================
+
+describe("autoUpdateEnabled (automatischer Update-Check)", () => {
+  it("defaultet auf true — Update-Kanal ist standardmäßig offen", () => {
+    expect(getState().autoUpdateEnabled).toBe(true);
+  });
+
+  it("sanitizeAutoUpdateEnabled: nur explizites false deaktiviert, alles andere heilt zu true", () => {
+    expect(sanitizeAutoUpdateEnabled(false)).toBe(false);
+    expect(sanitizeAutoUpdateEnabled(true)).toBe(true);
+    // Korrupte/unbekannte Werte → true (sicherster Wert: Kanal offen)
+    expect(sanitizeAutoUpdateEnabled(undefined)).toBe(true);
+    expect(sanitizeAutoUpdateEnabled(null)).toBe(true);
+    expect(sanitizeAutoUpdateEnabled("false")).toBe(true);
+    expect(sanitizeAutoUpdateEnabled(0)).toBe(true);
+    expect(sanitizeAutoUpdateEnabled({})).toBe(true);
+  });
+
+  it("setAutoUpdateEnabled sanitisiert Nicht-Boolean-Input auf true", () => {
+    getState().setAutoUpdateEnabled(false);
+    getState().setAutoUpdateEnabled("false" as never);
+    expect(getState().autoUpdateEnabled).toBe(true);
+  });
+
+  it("migrate seedet Bestands-User (Blob ohne Feld) auf true", () => {
+    const migrated = useSettingsStoreMigrateForTest({ locale: "de" }, 13);
+    expect(migrated.autoUpdateEnabled).toBe(true);
+  });
+
+  it("migrate erhält ein explizit persistiertes false", () => {
+    const migrated = useSettingsStoreMigrateForTest({ autoUpdateEnabled: false }, 13);
+    expect(migrated.autoUpdateEnabled).toBe(false);
+  });
+
+  it("migrate heilt einen korrupten Wert auf true", () => {
+    const migrated = useSettingsStoreMigrateForTest({ autoUpdateEnabled: "false" }, 13);
+    expect(migrated.autoUpdateEnabled).toBe(true);
+  });
+
+  it("resetToDefaults setzt autoUpdateEnabled zurück auf true", () => {
+    getState().setAutoUpdateEnabled(false);
+    getState().resetToDefaults();
+    expect(getState().autoUpdateEnabled).toBe(true);
   });
 });
