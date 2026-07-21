@@ -2,6 +2,7 @@ import { useState } from "react";
 import { wrapInvoke } from "../../utils/perfLogger";
 import { logError } from "../../utils/errorLogger";
 import { ICONS, ICON_SIZE } from "../../utils/icons";
+import { Button } from "../ui/Button";
 import type { TerminalFixCommandId } from "../../utils/adpError";
 
 const TerminalIcon = ICONS.action.terminal;
@@ -27,6 +28,12 @@ export function OpenInTerminalButton({
     try {
       await wrapInvoke("open_system_terminal", { commandId });
     } catch (err) {
+      // Bewusst stiller Fehlerpfad (nur Log, kein Toast): alle Render-Orte
+      // (Settings-System-Panel, Kanban-Fehlerkarte/-Picker) leben im
+      // Sekundärfenster (`DetachedViewApp`), das keinen ToastContainer
+      // mountet — ein addToast wäre dort unsichtbar. Sichtbarer Fallback ist
+      // die CopyableCommand-Box direkt daneben: der Befehl lässt sich immer
+      // manuell kopieren und ausführen.
       logError("OpenInTerminalButton.open", err);
     } finally {
       setOpening(false);
@@ -34,14 +41,15 @@ export function OpenInTerminalButton({
   };
 
   return (
-    <button
+    <Button
       type="button"
+      variant="secondary"
+      size="sm"
       onClick={() => void handleClick()}
-      disabled={opening}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md bg-surface-raised text-neutral-300 shadow-hairline hover:shadow-lift hover:bg-hover-overlay hover:text-neutral-100 transition-shadow duration-200 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+      loading={opening}
+      icon={<TerminalIcon className={ICON_SIZE.card} aria-hidden="true" />}
     >
-      <TerminalIcon className={`${ICON_SIZE.card} shrink-0`} aria-hidden="true" />
       <span>Im Terminal öffnen</span>
-    </button>
+    </Button>
   );
 }

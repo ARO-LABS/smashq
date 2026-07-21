@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ICONS } from "../../utils/icons";
 
 const CopyIcon = ICONS.action.copy;
@@ -14,11 +14,16 @@ const CheckIcon = ICONS.toast.success;
  *  reuse the exact same snippet UI (Issue #38). */
 export function CopyableCommand({ command }: { command: string }) {
   const [copied, setCopied] = useState(false);
+  const resetTimer = useRef<number | undefined>(undefined);
+  // Timer cleanup: an unmount before the 2s reset elapses must cancel the
+  // pending timeout, otherwise it fires setCopied on an unmounted component.
+  useEffect(() => () => window.clearTimeout(resetTimer.current), []);
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(command);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      window.clearTimeout(resetTimer.current);
+      resetTimer.current = window.setTimeout(() => setCopied(false), 2000);
     } catch {
       // leave UI unchanged
     }
