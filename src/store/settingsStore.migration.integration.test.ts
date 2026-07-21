@@ -263,9 +263,22 @@ describe("settingsStore — sessionAccents persistence", () => {
 describe("settingsStore — defaultPermissionMode persistence", () => {
   it("persistiert 'bypass' über einen rehydrate-Roundtrip", async () => {
     const store = useSettingsStore;
+    // Setter löst den Persist-Write mit "bypass" aus.
     store.getState().setDefaultPermissionMode("bypass");
     expect(store.getState().defaultPermissionMode).toBe("bypass");
+    // Blob JETZT einfangen: persist patcht auch api.setState (middleware
+    // schreibt bei jedem setState den partialized Live-State neu) — das
+    // Zurückdrehen unten würde den Blob sonst gleich mit überschreiben.
+    const blob = localStorage.getItem(PERSIST_KEY);
+    expect(blob).toBeTruthy();
+    // In-Memory-State zurückdrehen: merge() nutzt den LIVE-State als current —
+    // stünde "bypass" noch im Speicher, bliebe der Test auch dann grün, wenn
+    // der Blob das Feld nie enthielte (fehlende partialize-Zeile unsichtbar).
+    store.setState({ defaultPermissionMode: "default" });
+    localStorage.setItem(PERSIST_KEY, blob as string);
     await store.persist.rehydrate();
+    // Diskriminiert: nur wenn partialize das Feld in den Blob schreibt, gewinnt
+    // "bypass" hier gegen den zurückgedrehten Live-Wert "default".
     expect(store.getState().defaultPermissionMode).toBe("bypass");
   });
 
@@ -276,6 +289,40 @@ describe("settingsStore — defaultPermissionMode persistence", () => {
     store.setState({ defaultPermissionMode: "bypassPermissions" as never });
     await store.persist.rehydrate();
     expect(store.getState().defaultPermissionMode).toBe("default");
+  });
+});
+
+describe("settingsStore — autoUpdateEnabled persistence (Issue #21)", () => {
+  it("persistiert false über einen rehydrate-Roundtrip", async () => {
+    const store = useSettingsStore;
+    // Setter löst den Persist-Write mit false aus.
+    store.getState().setAutoUpdateEnabled(false);
+    expect(store.getState().autoUpdateEnabled).toBe(false);
+    // Blob JETZT einfangen: persist patcht auch api.setState (middleware
+    // schreibt bei jedem setState den partialized Live-State neu) — das
+    // Zurückdrehen unten würde den Blob sonst gleich mit überschreiben.
+    const blob = localStorage.getItem(PERSIST_KEY);
+    expect(blob).toBeTruthy();
+    // In-Memory-State zurückdrehen: merge() nutzt den LIVE-State als current —
+    // stünde false schon im Speicher, bliebe der Test auch ohne
+    // partialize-Zeile grün und würde die Regression nicht sehen.
+    store.setState({ autoUpdateEnabled: true });
+    localStorage.setItem(PERSIST_KEY, blob as string);
+    await store.persist.rehydrate();
+    // Diskriminiert: nur wenn partialize das Feld in den Blob schreibt, gewinnt
+    // false hier gegen den zurückgedrehten Live-Wert true. Fehlt die Zeile,
+    // bleibt true stehen und der Test schlägt fehl.
+    expect(store.getState().autoUpdateEnabled).toBe(false);
+  });
+
+  it("heilt einen korrupten persistierten Wert beim Rehydrate auf true (Update-Kanal offen)", async () => {
+    const store = useSettingsStore;
+    // setState umgeht den sanitisierenden Setter — simuliert einen manipulierten
+    // Persist-Blob bei GLEICHER Schema-Version (migrate feuert nicht, nur
+    // merge/onRehydrateStorage können heilen — Issue-#209-Klasse).
+    store.setState({ autoUpdateEnabled: "false" as never });
+    await store.persist.rehydrate();
+    expect(store.getState().autoUpdateEnabled).toBe(true);
   });
 });
 

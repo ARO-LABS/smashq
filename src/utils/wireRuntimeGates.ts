@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   useSettingsStore,
   sanitizePermissionMode,
+  sanitizeAutoUpdateEnabled,
   type AppPreferencesSettings,
   type SettingsState,
 } from "../store/settingsStore";
@@ -94,6 +95,12 @@ export function applySettingsSync(sync: SettingsSyncPartial): void {
   }
   if (typeof sync.defaultProjectPath === "string" && sync.defaultProjectPath !== state.defaultProjectPath) {
     patch.defaultProjectPath = sync.defaultProjectPath;
+  }
+  if (sync.autoUpdateEnabled !== undefined) {
+    // Trust-Boundary: Cross-Window-Payloads werden re-sanitisiert. Fail-safe
+    // ist true (Update-Kanal offen) — nur explizites false deaktiviert.
+    const enabled = sanitizeAutoUpdateEnabled(sync.autoUpdateEnabled);
+    if (enabled !== state.autoUpdateEnabled) patch.autoUpdateEnabled = enabled;
   }
   if (sync.notifications) {
     const next = { ...state.notifications, ...sync.notifications };

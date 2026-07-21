@@ -194,6 +194,20 @@ export function sanitizeTasksWindowSize(value: unknown): WindowSize {
 }
 
 /**
+ * Sanitize the persisted `autoUpdateEnabled` flag (automatischer Update-Check).
+ * Fail-safe ist TRUE — der Update-Kanal ist der einzige Pfad, über den Bugfixes
+ * die Bestandsbasis erreichen. Nur ein explizites boolesches `false` schaltet
+ * den automatischen Check ab; jeder unbekannte/korrupte Wert (String "false",
+ * null, fehlendes Feld) heilt zu `true`, damit kein User den Kanal still
+ * verliert. Geteilt zwischen Store-Default, migrate, merge und
+ * onRehydrateStorage (Issue-#209-Klasse) sowie dem Cross-Window-Empfänger
+ * (applySettingsSync — Trust-Boundary).
+ */
+export function sanitizeAutoUpdateEnabled(value: unknown): boolean {
+  return value !== false;
+}
+
+/**
  * Sanitize the persisted `lastSeenVersion` (whats-new gating). Any non-string
  * or empty value degrades to null — null means "fresh install": the whats-new
  * modal is skipped and only the stamp is written.
@@ -336,6 +350,13 @@ export interface SettingsState {
   notesWindowSize: WindowSize;
   /** Persisted size of the floating tasks window. */
   tasksWindowSize: WindowSize;
+  /**
+   * Automatischer Update-Check (Mount-Delay + Intervall in useAutoUpdate)
+   * aktiv? Default TRUE — Bestands-User dürfen den Update-Kanal nicht still
+   * verlieren. Gated NUR den automatischen Check; der manuelle Check über das
+   * v-Badge (SessionPanelDock.handleVersionClick) funktioniert immer.
+   */
+  autoUpdateEnabled: boolean;
 
   // Actions
   setTheme: (partial: Partial<ThemeSettings>) => void;
@@ -378,6 +399,7 @@ export interface SettingsState {
   setNotesWindowSize: (size: WindowSize) => void;
   setTasksWindowSize: (size: WindowSize) => void;
   setLastSeenVersion: (version: string) => void;
+  setAutoUpdateEnabled: (enabled: boolean) => void;
 
   addApiKeyMetadata: (entry: ApiKeyMetadataEntry) => void;
   removeApiKeyMetadata: (id: string) => void;
@@ -627,6 +649,7 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
     folderAccents: {} as Record<string, string>,
     notesWindowSize: DEFAULT_NOTES_WINDOW_SIZE,
     tasksWindowSize: DEFAULT_TASKS_WINDOW_SIZE,
+    autoUpdateEnabled: true,
   };
   if (!persisted || typeof persisted !== "object") return defaults as unknown as SettingsState;
   const p = persisted as Record<string, unknown>;
@@ -750,6 +773,9 @@ function _settingsMigrate(persisted: unknown, _fromVersion: number): SettingsSta
     folderAccents: remapAccentsRecord(p.folderAccents),
     notesWindowSize: sanitizeNotesWindowSize(p.notesWindowSize),
     tasksWindowSize: sanitizeTasksWindowSize(p.tasksWindowSize),
+    // v13→v14: Bestands-User haben das Feld nicht — sanitize heilt fehlende
+    // wie korrupte Werte auf true (Update-Kanal bleibt offen).
+    autoUpdateEnabled: sanitizeAutoUpdateEnabled(p.autoUpdateEnabled),
     // Upgrade-vs-Neuinstallation: migrate laeuft NUR, wenn bereits ein
     // persistierter Blob existiert — also nur fuer Bestands-User. Fehlt
     // lastSeenVersion hier (Upgrade von pre-v12), MUSS der Sentinel "0.0.0"
@@ -840,9 +866,20 @@ export const useSettingsStore = create<SettingsState>()(
       folderAccents: {},
       notesWindowSize: DEFAULT_NOTES_WINDOW_SIZE,
       tasksWindowSize: DEFAULT_TASKS_WINDOW_SIZE,
+      autoUpdateEnabled: true,
 
       setLastSeenVersion: (version) =>
         set({ lastSeenVersion: sanitizeLastSeenVersion(version) }),
+
+      setAutoUpdateEnabled: (enabled) => {
+        const sanitized = sanitizeAutoUpdateEnabled(enabled);
+        set({ autoUpdateEnabled: sanitized });
+        // Settings-View lebt IMMER im Sekundärfenster (DetachedViewApp) — deren
+        // Disk-Writes verwirft der tauriStorage-isMainWindow-Guard still. Der
+        // Broadcast ist der EINZIGE Persistenzpfad: das Hauptfenster wendet den
+        // Wert via applySettingsSync an und sein persist-Middleware schreibt ihn.
+        void broadcastPreferencesChange({ settingsSync: { autoUpdateEnabled: sanitized } });
+      },
 
       setNotesWindowSize: (size) =>
         set({ notesWindowSize: sanitizeNotesWindowSize(size) }),
@@ -1352,6 +1389,7 @@ export const useSettingsStore = create<SettingsState>()(
           defaultShell: "auto",
           defaultPermissionMode: "default",
           defaultProjectPath: "",
+          autoUpdateEnabled: true,
           // apiKeys, favorites, globalNotes, projectNotes, sessionRestore, sessionTitleOverrides, sessionAccents and folderAccents are intentionally NOT reset
           apiKeys: state.apiKeys,
           favorites: state.favorites,
@@ -1399,6 +1437,7 @@ export const useSettingsStore = create<SettingsState>()(
         notesWindowSize: state.notesWindowSize,
         tasksWindowSize: state.tasksWindowSize,
         lastSeenVersion: state.lastSeenVersion,
+        autoUpdateEnabled: state.autoUpdateEnabled,
       }),
       // v11: added theme.syncTerminalTheme (default false). The migrate merge
       // `{ ...defaults.theme, ...p.theme }` fills it for existing users. No
@@ -1417,7 +1456,11 @@ export const useSettingsStore = create<SettingsState>()(
       // Versions-Bump dazu: rein optionales Feld, validateSessionRestore läuft
       // versionsunabhängig in migrate UND onRehydrateStorage; alte Snapshots
       // lesen sich als undefined (→ Settings-Default), es ist nichts zu seeden.
-      version: 13,
+      // v14: added autoUpdateEnabled (automatischer Update-Check abschaltbar,
+      // Issue #21). Default TRUE — der Update-Kanal darf für Bestands-User
+      // nicht still zugehen. Migrate + merge + onRehydrateStorage sanitizen
+      // via sanitizeAutoUpdateEnabled (nur explizites false deaktiviert).
+      version: 14,
       migrate: (persisted: unknown, fromVersion: number) => _settingsMigrate(persisted, fromVersion),
       // SYNCHRONOUS heal of the rehydrated state. This runs DURING rehydration
       // and its return value feeds the very first render — unlike
@@ -1434,6 +1477,7 @@ export const useSettingsStore = create<SettingsState>()(
           favorites: validated.favorites,
           favoriteGroups: validated.favoriteGroups,
           defaultPermissionMode: sanitizePermissionMode(merged.defaultPermissionMode),
+          autoUpdateEnabled: sanitizeAutoUpdateEnabled(merged.autoUpdateEnabled),
         };
       },
       onRehydrateStorage: () => (state, error) => {
@@ -1495,6 +1539,14 @@ export const useSettingsStore = create<SettingsState>()(
             validatedSize.h !== state.notesWindowSize?.h
           ) {
             patches.notesWindowSize = validatedSize;
+          }
+
+          // Same-version-recovery für autoUpdateEnabled: ein korrupter Wert
+          // (String "false", null) heilt zu true — Update-Kanal bleibt offen
+          // (Issue-#209-Klasse; migrate feuert bei gleicher Version nicht).
+          const sanitizedAutoUpdate = sanitizeAutoUpdateEnabled(state.autoUpdateEnabled);
+          if (sanitizedAutoUpdate !== state.autoUpdateEnabled) {
+            patches.autoUpdateEnabled = sanitizedAutoUpdate;
           }
 
           // Same-version-recovery for tasksWindowSize: mirrors notesWindowSize pattern.

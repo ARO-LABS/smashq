@@ -33,6 +33,7 @@ export type SettingsSyncPartial = {
   defaultProjectPath?: string;
   notifications?: Partial<NotificationSettings>;
   sound?: Partial<SoundSettings>;
+  autoUpdateEnabled?: boolean;
 };
 
 /**

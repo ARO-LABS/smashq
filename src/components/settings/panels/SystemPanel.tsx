@@ -7,6 +7,7 @@ import { isMacOS, isWindows } from "../../../utils/platform";
 import { Button } from "../../ui/Button";
 import { CopyableCommand } from "../../shared/CopyableCommand";
 import { OpenInTerminalButton } from "../../shared/OpenInTerminalButton";
+import { useSettingsStore } from "../../../store/settingsStore";
 
 const CheckIcon = ICONS.toast.success; // CheckCircle2
 const CrossIcon = ICONS.git.checkFailed; // XCircle
@@ -243,6 +244,38 @@ export function SystemPanel() {
         </h4>
         <GhAuthSection auth={auth} checked={authChecked} />
       </section>
+
+      <UpdatesSection />
     </div>
+  );
+}
+
+/**
+ * Updates-Sektion: Toggle für den automatischen Update-Check (Issue #21).
+ * Gated NUR den automatischen Check in useAutoUpdate — der manuelle Check
+ * über das v-Badge in der Session-Leiste funktioniert unabhängig davon.
+ */
+function UpdatesSection() {
+  const autoUpdateEnabled = useSettingsStore((s) => s.autoUpdateEnabled ?? true);
+  const setAutoUpdateEnabled = useSettingsStore((s) => s.setAutoUpdateEnabled);
+
+  return (
+    <section className="rounded-md shadow-hairline p-4 flex flex-col gap-4 bg-surface-base">
+      <h4 className="text-xs font-semibold text-neutral-300 uppercase tracking-wide">
+        Updates
+      </h4>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={autoUpdateEnabled}
+          onChange={(e) => setAutoUpdateEnabled(e.target.checked)}
+        />
+        <span className="text-neutral-200">Automatisch nach Updates suchen</span>
+      </label>
+      <p className="text-xs text-neutral-500">
+        Die manuelle Suche über das Versions-Badge in der Session-Leiste bleibt
+        jederzeit möglich.
+      </p>
+    </section>
   );
 }

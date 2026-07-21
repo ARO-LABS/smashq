@@ -7,14 +7,21 @@
  * platform fix command when a tool is absent.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { SystemPanel } from "./SystemPanel";
 import { claudeInstallHint } from "../../../utils/adpError";
 import { installRealIPC, clearTauriIPC, type IPCHandler } from "../../../test/mockTauriIPC";
+import { useSettingsStore } from "../../../store/settingsStore";
 
 afterEach(() => {
   clearTauriIPC();
+  // act: dieser afterEach läuft VOR dem RTL-Auto-Cleanup (LIFO), das Panel
+  // ist also noch gemountet — ein nackter setState würde als act-Warning
+  // auffallen.
+  act(() => {
+    useSettingsStore.setState({ autoUpdateEnabled: true });
+  });
 });
 
 describe("SystemPanel — Layer-B", () => {
@@ -186,6 +193,37 @@ describe("SystemPanel — Layer-B", () => {
     });
     // Prerequisite section must survive the failed auth probe.
     expect(screen.getByText("/usr/local/bin/claude")).toBeTruthy();
+  });
+
+  // ── AutoUpdate-Toggle (Issue #21) ───────────────────────────────────
+
+  it("rendert den AutoUpdate-Toggle (Default an) und schreibt einen Klick in den Store", async () => {
+    installRealIPC({ check_prerequisites: async () => ({
+      claude: { found: true, path: "/usr/local/bin/claude" },
+      git: { found: true, path: "/usr/bin/git" },
+      gh: { found: true, path: "/usr/bin/gh" },
+      shell: { found: true, path: "/bin/zsh" },
+      shellName: "zsh",
+    }) });
+
+    render(<SystemPanel />);
+
+    const toggle = screen.getByLabelText(
+      "Automatisch nach Updates suchen",
+    ) as HTMLInputElement;
+    // Default AN — Bestands-User verlieren den Update-Kanal nicht still.
+    expect(toggle.checked).toBe(true);
+    // Hinweis auf den weiterhin möglichen manuellen Check ist sichtbar.
+    expect(
+      screen.getByText(/manuelle Suche über das Versions-Badge/i),
+    ).toBeTruthy();
+
+    fireEvent.click(toggle);
+
+    await waitFor(() => {
+      expect(useSettingsStore.getState().autoUpdateEnabled).toBe(false);
+    });
+    expect(toggle.checked).toBe(false);
   });
 
   // macOS branch of `claudeInstallHint()` has no coverage otherwise: jsdom's UA

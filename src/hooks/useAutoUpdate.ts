@@ -2,6 +2,7 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useSettingsStore } from "../store/settingsStore";
 
 const isTauri = "__TAURI_INTERNALS__" in window;
 
@@ -172,9 +173,22 @@ export function useAutoUpdate(): UseAutoUpdateReturn {
     setUpdate(null);
   }, [state.newVersion, safeSetState]);
 
+  // Settings-Gate NUR für den automatischen Check (Mount-Delay + Intervall).
+  // Der manuelle Pfad (checkForUpdate via v-Badge, handleVersionClick) bleibt
+  // bewusst ungegated — der Update-Kanal muss per Nutzer-Aktion immer
+  // erreichbar sein. `?? true` als Null-Safety: fail-safe ist "Kanal offen".
+  const autoUpdateEnabled = useSettingsStore((s) => s.autoUpdateEnabled ?? true);
+
   useEffect(() => {
     isMountedRef.current = true;
-    if (!isTauri) return;
+    if (!isTauri || !autoUpdateEnabled) {
+      // Kein Timer geplant — aber isMountedRef beim Unmount trotzdem
+      // zurücksetzen, damit späte Promise-Auflösungen eines manuellen Checks
+      // nicht in einen unmounted Hook setState-en.
+      return () => {
+        isMountedRef.current = false;
+      };
+    }
 
     const initialTimeout = setTimeout(() => {
       checkFnRef.current?.();
@@ -189,7 +203,7 @@ export function useAutoUpdate(): UseAutoUpdateReturn {
       clearTimeout(initialTimeout);
       clearInterval(interval);
     };
-  }, []);
+  }, [autoUpdateEnabled]);
 
   return {
     ...state,

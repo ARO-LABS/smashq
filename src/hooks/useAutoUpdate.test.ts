@@ -20,6 +20,14 @@ vi.mock("@tauri-apps/api/app", () => ({
   getVersion: (...args: unknown[]) => mockGetVersion(...args),
 }));
 
+// Der Hook liest jetzt settingsStore.autoUpdateEnabled; der Store zieht bei
+// gesetztem __TAURI_INTERNALS__ (Gating-Tests unten) über tauriStorage invoke
+// aus @tauri-apps/api/core nach — hier gemockt, damit kein echter IPC-Versuch
+// gegen das leere Internals-Objekt läuft.
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn(() => Promise.resolve("")),
+}));
+
 // Ensure isTauri is false in test env (no __TAURI_INTERNALS__)
 // so auto-check timers don't fire. We test manual calls instead.
 
@@ -245,5 +253,137 @@ describe("useAutoUpdate", () => {
       newVersion: null,
       lastChecked: null,
     });
+  });
+});
+
+// ── autoUpdateEnabled-Gate (Issue #21) ────────────────────────────────
+//
+// Das Setting gated NUR den automatischen Check (Mount-Delay + Intervall).
+// Der manuelle Pfad (checkForUpdate, v-Badge) muss IMMER funktionieren —
+// er ist der einzige verbleibende Weg zum Update-Kanal, wenn der Toggle
+// aus ist. Tauri-Modus via __TAURI_INTERNALS__ + resetModules (isTauri ist
+// eine Modul-Konstante), Muster wie im confirmRelaunch-Fehlerfall-Test oben.
+
+describe("useAutoUpdate — autoUpdateEnabled-Gate (in Tauri)", () => {
+  async function setupTauri(autoUpdateEnabled: boolean) {
+    (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
+    vi.resetModules();
+    // Frische Module-Registry: Store und Hook MÜSSEN aus demselben frischen
+    // Graph kommen, sonst liest der Hook einen anderen Store als der Test setzt.
+    const { useSettingsStore } = await import("../store/settingsStore");
+    useSettingsStore.setState({ autoUpdateEnabled });
+    const { useAutoUpdate: freshUseAutoUpdate } = await import("./useAutoUpdate");
+    return freshUseAutoUpdate;
+  }
+
+  function teardownTauri() {
+    delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
+    vi.resetModules();
+  }
+
+  it("Toggle aus → weder Initial-Delay noch Intervall lösen einen Check aus", async () => {
+    const freshUseAutoUpdate = await setupTauri(false);
+    vi.useFakeTimers();
+    try {
+      renderHook(() => freshUseAutoUpdate());
+      // 31 Minuten decken Initial-Delay (15s) UND das 30-Minuten-Intervall ab.
+      // Ohne Gating hätte check() hier mehrfach gefeuert — der Test schlägt
+      // unter der verhinderten Regression also sicher fehl.
+      await act(async () => {
+        vi.advanceTimersByTime(31 * 60 * 1000);
+      });
+      expect(mockCheck).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      teardownTauri();
+    }
+  });
+
+  it("Toggle an (Default) → Initial-Check feuert nach dem Mount-Delay wie bisher", async () => {
+    const freshUseAutoUpdate = await setupTauri(true);
+    mockCheck.mockResolvedValue(null);
+    vi.useFakeTimers();
+    try {
+      renderHook(() => freshUseAutoUpdate());
+      expect(mockCheck).not.toHaveBeenCalled();
+      await act(async () => {
+        vi.advanceTimersByTime(15_000);
+      });
+      expect(mockCheck).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      teardownTauri();
+    }
+  });
+
+  it("Übergang an→aus räumt die Timer ab — kein Auto-Check mehr nach dem Umschalten", async () => {
+    const freshUseAutoUpdate = await setupTauri(true);
+    // Gleiche frische Module-Registry wie im Hook (resetModules lief in
+    // setupTauri): dieser Import liefert DENSELBEN Store, den der Hook liest.
+    const { useSettingsStore } = await import("../store/settingsStore");
+    mockCheck.mockResolvedValue(null);
+    vi.useFakeTimers();
+    try {
+      renderHook(() => freshUseAutoUpdate());
+      // Armiert: Initial-Check feuert nach dem Mount-Delay.
+      await act(async () => {
+        vi.advanceTimersByTime(15_000);
+      });
+      expect(mockCheck).toHaveBeenCalledTimes(1);
+      // Live umschalten → Effekt-Cleanup muss Timeout UND Intervall abräumen.
+      act(() => {
+        useSettingsStore.setState({ autoUpdateEnabled: false });
+      });
+      // 31 weitere Minuten decken das 30-Minuten-Intervall ab — ohne Cleanup
+      // hätte check() hier erneut gefeuert.
+      await act(async () => {
+        vi.advanceTimersByTime(31 * 60 * 1000);
+      });
+      expect(mockCheck).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      teardownTauri();
+    }
+  });
+
+  it("Übergang aus→an armiert neu — Check feuert nach dem Mount-Delay", async () => {
+    const freshUseAutoUpdate = await setupTauri(false);
+    const { useSettingsStore } = await import("../store/settingsStore");
+    mockCheck.mockResolvedValue(null);
+    vi.useFakeTimers();
+    try {
+      renderHook(() => freshUseAutoUpdate());
+      // Deaktiviert: auch nach 31 Minuten kein automatischer Check.
+      await act(async () => {
+        vi.advanceTimersByTime(31 * 60 * 1000);
+      });
+      expect(mockCheck).not.toHaveBeenCalled();
+      // Live einschalten → Effekt re-armiert Initial-Delay + Intervall.
+      act(() => {
+        useSettingsStore.setState({ autoUpdateEnabled: true });
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(15_000);
+      });
+      expect(mockCheck).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      teardownTauri();
+    }
+  });
+
+  it("Toggle aus → manueller Check (v-Badge-Pfad) ruft check() trotzdem auf", async () => {
+    const freshUseAutoUpdate = await setupTauri(false);
+    mockCheck.mockResolvedValue(null);
+    try {
+      const { result } = renderHook(() => freshUseAutoUpdate());
+      await act(async () => {
+        await result.current.checkForUpdate();
+      });
+      expect(mockCheck).toHaveBeenCalledTimes(1);
+      expect(result.current.lastChecked).not.toBeNull();
+    } finally {
+      teardownTauri();
+    }
   });
 });
