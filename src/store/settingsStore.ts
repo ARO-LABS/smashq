@@ -1457,7 +1457,7 @@ export const useSettingsStore = create<SettingsState>()(
       // versionsunabhängig in migrate UND onRehydrateStorage; alte Snapshots
       // lesen sich als undefined (→ Settings-Default), es ist nichts zu seeden.
       // v14: added autoUpdateEnabled (automatischer Update-Check abschaltbar,
-      // Issue #21). Default TRUE — der Update-Kanal darf fuer Bestands-User
+      // Issue #21). Default TRUE — der Update-Kanal darf für Bestands-User
       // nicht still zugehen. Migrate + merge + onRehydrateStorage sanitizen
       // via sanitizeAutoUpdateEnabled (nur explizites false deaktiviert).
       version: 14,

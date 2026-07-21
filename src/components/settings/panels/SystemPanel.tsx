@@ -260,7 +260,7 @@ function UpdatesSection() {
   const setAutoUpdateEnabled = useSettingsStore((s) => s.setAutoUpdateEnabled);
 
   return (
-    <section className="rounded-md shadow-hairline p-4 flex flex-col gap-3 bg-surface-base">
+    <section className="rounded-md shadow-hairline p-4 flex flex-col gap-4 bg-surface-base">
       <h4 className="text-xs font-semibold text-neutral-300 uppercase tracking-wide">
         Updates
       </h4>
