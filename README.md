@@ -74,6 +74,88 @@ one step. Relative paths resolve against the session's working directory;
 absolute paths are used as-is. If the editor has unsaved changes, the open is
 skipped (you are notified) so your edits are never clobbered.
 
+## Betrieb hinter Corporate Proxy
+
+Smashq hat drei netzwerkrelevante Komponenten mit jeweils eigenem Proxy-Mechanismus.
+Kurzfassung: **Alle drei Pfade folgen den Standard-Umgebungsvariablen
+`HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`** (der Auto-Updater versteht zusätzlich
+`ALL_PROXY`). Die Proxy-Einstellungen des Betriebssystems (Windows
+„Internetoptionen", PAC-Skripte) wertet dagegen **keine** der drei Komponenten
+aus — nur externe Links und Fonts nutzen den System-Proxy (siehe Schnellreferenz).
+
+> **Ungetestet:** Die reale Verifikation hinter einem Corporate Proxy steht aus
+> ([#25](https://github.com/ARO-LABS/smashq/issues/25)). Die folgenden Aussagen
+> sind aus Quellcode und Crate-Doku belegt, aber noch nicht gegen eine echte
+> Proxy-Infrastruktur (inkl. TLS-Interception und Proxy-Auth) geprüft.
+
+### 1. Auto-Updater (`tauri-plugin-updater`)
+
+- **HTTP-Client:** `reqwest` mit rustls; Update-Endpoint ist `github.com`.
+- **Proxy-Quelle:** reqwest liest `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY`/`NO_PROXY`
+  (Groß- wie Kleinschreibung) immer aus der Prozess-Umgebung. Smashq setzt weder
+  einen expliziten Proxy noch deaktiviert es diesen Mechanismus — die
+  Env-Variablen greifen ungefiltert.
+- **Bekannte Lücke — OS-Proxy:** Das reqwest-Feature `system-proxy` (liest
+  Windows-Registry bzw. macOS-Systemkonfiguration) ist im Updater-Plugin
+  **deaktiviert**. Ein nur in den Windows-Internetoptionen oder per PAC-Skript
+  konfigurierter Proxy wird vom Updater **nicht** übernommen — die Env-Variablen
+  müssen gesetzt sein.
+- **TLS-Interception:** Zertifikate prüft rustls über den **OS-Zertifikatsspeicher**
+  (`rustls-platform-verifier`). Eine im Windows-/macOS-Zertifikatsspeicher
+  installierte Corporate-CA (SSL-Inspection) wird damit akzeptiert.
+- **Proxy-Auth:** Basic-Auth über die Proxy-URL (`http://user:pass@proxy:port`) wird
+  von reqwest unterstützt; NTLM/Kerberos/Negotiate **nicht** — reqwest bietet
+  dafür keinen Mechanismus. Hinter reinen NTLM-Proxys hilft nur ein lokaler
+  Auth-Relay (z. B. Px/Cntlm).
+
+### 2. GitHub-Integration (`gh` CLI — Kanban, Issues, PRs)
+
+- **Spawn-Pfad:** `gh` (und `git`) laufen als normale Kindprozesse und erben die
+  komplette Prozess-Umgebung von Smashq (kein `env_clear` in den Spawn-Pfaden),
+  inklusive aller Proxy-Variablen.
+- **Proxy-Quelle:** `gh` respektiert `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY` über die
+  Go-Standardbibliothek (`net/http`); eine eigene Proxy-Konfiguration hat `gh`
+  nicht. Sind die Variablen für den Smashq-Prozess sichtbar, gelten sie auch
+  für alle Kanban-/Issue-Aufrufe.
+
+### 3. Claude CLI in PTY-Sessions
+
+- **Env-Vererbung:** `portable-pty` seedet die Umgebung jedes PTY-Kindes aus der
+  vollen Prozess-Umgebung; unter Windows werden zusätzlich die
+  Environment-Zweige der Registry eingemischt — das sind die Benutzer- bzw.
+  System-Umgebungsvariablen (Systemsteuerung), **nicht** die
+  WinINET-Proxy-Einstellungen der Internetoptionen. Proxy-Variablen erreichen
+  die Claude CLI also auf beiden Wegen.
+- **macOS-Besonderheit:** Die PTY-Shell startet als **Login-Shell** und sourced
+  dabei `.zprofile`/`.zshrc` — dort gesetzte Proxy-Variablen wirken in der
+  Session, selbst wenn der App-Prozess (Finder-/Dock-Start) sie nicht hat.
+- **Bekannte Lücke — macOS-GUI-Start:** Beim App-Start wird aus der Login-Shell
+  **nur `PATH`** übernommen (`hydrate_path_from_login_shell`), keine
+  Proxy-Variablen. Ein aus Finder/Dock gestartetes Smashq sieht Proxy-Variablen
+  aus Shell-Profilen daher **nicht** — Updater und `gh` laufen dann proxylos,
+  obwohl die PTY-Sessions (via Login-Shell) den Proxy nutzen. Abhilfe:
+  `launchctl setenv HTTPS_PROXY …` oder App-Start aus dem Terminal.
+  Unter Windows gilt das nicht: Benutzer-Umgebungsvariablen (Systemsteuerung)
+  erreichen auch GUI-Prozesse.
+
+### 4. Sonstige Netzpfade
+
+- **Externe Links** (Kanban-Karten, „Über"-Panel, Whats-New-Modal) öffnen über
+  `shell.open()` im Default-Browser — es gilt dessen eigene Proxy-Konfiguration.
+- **Google Fonts** lädt die WebView (WebView2/WKWebView) mit dem
+  **System-Proxy des OS**. Schlägt das fehl, greifen die Fallback-Fonts —
+  die App bleibt voll funktionsfähig.
+- Direkte `fetch()`-Aufrufe ins Netz gibt es im Frontend aktuell nicht.
+
+### Schnellreferenz
+
+| Komponente | Mechanismus | Env-Variablen | OS-Proxy (Internetoptionen/PAC) |
+|---|---|---|---|
+| Auto-Updater | reqwest (rustls, Platform-Verifier) | `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`, `NO_PROXY` | nein |
+| `gh` / `git` | Env-Vererbung an Kindprozess, Go `net/http` | `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY` | nein |
+| Claude CLI (PTY) | Env-Vererbung + Login-Shell-Profile (macOS) | wie von Claude CLI unterstützt (`HTTPS_PROXY` u. a.) | nein |
+| Externe Links / Fonts | Default-Browser bzw. WebView | — | ja (Browser/WebView) |
+
 ## Documentation
 
 | Document | Description |
