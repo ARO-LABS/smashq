@@ -1144,6 +1144,19 @@ pub(crate) fn which_executable(name: &str) -> Option<std::path::PathBuf> {
 mod tests {
     use super::*;
 
+    /// Production half of this file: everything before the first `#[cfg(test)]`.
+    ///
+    /// The source-pin tests below search this text for load-bearing production
+    /// lines. Restricting the search to the production half is essential: the
+    /// assertions themselves contain the searched-for literals, so scanning
+    /// the whole file could never fail (tautology).
+    fn production_source() -> &'static str {
+        include_str!("manager.rs")
+            .split("#[cfg(test)]")
+            .next()
+            .expect("split yields at least one element")
+    }
+
     fn status(s: &str) -> String {
         SessionManager::detect_status(s)
     }
@@ -1304,10 +1317,7 @@ mod tests {
 
     #[test]
     fn claude_flicker_env_is_set_in_spawn_path() {
-        let src = include_str!("manager.rs");
-        // Examine only the production portion — this test module itself mentions
-        // the literals below, so the whole-file view would be tautological.
-        let prod = src.split("#[cfg(test)]").next().unwrap_or(src);
+        let prod = production_source();
         assert!(
             prod.contains("CLAUDE_CODE_NO_FLICKER"),
             "CLAUDE_CODE_NO_FLICKER env var setting removed from manager.rs — \
@@ -1358,10 +1368,7 @@ mod tests {
         // inside the create_session spawn path (real AppHandle + PTY, not
         // unit-testable in isolation), so we pin the source text. Removing the
         // loop that applies terminal_env would silently bring back issue #8.
-        let src = include_str!("manager.rs");
-        // Examine only the production portion — this test module itself mentions
-        // the literal below, so the whole-file view would be tautological.
-        let prod = src.split("#[cfg(test)]").next().unwrap_or(src);
+        let prod = production_source();
         assert!(
             prod.contains("terminal_env(platform)"),
             "terminal_env(platform) must be applied to the CommandBuilder before \
@@ -1758,10 +1765,7 @@ mod tests {
         // The guard call lives in the real create_session spawn path (needs a
         // PTY + AppHandle, not unit-testable in isolation), so we pin the
         // source text — like the CLAUDE_CODE_NO_FLICKER / terminal_env guards.
-        let src = include_str!("manager.rs");
-        // Examine only the production portion — this test module itself mentions
-        // the literal in the assert below, so the whole-file view is tautological.
-        let prod = src.split("#[cfg(test)]").next().unwrap_or(src);
+        let prod = production_source();
         assert!(
             prod.contains("ensure_claude_available(|exe| which_executable(exe).is_some())?"),
             "create_session must guard on claude presence before spawning the PTY"
@@ -2084,10 +2088,7 @@ mod tests {
     // on Windows.
     #[test]
     fn close_session_invokes_killer() {
-        let src = include_str!("manager.rs");
-        // Examine only the production portion — this test module itself mentions
-        // the literals below, so the whole-file view would be tautological.
-        let prod = src.split("#[cfg(test)]").next().unwrap_or(src);
+        let prod = production_source();
         assert!(
             prod.contains("removed.killer.kill()"),
             "close_session must explicitly kill the child via the stored killer \
@@ -2103,14 +2104,14 @@ mod tests {
     // --- Finding 2: watcher cancellation flag ---
     #[test]
     fn close_session_cancels_watcher() {
-        let src = include_str!("manager.rs");
+        let prod = production_source();
         assert!(
-            src.contains("removed.watcher_cancelled.store(true, Ordering::SeqCst)"),
+            prod.contains("removed.watcher_cancelled.store(true, Ordering::SeqCst)"),
             "close_session must set the watcher cancel flag so the claude-id \
              watcher exits early instead of emitting for a dead session"
         );
         assert!(
-            src.contains("if cancel.load(Ordering::SeqCst)"),
+            prod.contains("if cancel.load(Ordering::SeqCst)"),
             "run_id_watcher must poll the cancel flag each iteration"
         );
     }
@@ -2118,11 +2119,9 @@ mod tests {
     // --- Finding 3: single mutex-poison helper ---
     #[test]
     fn all_session_access_routes_through_lock_helper() {
-        let src = include_str!("manager.rs");
+        let prod = production_source();
         // Only the helper itself may call .sessions.lock(); every other accessor
-        // must go through lock_sessions(). Examine only the production portion —
-        // this test module itself mentions the literal in comments/asserts.
-        let prod = src.split("#[cfg(test)]").next().unwrap_or(src);
+        // must go through lock_sessions().
         let direct_locks = prod.matches(".sessions.lock()").count();
         assert_eq!(
             direct_locks, 1,
