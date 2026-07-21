@@ -320,6 +320,9 @@ pub fn run() {
             github::commands::commands::get_issue_detail,
             github::commands::commands::get_issue_checks,
             github::commands::commands::post_issue_comment,
+            // gh-Auth-Fixes (Issue #38): Terminal-Öffner + Auth/Scope-Preflight
+            github::auth::commands::open_system_terminal,
+            github::auth::commands::check_gh_auth_status,
             // Projects v2 Kanban
             github::project::commands::list_user_projects,
             github::project::commands::list_project_owners,

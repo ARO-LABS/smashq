@@ -9,6 +9,8 @@ import {
 import { wrapInvoke } from "../../utils/perfLogger";
 import { KanbanCard, type KanbanIssue } from "./KanbanCard";
 import { KanbanDetailModal } from "./KanbanDetailModal";
+import { CopyableCommand } from "../shared/CopyableCommand";
+import { OpenInTerminalButton } from "../shared/OpenInTerminalButton";
 import { useProjectStore } from "../../store/projectStore";
 import { logError } from "../../utils/errorLogger";
 
@@ -17,46 +19,6 @@ const Columns3 = ICONS.nav.kanban;
 const AlertCircle = ICONS.update.error;
 const ChevronDown = ICONS.action.collapse;
 const X = ICONS.action.close;
-const CopyIcon = ICONS.action.copy;
-const CheckIcon = ICONS.toast.success;
-
-/** Copyable fix command for classified errors. `gh auth` commands are
- *  interactive (OAuth device flow), so the app cannot run them itself —
- *  the best it can offer is a one-click copy for the user's own terminal.
- *  Copy feedback follows the AboutPanel contract: optimistic check icon,
- *  silent failure. */
-function CopyableCommand({ command }: { command: string }) {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(command);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // leave UI unchanged
-    }
-  };
-  return (
-    <div className="flex items-center gap-2 rounded-md bg-surface-raised shadow-hairline px-3 py-1.5 max-w-full">
-      <code className="text-xs font-mono text-neutral-300 truncate" title={command}>
-        {command}
-      </code>
-      <button
-        type="button"
-        onClick={() => void handleCopy()}
-        aria-label="Befehl kopieren"
-        title="Befehl kopieren"
-        className="shrink-0 text-neutral-500 hover:text-neutral-200 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded-sm"
-      >
-        {copied ? (
-          <CheckIcon className="w-3.5 h-3.5 text-success" aria-hidden="true" />
-        ) : (
-          <CopyIcon className="w-3.5 h-3.5" aria-hidden="true" />
-        )}
-      </button>
-    </div>
-  );
-}
 
 // ── Types from backend ────────────────────────────────────────────────
 
@@ -610,8 +572,11 @@ export function KanbanBoard() {
           <span className="block text-neutral-400">{pickerError.title}</span>
           <span className="block text-neutral-600 mt-1">{pickerError.hint}</span>
           {pickerError.command ? (
-            <div className="flex justify-center mt-2">
+            <div className="flex flex-col items-center gap-2 mt-2">
               <CopyableCommand command={pickerError.command} />
+              {pickerError.terminalCommandId ? (
+                <OpenInTerminalButton commandId={pickerError.terminalCommandId} />
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -660,6 +625,9 @@ export function KanbanBoard() {
           {errorInfo.hint}
         </span>
         {errorInfo.command ? <CopyableCommand command={errorInfo.command} /> : null}
+        {errorInfo.terminalCommandId ? (
+          <OpenInTerminalButton commandId={errorInfo.terminalCommandId} />
+        ) : null}
         <button
           onClick={() => {
             const controller = new AbortController();

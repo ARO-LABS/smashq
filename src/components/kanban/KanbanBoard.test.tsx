@@ -353,6 +353,79 @@ describe("KanbanBoard — Projects v2", () => {
     expect(screen.queryByLabelText("Befehl kopieren")).toBeNull();
   });
 
+  it("offers »Im Terminal öffnen« for a scope error and launches it via the allowlist id", async () => {
+    // Issue #38: gh auth refresh is interactive (device flow), so the card
+    // offers a system-terminal launch. Security contract: the frontend must
+    // send ONLY the closed discriminator — never the command string.
+    setupStore();
+    mockInvoke.mockRejectedValueOnce({
+      code: "SERVICE_AUTH_FAILED",
+      message: "required scopes: read:project",
+      details: "scope",
+      retryable: false,
+    });
+
+    render(<Board folder="/test/scope-terminal" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("GitHub-Scope fehlt")).toBeTruthy();
+    });
+
+    mockInvoke.mockResolvedValueOnce(undefined); // open_system_terminal
+    fireEvent.click(screen.getByText("Im Terminal öffnen"));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("open_system_terminal", {
+        commandId: "gh_refresh_project_scope",
+      });
+    });
+    // Discriminating anchor: the raw command string must NOT cross the IPC
+    // boundary (that would reopen the shell-injection surface).
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "open_system_terminal",
+      expect.objectContaining({ command: expect.anything() })
+    );
+  });
+
+  it("uses the gh_login id for a not-logged-in error", async () => {
+    setupStore();
+    mockInvoke.mockRejectedValueOnce({
+      code: "SERVICE_AUTH_FAILED",
+      message: "To get started with GitHub CLI, please run: gh auth login",
+      details: "auth",
+      retryable: false,
+    });
+
+    render(<Board folder="/test/auth-terminal" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Nicht bei GitHub angemeldet")).toBeTruthy();
+    });
+
+    mockInvoke.mockResolvedValueOnce(undefined);
+    fireEvent.click(screen.getByText("Im Terminal öffnen"));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("open_system_terminal", {
+        commandId: "gh_login",
+      });
+    });
+  });
+
+  it("shows NO terminal button for errors without a fix command", async () => {
+    // Edge guard: a network error has no terminal remedy — the button must
+    // not render (it would invoke with an undefined id).
+    setupStore();
+    mockInvoke.mockRejectedValueOnce(new Error("Network error"));
+
+    render(<Board folder="/test/error-no-terminal" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Fehler beim Laden des Boards")).toBeTruthy();
+    });
+    expect(screen.queryByText("Im Terminal öffnen")).toBeNull();
+  });
+
   it("does NOT show a scope hint for a not_found board (the original misclassification bug)", async () => {
     // Regression guard: a deleted board's NOT_FOUND message contains 'project'
     // but must never surface as the scope hint.
