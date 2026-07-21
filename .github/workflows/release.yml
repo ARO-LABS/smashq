@@ -20,6 +20,15 @@ jobs:
     timeout-minutes: 40
     outputs:
       release_id: ${{ steps.tauri.outputs.releaseId }}
+    env:
+      # Secret-Präsenz-Guard für Windows Code Signing (Issue #22): secrets.*
+      # ist in step-level `if:` nicht direkt nutzbar, deshalb dieser
+      # Zwischenschritt auf Job-Ebene. Der Guard prüft BEIDE Secrets: Fehlt nur
+      # das Passwort, würde `ConvertTo-SecureString -String ""` im Step mit
+      # einem Binding-Fehler abbrechen → build-windows failt → wegen `needs:`
+      # kein Release. Solange nicht beide gesetzt sind, ist der Wert "false"
+      # und der Signing-Step unten wird übersprungen (exaktes No-op).
+      HAS_WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE != '' && secrets.WINDOWS_CERTIFICATE_PASSWORD != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -41,6 +50,75 @@ jobs:
           # dann die kompilierten Deps statt ~10min neu zu bauen (v1.0.23:
           # zwei Notarize-Haenger, jeder Retry kompilierte von Null).
           cache-on-failure: true
+
+      # -----------------------------------------------------------------------
+      # Windows Code Signing (Authenticode) — VORBEREITUNG (Issue #22).
+      # Aktuell existiert noch KEIN Zertifikat: solange die Secrets fehlen,
+      # wird dieser Step übersprungen und der Workflow verhält sich exakt wie
+      # bisher. Sobald ein Zertifikat vorliegt, hinterlegt der Maintainer im
+      # Repo zwei Secrets:
+      #
+      #   WINDOWS_CERTIFICATE          — Code-Signing-Zertifikat inkl. Private
+      #                                  Key als Base64-kodierte .pfx-Datei
+      #                                  (erzeugen z.B. mit
+      #                                  `base64 -w0 zertifikat.pfx`).
+      #   WINDOWS_CERTIFICATE_PASSWORD — Passwort der .pfx-Datei.
+      #
+      # Der Step importiert die .pfx in den User-Zertifikatsspeicher des
+      # Runners und schreibt certificateThumbprint / digestAlgorithm /
+      # timestampUrl in eine NEUE Overlay-Datei src-tauri/tauri.windows.conf.json
+      # (existiert nur im CI-Workspace, nie im Repo). Tauri v2 merged diese
+      # Datei automatisch per JSON Merge Patch (RFC 7396) über die Haupt-Config:
+      # Objekte werden rekursiv gemerged, d.h. der bestehende
+      # bundle.windows.nsis-Block bleibt erhalten, nur die deklarierten Keys
+      # kommen hinzu. Vorteil gegenüber einem In-Place-Patch: die eingecheckte
+      # tauri.conf.json (trägt plugins.updater.pubkey) bleibt byte-identisch,
+      # und der Step braucht kein node. `tauri build` signiert damit .exe und
+      # NSIS-Installer via signtool, BEVOR die Updater-Artefakte entstehen —
+      # die Minisign-Signatur (TAURI_SIGNING_PRIVATE_KEY) und latest.json
+      # bleiben unberührt und gültig.
+      # Achtung: timestampUrl ist eine harte, retry-lose Netzabhängigkeit —
+      # ein transienter Ausfall von timestamp.digicert.com bricht den
+      # Release-Lauf ab (bewusst akzeptiert; Recovery = Re-Run des Tags).
+      # Referenzen: https://v2.tauri.app/distribute/sign/windows/
+      #             https://v2.tauri.app/develop/configuration-files/
+      - name: Import Windows code signing certificate (optional)
+        if: env.HAS_WINDOWS_CERTIFICATE == 'true'
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: pwsh
+        run: |
+          $pfxPath = Join-Path $env:RUNNER_TEMP "codesign.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $password = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+          # Eine .pfx kann eine ganze Zertifikatskette enthalten — Import-PfxCertificate
+          # liefert dann MEHRERE Zertifikate und .Thumbprint wäre ein Array (ungültiger
+          # Wert für certificateThumbprint, signtool schlägt fehl). Deshalb: auf
+          # Code-Signing-EKU (OID 1.3.6.1.5.5.7.3.3), Private Key und Gültigkeit
+          # filtern; bei mehreren Treffern gewinnt das mit dem spätesten NotAfter.
+          $certs = @(Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $password)
+          $cert = $certs |
+            Where-Object { $_.HasPrivateKey -and $_.NotAfter -gt (Get-Date) -and ($_.Extensions.EnhancedKeyUsages.Value -contains '1.3.6.1.5.5.7.3.3') } |
+            Sort-Object NotAfter -Descending |
+            Select-Object -First 1
+          if (-not $cert) { throw "Kein gültiges Code-Signing-Zertifikat (EKU 1.3.6.1.5.5.7.3.3, Private Key, nicht abgelaufen) in der .pfx gefunden." }
+          Remove-Item $pfxPath
+          $overlay = [ordered]@{
+            bundle = [ordered]@{
+              windows = [ordered]@{
+                certificateThumbprint = $cert.Thumbprint
+                digestAlgorithm       = "sha256"
+                timestampUrl          = "http://timestamp.digicert.com"
+              }
+            }
+          }
+          $overlayPath = Join-Path $env:GITHUB_WORKSPACE "src-tauri/tauri.windows.conf.json"
+          # UTF-8 OHNE BOM schreiben: serde_json (Tauri-CLI) lehnt eine BOM ab,
+          # und Out-File/Set-Content -Encoding utf8 schreibt je nach PS-Edition
+          # eine — deshalb explizit über WriteAllText.
+          [IO.File]::WriteAllText($overlayPath, ($overlay | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
+          Write-Host "Zertifikat importiert (Thumbprint: $($cert.Thumbprint)), Overlay tauri.windows.conf.json für signtool geschrieben."
 
       - name: Build Windows app and create release
         id: tauri
