@@ -43,6 +43,9 @@ export function dedupRestorableSessions(
       claudeSessionId: s.claudeSessionId,
       // Time anchor for the restore-side scan fallback (see RestorableSession).
       createdAt: s.createdAt,
+      // Restart-Treue über App-Neustarts: ohne diese Kopie überlebte der
+      // Session-eigene Permission-Mode den Neustart der App nicht (PR #44).
+      permissionMode: s.permissionMode,
     });
   }
 

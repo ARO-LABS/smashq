@@ -7,6 +7,14 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-07-21 — Lokale Gates ohne Layer-B: `npx vitest run` deckt die Integrationssuite NICHT ab
+
+**Kontext:** PR-#44-Review-Nacharbeit (Session-Neustart). Lokal liefen `tsc`, volle Unit-Suite (2543 Tests) und Build grün — der CI-Lauf brach trotzdem im Step „Run Layer-B integration tests" (`sessionRestoreSync.integration.test.ts`: Shape-Whitelist kannte das neue `permissionMode`-Feld nicht).
+
+**Fehler → Korrektur:** Layer B läuft über ein SEPARATES Config-File (`vitest.config.integration.ts`, Script `npm run test:integration`); `npx vitest run` sammelt diese `*.integration.test.ts`-Dateien nicht ein. Die Änderung am persistierten `RestorableSession`-Shape hatte dort einen Kontrakt-Test (Key-Whitelist), den nur die CI fing. Korrektur: Whitelist um `permissionMode` erweitert, `npm run test:integration` lokal grün nachgezogen.
+
+**Regel:** Bei Änderungen an persistierten Shapes, Stores oder IPC-Verträgen gehört `npm run test:integration` (bzw. `npm run test:all`) in die lokalen Gates — die Unit-Suite beweist Layer B nicht. Merkhilfe: Kontrakt-/Shape-Tests leben bevorzugt in `*.integration.test.ts` und sind im normalen `vitest run` unsichtbar.
+
 ### 2026-07-16 — Settings-Fenster-Persistenz: Sekundärfenster dürfen nicht schreiben — jeder Setter ohne Broadcast verliert still Daten
 
 **Kontext:** User-Report „Einstellungen speichern nicht" (Permission-Modus sprang trotz „Gespeichert" auf Standard zurück). Drei parallele Hypothesen-Subagenten (Write-Pfad, Rehydrate-Pfad, Persistenz-Mechanik) + Ground-Truth-Check der `settings.json` auf Platte (PR #40).

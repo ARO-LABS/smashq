@@ -70,6 +70,19 @@ describe("dedupRestorableSessions", () => {
     expect(result[0].createdAt).toBe(1_751_364_000_000);
   });
 
+  it("carries permissionMode into the persisted snapshot (Restart-Treue über App-Neustarts)", () => {
+    // Ohne dieses Feld überlebte der Session-eigene Permission-Mode keinen
+    // App-Neustart — Restore stempelte still den aktuellen Settings-Default.
+    const result = dedupRestorableSessions([
+      makeSession({ id: "s1", title: "m2", permissionMode: "plan" }),
+      makeSession({ id: "s2", title: "legacy", folder: "C:/proj/legacy" }),
+    ]);
+
+    expect(result).toHaveLength(2);
+    expect(result[0].permissionMode).toBe("plan");
+    expect(result[1].permissionMode).toBeUndefined();
+  });
+
   it("never deduplicates sessions without a claudeSessionId — even if folder matches", () => {
     // Two fresh sessions in the same folder before discovery has run are
     // legitimately distinct. The restore-side claim set assigns distinct
@@ -102,6 +115,7 @@ describe("dedupRestorableSessions", () => {
         folder: "C:/proj/m2",
         shell: "powershell",
         claudeSessionId: "uuid-1",
+        permissionMode: "plan",
         status: "running",
         lastOutputAt: 12345,
         lastOutputSnippet: "secret content",
@@ -110,7 +124,7 @@ describe("dedupRestorableSessions", () => {
 
     expect(result).toHaveLength(1);
     expect(Object.keys(result[0]).sort()).toEqual(
-      ["claudeSessionId", "createdAt", "folder", "shell", "title"].sort(),
+      ["claudeSessionId", "createdAt", "folder", "permissionMode", "shell", "title"].sort(),
     );
   });
 });

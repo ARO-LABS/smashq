@@ -1,4 +1,7 @@
 import { create } from "zustand";
+// Type-only import — erased at compile time, so the settingsStore→sessionStore
+// type dependency in the other direction cannot form a runtime cycle.
+import type { PermissionMode } from "./settingsStore";
 import { logWarn } from "../utils/errorLogger";
 import { recordPerf } from "../utils/perfLogger";
 import {
@@ -32,6 +35,14 @@ export interface ClaudeSession {
   folder: string;
   shell: SessionShell;
   claudeSessionId?: string;      // Claude CLI Session-UUID fuer Resume
+  /**
+   * Permission-Mode, mit dem die Session erzeugt wurde. Gespeichert, damit ein
+   * Neustart (Issue #13) die Session mit DENSELBEN Einstellungen reproduziert —
+   * auch wenn der Settings-Default sich zwischenzeitlich geändert hat.
+   * Optional: Legacy-Sessions ohne Feld fallen beim Neustart auf den aktuellen
+   * Default zurück.
+   */
+  permissionMode?: PermissionMode;
   status: SessionStatus;
   createdAt: number;
   finishedAt: number | null;
@@ -82,6 +93,30 @@ export function generateUniqueDisplayId(existingSessions: ClaudeSession[]): stri
   return Math.random().toString(36).slice(2, 6).toUpperCase().padEnd(DISPLAY_ID_LENGTH, "0");
 }
 
+/**
+ * Erzeugt eine frische interne (Frontend-)Session-ID. Einzige Definition —
+ * geteilt von useSessionCreation, useSessionRestore und sessionRestart
+ * (war zuvor dreifach byte-identisch dupliziert, Review-Finding PR #44).
+ */
+export function generateSessionId(): string {
+  return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Shape der Rust-`create_session`-Antwort (SessionInfo, camelCase). Die
+ * Snapshot-Felder `isGitRepo`/`snapshotCommit` sind optional, weil der
+ * Rust-Struct sie via `skip_serializing_if = "Option::is_none"` unterdrückt.
+ * Einzige Definition für alle Erzeugungspfade (Creation, Restore, Restart).
+ */
+export interface CreateSessionResult {
+  id: string;
+  title: string;
+  folder: string;
+  shell: string;
+  isGitRepo?: boolean;
+  snapshotCommit?: string;
+}
+
 // ============================================================================
 // State Interface
 // ============================================================================
@@ -103,6 +138,7 @@ export interface SessionState {
     folder: string;
     shell: SessionShell;
     claudeSessionId?: string;
+    permissionMode?: PermissionMode;
     isGitRepo?: boolean;
     snapshotCommit?: string;
   }) => void;
@@ -163,6 +199,7 @@ export const useSessionStore = create<SessionState>((set) => ({
         folder: params.folder,
         shell: params.shell,
         claudeSessionId: params.claudeSessionId,
+        permissionMode: params.permissionMode,
         status: "starting",
         createdAt: Date.now(),
         finishedAt: null,

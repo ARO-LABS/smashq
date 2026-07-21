@@ -241,6 +241,12 @@ export interface RestorableSession {
    * Optional: absent on pre-anchor snapshots.
    */
   createdAt?: number;
+  /**
+   * Permission-Mode, mit dem die Session erzeugt wurde (Restart-Treue über
+   * App-Neustarts hinweg, Issue #13). Optional: Legacy-Snapshots ohne Feld
+   * fallen beim Restore auf den aktuellen Settings-Default zurück.
+   */
+  permissionMode?: PermissionMode;
 }
 
 export interface SessionRestoreData {
@@ -496,12 +502,22 @@ export function validateSessionRestore(raw: unknown): SessionRestoreData {
       entry.createdAt > 0
         ? entry.createdAt
         : undefined;
+    // Unbekannt/korrupt/fehlend → undefined, Eintrag bleibt erhalten. Bewusst
+    // NICHT sanitizePermissionMode: dessen "default"-Fail-safe würde Legacy-
+    // Einträge auf "default" festnageln, statt sie beim Restore dem aktuellen
+    // Settings-Default folgen zu lassen (undefined = "kein eigener Modus").
+    const permissionMode = (PERMISSION_MODES as readonly string[]).includes(
+      entry.permissionMode as string,
+    )
+      ? (entry.permissionMode as PermissionMode)
+      : undefined;
     cleanSessions.push({
       folder: entry.folder,
       title: entry.title,
       shell: entry.shell as RestorableSession["shell"],
       claudeSessionId,
       createdAt,
+      permissionMode,
     });
   }
   return {
@@ -1397,6 +1413,10 @@ export const useSettingsStore = create<SettingsState>()(
       // sanitizt via sanitizePermissionMode; merge heilt same-version-Corruption.
       // Bewusste Verhaltensaenderung: Bestands-User (bisher hart Bypass) werden
       // auf "default" geseedet — siehe CHANGELOG.
+      // RestorableSession.permissionMode (Restart-Treue, PR #44) kam OHNE
+      // Versions-Bump dazu: rein optionales Feld, validateSessionRestore läuft
+      // versionsunabhängig in migrate UND onRehydrateStorage; alte Snapshots
+      // lesen sich als undefined (→ Settings-Default), es ist nichts zu seeden.
       version: 13,
       migrate: (persisted: unknown, fromVersion: number) => _settingsMigrate(persisted, fromVersion),
       // SYNCHRONOUS heal of the rehydrated state. This runs DURING rehydration

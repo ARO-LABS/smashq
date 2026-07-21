@@ -11,7 +11,11 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 const mockAddSession = vi.fn();
-vi.mock("../../../store/sessionStore", () => ({
+// importOriginal-Spread statt Voll-Ersatz: der Hook importiert inzwischen auch
+// generateSessionId (+ Typen) aus dem sessionStore — ein handgepflegter Mock
+// würde bei jedem neuen Export still brechen (Mock-Drift).
+vi.mock("../../../store/sessionStore", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../store/sessionStore")>()),
   useSessionStore: {
     getState: () => ({
       sessions: [],

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { SessionCard } from "./SessionCard";
 import { useSessionStore } from "../../store/sessionStore";
 import { useSettingsStore } from "../../store/settingsStore";
@@ -622,6 +622,123 @@ describe("SessionCard", () => {
       fireEvent.click(screen.getByLabelText("Ordner im Explorer öffnen"));
       fireEvent.click(screen.getByLabelText("Terminal im Ordner öffnen"));
       expect(onClick).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Restart button (Issue #13) ───────────────────────────────────────
+
+  describe("restart button", () => {
+    it("restarts via close_session + fresh create_session in the same folder with the stored settings", async () => {
+      const session = makeSession({
+        id: "sess-restart",
+        folder: "C:/Projects/demo",
+        shell: "gitbash",
+      });
+      useSessionStore.setState({ sessions: [], activeSessionId: null });
+      useSessionStore.getState().addSession({
+        id: session.id,
+        title: session.title,
+        folder: session.folder,
+        shell: session.shell,
+        permissionMode: "plan",
+      });
+      mockedInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
+        if (cmd === "create_session") {
+          const a = args as { id: string; title: string; folder: string; shell: string };
+          return { id: a.id, title: a.title, folder: a.folder, shell: a.shell };
+        }
+        return undefined;
+      });
+      renderCard(session);
+
+      fireEvent.click(screen.getByLabelText("Session neu starten"));
+
+      await waitFor(() => {
+        expect(mockedInvoke).toHaveBeenCalledWith("close_session", { id: "sess-restart" });
+        expect(mockedInvoke).toHaveBeenCalledWith(
+          "create_session",
+          expect.objectContaining({
+            folder: "C:/Projects/demo",
+            shell: "gitbash",
+            permissionMode: "plan",
+          }),
+        );
+      });
+      // Fresh session, no resume: the create call must NOT carry a resumeSessionId.
+      const createArgs = mockedInvoke.mock.calls.find(([cmd]) => cmd === "create_session")?.[1] as
+        | { resumeSessionId?: string }
+        | undefined;
+      expect(createArgs?.resumeSessionId).toBeUndefined();
+      // Old card gone, fresh one in the store.
+      const sessions = useSessionStore.getState().sessions;
+      expect(sessions.find((s) => s.id === "sess-restart")).toBeUndefined();
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].status).toBe("starting");
+    });
+
+    it("disables the restart button and marks it busy while the restart is in flight", async () => {
+      const session = makeSession({ id: "sess-busy" });
+      useSessionStore.setState({ sessions: [], activeSessionId: null });
+      useSessionStore.getState().addSession({
+        id: session.id,
+        title: session.title,
+        folder: session.folder,
+        shell: session.shell,
+      });
+      let releaseClose!: () => void;
+      const closeGate = new Promise<void>((resolve) => {
+        releaseClose = resolve;
+      });
+      mockedInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
+        if (cmd === "close_session") {
+          await closeGate; // Restart mid-flight festhalten
+          return undefined;
+        }
+        if (cmd === "create_session") {
+          const a = args as { id: string; title: string; folder: string; shell: string };
+          return { id: a.id, title: a.title, folder: a.folder, shell: a.shell };
+        }
+        return undefined;
+      });
+      renderCard(session);
+
+      const btn = screen.getByLabelText("Session neu starten") as HTMLButtonElement;
+      fireEvent.click(btn);
+
+      // Reine Optik: der Modul-Guard in restartSession bleibt die Wahrheit,
+      // aber der User sieht sofort, dass der Klick angekommen ist.
+      expect(btn.disabled).toBe(true);
+      expect(btn.getAttribute("aria-busy")).toBe("true");
+
+      // act-Wrap: das finally-setState des Restarts läuft nach der Promise-Kette —
+      // ohne act() feuert React die "not wrapped in act"-Warnung in die CI-Logs.
+      await act(async () => {
+        releaseClose();
+      });
+      await waitFor(() => {
+        expect(btn.disabled).toBe(false);
+      });
+      expect(btn.getAttribute("aria-busy")).toBe("false");
+    });
+
+    it("does not trigger onClick or onClose when the restart button is clicked", () => {
+      const onClick = vi.fn();
+      const onClose = vi.fn();
+      const session = makeSession({ id: "sess-restart-guard" });
+      useSessionStore.setState({ sessions: [], activeSessionId: null });
+      useSessionStore.getState().addSession({
+        id: session.id,
+        title: session.title,
+        folder: session.folder,
+        shell: session.shell,
+      });
+      mockedInvoke.mockResolvedValue(undefined);
+      renderCard(session, { onClick, onClose });
+
+      fireEvent.click(screen.getByLabelText("Session neu starten"));
+
+      expect(onClick).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
     });
   });
 

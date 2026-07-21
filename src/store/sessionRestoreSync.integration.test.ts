@@ -105,7 +105,9 @@ describe("sessionRestoreSync — Layer-B integration", () => {
   // restore-side scan fallback needs to resume the RIGHT session when no
   // claudeSessionId was persisted (wrong-session-restore fix). It is a plain
   // epoch timestamp — no content leak, unlike lastOutputSnippet.
-  it("persisted shape ONLY has folder, title, shell, claudeSessionId, createdAt — never lastOutputSnippet etc.", () => {
+  // permissionMode joined the whitelist with PR #44 (Restart-Treue über
+  // App-Neustarts): ein geschlossener Enum-Wert, kein Content-Leak.
+  it("persisted shape ONLY has folder, title, shell, claudeSessionId, createdAt, permissionMode — never lastOutputSnippet etc.", () => {
     const session = useSessionStore.getState();
 
     session.addSession({
@@ -128,6 +130,7 @@ describe("sessionRestoreSync — Layer-B integration", () => {
       "shell",
       "claudeSessionId",
       "createdAt",
+      "permissionMode",
     ]);
     const actualKeys = Object.keys(persisted[0]);
     for (const key of actualKeys) {

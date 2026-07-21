@@ -1,18 +1,18 @@
 import { useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { wrapInvoke } from "../../../utils/perfLogger";
-import { useSessionStore, generateUniqueDisplayId } from "../../../store/sessionStore";
+import {
+  useSessionStore,
+  generateUniqueDisplayId,
+  generateSessionId,
+} from "../../../store/sessionStore";
 import { useSettingsStore } from "../../../store/settingsStore";
 import { useUIStore } from "../../../store/uiStore";
 import { logError } from "../../../utils/errorLogger";
 import { classifyPrerequisiteError } from "../../../utils/adpError";
 import { isWindows } from "../../../utils/platform";
 import type { FavoriteFolder } from "../../../store/settingsStore";
-import type { SessionShell } from "../../../store/sessionStore";
-
-function generateSessionId(): string {
-  return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
+import type { SessionShell, CreateSessionResult } from "../../../store/sessionStore";
 
 function extractFolderName(path: string): string {
   const parts = path.replace(/\\/g, "/").split("/").filter(Boolean);
@@ -41,24 +41,6 @@ export interface UseSessionCreationReturn {
   handleResumeSession: (resumeSessionId: string, cwd: string, title?: string) => Promise<void>;
   handleQuickStart: (favorite: FavoriteFolder) => Promise<void>;
   handleNewSessionFromDefaults: () => Promise<void>;
-}
-
-/**
- * Shape returned by the Rust `create_session` command — mirrors `SessionInfo`
- * with the snapshot fields renamed for camelCase consumption.
- *
- * The diff-window feature relies on `isGitRepo`/`snapshotCommit` to decide
- * whether to render the Diff-Button + whether the future diff-call has a
- * baseline to compare against. Both fields are optional because the Rust
- * struct hides them via `skip_serializing_if = "Option::is_none"`.
- */
-interface CreateSessionResult {
-  id: string;
-  title: string;
-  folder: string;
-  shell: string;
-  isGitRepo?: boolean;
-  snapshotCommit?: string;
 }
 
 export function useSessionCreation(): UseSessionCreationReturn {
@@ -90,6 +72,7 @@ export function useSessionCreation(): UseSessionCreationReturn {
           folder: result?.folder ?? cwd,
           shell: (result?.shell ?? concreteShellFallback(shell)) as SessionShell,
           claudeSessionId: resumeSessionId,
+          permissionMode,
           isGitRepo: result?.isGitRepo,
           snapshotCommit: result?.snapshotCommit,
         });
@@ -130,6 +113,7 @@ export function useSessionCreation(): UseSessionCreationReturn {
         displayId: generateUniqueDisplayId(sessions),
         folder: result?.folder ?? folder,
         shell: (result?.shell ?? concreteShellFallback(shell)) as SessionShell,
+        permissionMode,
         isGitRepo: result?.isGitRepo,
         snapshotCommit: result?.snapshotCommit,
       });
@@ -199,6 +183,7 @@ export function useSessionCreation(): UseSessionCreationReturn {
         displayId: generateUniqueDisplayId(sessions),
         folder: result?.folder ?? folder,
         shell: (result?.shell ?? concreteShellFallback(shell)) as SessionShell,
+        permissionMode,
         isGitRepo: result?.isGitRepo,
         snapshotCommit: result?.snapshotCommit,
       });
