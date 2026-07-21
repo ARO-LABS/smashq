@@ -1,19 +1,19 @@
 import { useEffect, useRef } from "react";
 import { wrapInvoke } from "../utils/perfLogger";
-import { useSessionStore, generateUniqueDisplayId } from "../store/sessionStore";
+import {
+  useSessionStore,
+  generateUniqueDisplayId,
+  generateSessionId,
+} from "../store/sessionStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useUIStore } from "../store/uiStore";
 import { logWarn } from "../utils/errorLogger";
 import { classifyPrerequisiteError } from "../utils/adpError";
-import type { SessionShell } from "../store/sessionStore";
+import type { SessionShell, CreateSessionResult } from "../store/sessionStore";
 import {
   pickBestHistoryMatch,
   type ClaudeHistoryEntry,
 } from "../components/sessions/hooks/claudeIdDiscovery";
-
-function generateSessionId(): string {
-  return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
 
 const MAX_SESSIONS = 8;
 
@@ -122,16 +122,15 @@ async function restoreSessions(
         claimedClaudeIds.add(resumeSessionId);
       }
 
-      const permissionMode = useSettingsStore.getState().defaultPermissionMode;
+      // Session-eigener Modus aus dem Snapshot gewinnt — nur Legacy-Einträge
+      // ohne Feld fallen auf den aktuellen Settings-Default zurück. Vorher
+      // stempelte Restore pauschal den Default und maskierte damit den
+      // Legacy-Fallback des Neustarts (Review-Finding PR #44).
+      const permissionMode =
+        entry.permissionMode ??
+        useSettingsStore.getState().defaultPermissionMode;
 
-      const result = await wrapInvoke<{
-        id: string;
-        title: string;
-        folder: string;
-        shell: string;
-        isGitRepo?: boolean;
-        snapshotCommit?: string;
-      }>("create_session", {
+      const result = await wrapInvoke<CreateSessionResult>("create_session", {
         id,
         folder: entry.folder,
         title: entry.title,

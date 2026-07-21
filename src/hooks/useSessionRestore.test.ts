@@ -664,3 +664,56 @@ describe("useSessionRestore — session field mapping", () => {
     expect(useSessionStore.getState().sessions[0].id).toMatch(/^session-/);
   });
 });
+
+describe("useSessionRestore — permissionMode restore (Restart-Treue über App-Neustarts)", () => {
+  it("restores a session with its PERSISTED permissionMode, not the current settings default", async () => {
+    setupInvokeMock();
+    useSettingsStore.setState({
+      defaultPermissionMode: "default",
+      sessionRestore: {
+        enabled: true,
+        sessions: [
+          { folder: "C:/proj/plan", title: "plan-sess", shell: "powershell", permissionMode: "plan" },
+        ],
+        activeFolder: null,
+        layoutMode: "single",
+        gridFolders: [],
+      },
+    });
+
+    renderHook(() => useSessionRestore());
+
+    await waitFor(() => {
+      expect(useSessionStore.getState().sessions).toHaveLength(1);
+    });
+    // Der Rust-Call bekommt den Session-eigenen Modus…
+    const createCall = mockInvoke.mock.calls.find(([cmd]) => cmd === "create_session");
+    expect((createCall?.[1] as Record<string, unknown>).permissionMode).toBe("plan");
+    // …und die Runtime-Session ist damit gestempelt (nicht mit dem Default) —
+    // sonst würde der NÄCHSTE Neustart wieder den Default nehmen.
+    expect(useSessionStore.getState().sessions[0].permissionMode).toBe("plan");
+  });
+
+  it("legacy snapshot without permissionMode falls back to the current settings default", async () => {
+    setupInvokeMock();
+    useSettingsStore.setState({
+      defaultPermissionMode: "auto",
+      sessionRestore: {
+        enabled: true,
+        sessions: [{ folder: "C:/proj/legacy", title: "legacy", shell: "powershell" }],
+        activeFolder: null,
+        layoutMode: "single",
+        gridFolders: [],
+      },
+    });
+
+    renderHook(() => useSessionRestore());
+
+    await waitFor(() => {
+      expect(useSessionStore.getState().sessions).toHaveLength(1);
+    });
+    const createCall = mockInvoke.mock.calls.find(([cmd]) => cmd === "create_session");
+    expect((createCall?.[1] as Record<string, unknown>).permissionMode).toBe("auto");
+    expect(useSessionStore.getState().sessions[0].permissionMode).toBe("auto");
+  });
+});

@@ -127,6 +127,65 @@ describe("validateSessionRestore — createdAt anchor", () => {
 });
 
 // ============================================================================
+// validateSessionRestore — permissionMode (Restart-Treue über App-Neustarts)
+// ============================================================================
+
+describe("validateSessionRestore — permissionMode", () => {
+  const BASE_ENTRY = {
+    folder: "C:\\test\\a",
+    title: "x",
+    shell: "powershell",
+  };
+
+  it("keeps a valid permissionMode on the entry", () => {
+    const result = validateSessionRestore({
+      enabled: true,
+      sessions: [{ ...BASE_ENTRY, permissionMode: "plan" }],
+      activeFolder: null,
+      layoutMode: "single",
+      gridFolders: [],
+    });
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0].permissionMode).toBe("plan");
+  });
+
+  it("degrades unknown or corrupt permissionMode to undefined but keeps the entry", () => {
+    // Bewusst undefined statt sanitizePermissionMode: dessen "default"-Fail-safe
+    // würde Legacy-Einträge auf "default" festnageln, statt dem aktuellen
+    // Settings-Default beim Restore zu folgen.
+    const result = validateSessionRestore({
+      enabled: true,
+      sessions: [
+        { ...BASE_ENTRY, permissionMode: "yolo" },
+        { ...BASE_ENTRY, folder: "C:\\test\\b", permissionMode: 42 },
+      ],
+      activeFolder: null,
+      layoutMode: "single",
+      gridFolders: [],
+    });
+
+    expect(result.sessions).toHaveLength(2);
+    for (const s of result.sessions) {
+      expect(s.permissionMode).toBeUndefined();
+    }
+  });
+
+  it("leaves legacy entries without the field untouched (undefined → Settings-Default beim Restore)", () => {
+    const result = validateSessionRestore({
+      enabled: true,
+      sessions: [{ ...BASE_ENTRY }],
+      activeFolder: null,
+      layoutMode: "single",
+      gridFolders: [],
+    });
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0].permissionMode).toBeUndefined();
+  });
+});
+
+// ============================================================================
 // sanitizePreferences — Same-Version-Corruption-Recovery (Issue-#209-Klasse)
 // ============================================================================
 
