@@ -1,28 +1,14 @@
 import { wrapInvoke } from "../../../utils/perfLogger";
-import { useSessionStore, generateUniqueDisplayId } from "../../../store/sessionStore";
+import {
+  useSessionStore,
+  generateUniqueDisplayId,
+  generateSessionId,
+} from "../../../store/sessionStore";
 import { useSettingsStore } from "../../../store/settingsStore";
 import { useUIStore } from "../../../store/uiStore";
 import { logError, logWarn } from "../../../utils/errorLogger";
 import { classifyPrerequisiteError } from "../../../utils/adpError";
-import type { SessionShell } from "../../../store/sessionStore";
-
-function generateSessionId(): string {
-  return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-/**
- * Mirrors the Rust `create_session` response — same shape the creation paths
- * in useSessionCreation.ts consume (snapshot fields optional because the Rust
- * struct hides them via `skip_serializing_if`).
- */
-interface CreateSessionResult {
-  id: string;
-  title: string;
-  folder: string;
-  shell: string;
-  isGitRepo?: boolean;
-  snapshotCommit?: string;
-}
+import type { SessionShell, CreateSessionResult } from "../../../store/sessionStore";
 
 /**
  * Double-click guard: restart is a two-IPC sequence (close + create). A second
@@ -43,10 +29,10 @@ const restartsInFlight = new Set<string>();
  * - close: `close_session` + `removeSession` (same as SessionList.handleClose)
  * - create: `create_session` + `addSession` (same as useSessionCreation)
  *
- * Shell wird konkret aus der Session uebernommen (das Backend hat sie beim
- * Erstellen bereits plattformbewusst aufgeloest und zurueckgeechot). Der
+ * Shell wird konkret aus der Session übernommen (das Backend hat sie beim
+ * Erstellen bereits plattformbewusst aufgelöst und zurückgeechot). Der
  * Permission-Mode kommt aus `session.permissionMode`; Legacy-Sessions ohne
- * das Feld fallen auf den aktuellen Settings-Default zurueck.
+ * das Feld fallen auf den aktuellen Settings-Default zurück.
  */
 export async function restartSession(sessionId: string): Promise<void> {
   if (restartsInFlight.has(sessionId)) return;
@@ -58,9 +44,18 @@ export async function restartSession(sessionId: string): Promise<void> {
 
   restartsInFlight.add(sessionId);
   try {
-    const { folder, title, shell } = session;
+    const { folder, title, shell, status } = session;
     const permissionMode =
       session.permissionMode ?? useSettingsStore.getState().defaultPermissionMode;
+
+    // Grid-Zustand VOR dem Entfernen festhalten: removeSession streicht die
+    // Session aus `gridSessionIds` und flippt `layoutMode` auf "single", wenn
+    // sie das letzte Grid-Mitglied war. Ohne Wiederherstellung verlöre ein
+    // Neustart im Grid still den Grid-Platz der Session (Review-Finding PR #44).
+    const { gridSessionIds, layoutMode, focusedGridSessionId } =
+      useSessionStore.getState();
+    const wasInGrid = gridSessionIds.includes(sessionId);
+    const wasGridLayout = layoutMode === "grid";
 
     // Close the old session first so the fresh PTY never competes with the
     // dying one for the same working directory. A failing close is non-fatal:
@@ -70,10 +65,29 @@ export async function restartSession(sessionId: string): Promise<void> {
     try {
       await wrapInvoke("close_session", { id: sessionId });
     } catch (err) {
-      logWarn(
-        "sessionRestart",
-        `close_session für "${sessionId}" fehlgeschlagen (Session vermutlich bereits beendet): ${err}`,
-      );
+      // Ehrliche Diagnose statt Vermutung: bei done/error existiert kein
+      // lebendes PTY mehr, der Reject ist erwartbar. Lehnt das Backend den
+      // Close einer noch LAUFENDEN Session ab, kann der alte Prozess dagegen
+      // als Orphan weiterlaufen — das verdient eine deutlichere Warnung.
+      if (status === "done" || status === "error") {
+        logWarn(
+          "sessionRestart",
+          `close_session für "${sessionId}" fehlgeschlagen (Session bereits beendet, Status "${status}"): ${err}`,
+        );
+      } else {
+        logWarn(
+          "sessionRestart",
+          `close_session für "${sessionId}" fehlgeschlagen, obwohl die Session noch "${status}" war — der alte Prozess läuft möglicherweise als Orphan weiter: ${err}`,
+        );
+      }
+    }
+
+    // TOCTOU-Re-Check nach dem await: der User kann die Session währenddessen
+    // per X geschlossen haben (SessionList.handleClose lief und hat sie aus dem
+    // Store entfernt). Dann ist der Neustart gegenstandslos — ein create würde
+    // eine Session erzeugen, die niemand mehr angefordert hat.
+    if (!useSessionStore.getState().sessions.some((s) => s.id === sessionId)) {
+      return;
     }
     useSessionStore.getState().removeSession(sessionId);
 
@@ -88,8 +102,9 @@ export async function restartSession(sessionId: string): Promise<void> {
       });
 
       const sessions = useSessionStore.getState().sessions;
+      const freshId = result?.id ?? newId;
       useSessionStore.getState().addSession({
-        id: result?.id ?? newId,
+        id: freshId,
         title: result?.title ?? title,
         // Fresh runtime session → fresh displayId (same contract as restore).
         displayId: generateUniqueDisplayId(sessions),
@@ -99,6 +114,29 @@ export async function restartSession(sessionId: string): Promise<void> {
         isGitRepo: result?.isGitRepo,
         snapshotCommit: result?.snapshotCommit,
       });
+
+      // Grid-Platz wiederherstellen — addSession fügt bewusst NICHT ins Grid
+      // ein, das muss der Aufrufer tun (wie SessionList/useSessionRestore).
+      if (wasInGrid) {
+        const store = useSessionStore.getState();
+        store.addToGrid(freshId);
+        // addToGrid fokussiert die neue Zelle; lag der Fokus vorher auf einer
+        // ANDEREN Zelle, gehört er dorthin zurück (kein Fokus-Klau).
+        if (focusedGridSessionId && focusedGridSessionId !== sessionId) {
+          store.setFocusedGridSession(focusedGridSessionId);
+        }
+        // War die Session das letzte Grid-Mitglied, hat removeSession den
+        // layoutMode auf "single" geflippt — zurück in den Grid-Modus.
+        // (addToGrid kennt keinen Slot-Index; die neue Session landet am Ende
+        // der Komposition — bewusst akzeptiert statt neuer Store-API.)
+        if (wasGridLayout && useSessionStore.getState().layoutMode !== "grid") {
+          store.setLayoutMode("grid");
+        }
+      }
+
+      // Parität mit useSessionCreation: eine offene Favoriten-Preview schließen,
+      // damit die frische Session nicht hinter dem Preview-Panel verschwindet.
+      useUIStore.getState().closePreview();
     } catch (err) {
       // Surface the failure — the old session is already gone at this point,
       // a silent log would leave the user staring at a vanished card.

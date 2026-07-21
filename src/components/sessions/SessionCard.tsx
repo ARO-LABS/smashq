@@ -71,6 +71,11 @@ const SessionCardInner = ({ session, isActive, gridSlot, onClick, onClose }: Ses
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
+  // Reine Optik (Button disabled + aria-busy) — die WAHRHEIT gegen Doppelklicks
+  // ist der Modul-Level-Guard in restartSession, weil die Card mid-restart
+  // unmountet, sobald die alte Session den Store verlässt. React 18 macht das
+  // finally-setState nach dem Unmount zum No-op, kein Leak.
+  const [isRestarting, setIsRestarting] = useState(false);
 
   useEffect(() => {
     if (isEditing && editInputRef.current) {
@@ -219,12 +224,16 @@ const SessionCardInner = ({ session, isActive, gridSlot, onClick, onClose }: Ses
         <button
           onClick={(e) => {
             e.stopPropagation();
+            if (isRestarting) return;
+            setIsRestarting(true);
             // Fire-and-forget: restartSession guards double-clicks itself
             // (module-level in-flight set) and surfaces failures via toast —
-            // the card unmounts mid-restart, so no local state may be used.
-            void restartSession(session.id);
+            // the local state is cosmetics only (see isRestarting above).
+            void restartSession(session.id).finally(() => setIsRestarting(false));
           }}
-          className="p-1 text-neutral-400 hover:text-accent hover:bg-hover-overlay transition-colors"
+          disabled={isRestarting}
+          aria-busy={isRestarting}
+          className="p-1 text-neutral-400 hover:text-accent hover:bg-hover-overlay transition-colors disabled:opacity-50"
           aria-label="Session neu starten"
           title="Session neu starten"
         >

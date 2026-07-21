@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { SessionCard } from "./SessionCard";
 import { useSessionStore } from "../../store/sessionStore";
 import { useSettingsStore } from "../../store/settingsStore";
@@ -674,6 +674,51 @@ describe("SessionCard", () => {
       expect(sessions.find((s) => s.id === "sess-restart")).toBeUndefined();
       expect(sessions).toHaveLength(1);
       expect(sessions[0].status).toBe("starting");
+    });
+
+    it("disables the restart button and marks it busy while the restart is in flight", async () => {
+      const session = makeSession({ id: "sess-busy" });
+      useSessionStore.setState({ sessions: [], activeSessionId: null });
+      useSessionStore.getState().addSession({
+        id: session.id,
+        title: session.title,
+        folder: session.folder,
+        shell: session.shell,
+      });
+      let releaseClose!: () => void;
+      const closeGate = new Promise<void>((resolve) => {
+        releaseClose = resolve;
+      });
+      mockedInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
+        if (cmd === "close_session") {
+          await closeGate; // Restart mid-flight festhalten
+          return undefined;
+        }
+        if (cmd === "create_session") {
+          const a = args as { id: string; title: string; folder: string; shell: string };
+          return { id: a.id, title: a.title, folder: a.folder, shell: a.shell };
+        }
+        return undefined;
+      });
+      renderCard(session);
+
+      const btn = screen.getByLabelText("Session neu starten") as HTMLButtonElement;
+      fireEvent.click(btn);
+
+      // Reine Optik: der Modul-Guard in restartSession bleibt die Wahrheit,
+      // aber der User sieht sofort, dass der Klick angekommen ist.
+      expect(btn.disabled).toBe(true);
+      expect(btn.getAttribute("aria-busy")).toBe("true");
+
+      // act-Wrap: das finally-setState des Restarts läuft nach der Promise-Kette —
+      // ohne act() feuert React die "not wrapped in act"-Warnung in die CI-Logs.
+      await act(async () => {
+        releaseClose();
+      });
+      await waitFor(() => {
+        expect(btn.disabled).toBe(false);
+      });
+      expect(btn.getAttribute("aria-busy")).toBe("false");
     });
 
     it("does not trigger onClick or onClose when the restart button is clicked", () => {
