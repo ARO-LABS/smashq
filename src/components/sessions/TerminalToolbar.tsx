@@ -1,14 +1,17 @@
+import { useState } from "react";
 import { ICONS } from "../../utils/icons";
 import type { LayoutMode } from "../../store/sessionStore";
 import { useGitBranch } from "../../hooks/useGitBranch";
 import { DiffActionButton } from "../diff/DiffActionButton";
 import { TasksPanel } from "../shared/TasksPanel";
+import { restartSession } from "./hooks/sessionRestart";
 
 const LayoutList = ICONS.action.listView;
 const LayoutGrid = ICONS.action.detach;
 const PanelRightOpen = ICONS.action.panelOpen;
 const PanelRightClose = ICONS.action.panelClose;
 const GitBranch = ICONS.git.branch;
+const Restart = ICONS.action.retry;
 
 interface TerminalToolbarProps {
   layoutMode: LayoutMode;
@@ -41,6 +44,10 @@ export function TerminalToolbar({
   onToggleConfigPanel,
 }: TerminalToolbarProps) {
   const branch = useGitBranch(folder);
+  // Reine Optik (Button disabled + aria-busy) — die WAHRHEIT gegen
+  // Doppelklicks ist der Modul-Level-Guard in restartSession (gleiches
+  // Muster wie SessionCard, Issue #49).
+  const [isRestarting, setIsRestarting] = useState(false);
 
   return (
     <div
@@ -67,6 +74,28 @@ export function TerminalToolbar({
         />
       )}
       <TasksPanel variant="window" folder={folder} sessionId={sessionId} />
+
+      {/* Restart — resumed dieselbe Claude-Konversation (Issue #49); gleiche
+          Aktion wie der Neustart-Button in der SessionCard. */}
+      {sessionId && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (isRestarting) return;
+            setIsRestarting(true);
+            // Fire-and-forget: restartSession guards double-clicks itself and
+            // surfaces failures via toast — local state is cosmetics only.
+            void restartSession(sessionId).finally(() => setIsRestarting(false));
+          }}
+          disabled={isRestarting}
+          aria-busy={isRestarting}
+          className="p-1 rounded-md text-neutral-500 hover:text-neutral-300 hover:bg-hover-overlay transition-colors disabled:opacity-50"
+          aria-label="Session neu starten"
+          title="Session neu starten"
+        >
+          <Restart className="w-4 h-4" />
+        </button>
+      )}
 
       {/* Config panel toggle — only in single mode */}
       {layoutMode === "single" && onToggleConfigPanel && (

@@ -8,11 +8,21 @@ vi.mock("@tauri-apps/api/core", () => ({
     mockInvoke(cmd, args) as Promise<T>,
 }));
 
+// Wiring-Test-Mock: das Restart-VERHALTEN (close + create + resume) ist in
+// sessionRestart.test.ts abgedeckt — hier zählt nur, dass der Button die
+// Aktion mit der richtigen sessionId auslöst.
+const mockRestartSession = vi.fn();
+vi.mock("./hooks/sessionRestart", () => ({
+  restartSession: (id: string) => mockRestartSession(id) as Promise<void>,
+}));
+
 beforeEach(() => {
   mockInvoke.mockReset();
   // Default: not a git repo — prevents unhandled promise warnings in tests
   // that don't set their own mock
   mockInvoke.mockRejectedValue(new Error("Not a git repository"));
+  mockRestartSession.mockReset();
+  mockRestartSession.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -94,6 +104,62 @@ describe("TerminalToolbar (floating overlay variant)", () => {
     );
 
     expect(screen.getByLabelText("Konfig-Panel schließen")).toBeTruthy();
+  });
+
+  // ── Restart button (Issue #49) ─────────────────────────────────────────────
+
+  it("renders the restart button and calls restartSession with the toolbar's sessionId", async () => {
+    render(
+      <TerminalToolbar
+        layoutMode="single"
+        onLayoutChange={vi.fn()}
+        sessionId="sess-toolbar"
+      />,
+    );
+
+    const btn = screen.getByLabelText("Session neu starten");
+    fireEvent.click(btn);
+
+    expect(mockRestartSession).toHaveBeenCalledTimes(1);
+    expect(mockRestartSession).toHaveBeenCalledWith("sess-toolbar");
+    await act(async () => {});
+  });
+
+  it("does not render the restart button without a sessionId", () => {
+    render(<TerminalToolbar layoutMode="single" onLayoutChange={vi.fn()} />);
+    expect(screen.queryByLabelText("Session neu starten")).toBeNull();
+  });
+
+  it("disables the restart button and marks it busy while the restart is in flight", async () => {
+    let releaseRestart!: () => void;
+    mockRestartSession.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseRestart = resolve;
+        }),
+    );
+    render(
+      <TerminalToolbar
+        layoutMode="single"
+        onLayoutChange={vi.fn()}
+        sessionId="sess-busy"
+      />,
+    );
+
+    const btn = screen.getByLabelText("Session neu starten") as HTMLButtonElement;
+    fireEvent.click(btn);
+
+    // Reine Optik wie in SessionCard: der Modul-Guard in restartSession
+    // bleibt die Wahrheit gegen Doppelklicks.
+    expect(btn.disabled).toBe(true);
+    expect(btn.getAttribute("aria-busy")).toBe("true");
+
+    await act(async () => {
+      releaseRestart();
+    });
+    await waitFor(() => {
+      expect(btn.disabled).toBe(false);
+    });
   });
 
   // ── Branch chip ────────────────────────────────────────────────────────────
