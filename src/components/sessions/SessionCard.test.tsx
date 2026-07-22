@@ -664,7 +664,9 @@ describe("SessionCard", () => {
           }),
         );
       });
-      // Fresh session, no resume: the create call must NOT carry a resumeSessionId.
+      // Session without known claudeSessionId (discovery never ran) → fresh
+      // start fallback: the create call carries NO resumeSessionId. The resume
+      // happy path lives in sessionRestart.test.ts (Issue #49).
       const createArgs = mockedInvoke.mock.calls.find(([cmd]) => cmd === "create_session")?.[1] as
         | { resumeSessionId?: string }
         | undefined;

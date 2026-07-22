@@ -1,12 +1,15 @@
+import { useState } from "react";
 import { ICONS } from "../../utils/icons";
 import { useSessionStore } from "../../store/sessionStore";
 import { useGitBranch } from "../../hooks/useGitBranch";
 import { DiffActionButton } from "../diff/DiffActionButton";
 import { TasksPanel } from "../shared/TasksPanel";
+import { restartSession } from "./hooks/sessionRestart";
 
 const Maximize2 = ICONS.action.maximize;
 const X = ICONS.action.close;
 const GitBranch = ICONS.git.branch;
+const Restart = ICONS.action.retry;
 
 interface GridCellChromeProps {
   sessionId: string;
@@ -32,6 +35,10 @@ export function GridCellChrome({
 }: GridCellChromeProps) {
   const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === sessionId));
   const branch = useGitBranch(session?.folder);
+  // Reine Optik (Button disabled + aria-busy) — die WAHRHEIT gegen
+  // Doppelklicks ist der Modul-Level-Guard in restartSession (gleiches
+  // Muster wie SessionCard, Issue #49).
+  const [isRestarting, setIsRestarting] = useState(false);
 
   return (
     <div
@@ -59,6 +66,25 @@ export function GridCellChrome({
         folder={session?.folder}
         sessionId={sessionId}
       />
+      {/* Restart — resumed dieselbe Claude-Konversation (Issue #49); gleiche
+          Aktion wie der Neustart-Button in SessionCard/TerminalToolbar. */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          if (isRestarting) return;
+          setIsRestarting(true);
+          // Fire-and-forget: restartSession guards double-clicks itself and
+          // surfaces failures via toast — local state is cosmetics only.
+          void restartSession(sessionId).finally(() => setIsRestarting(false));
+        }}
+        disabled={isRestarting}
+        aria-busy={isRestarting}
+        className="p-1 rounded-md text-neutral-500 hover:text-accent hover:bg-hover-overlay transition-colors disabled:opacity-50"
+        aria-label="Session neu starten"
+        title="Session neu starten"
+      >
+        <Restart className="w-3.5 h-3.5" />
+      </button>
       <button
         onClick={(e) => {
           e.stopPropagation();
