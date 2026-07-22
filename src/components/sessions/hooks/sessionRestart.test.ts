@@ -69,8 +69,11 @@ describe("restartSession", () => {
     useSettingsStore.setState({ defaultPermissionMode: "default" });
   });
 
-  it("happy path: closes the old session and starts a FRESH one with same folder/shell/permissionMode (no resume)", async () => {
-    seedSession();
+  it("happy path: session with known claudeSessionId is RESUMED — create_session carries resumeSessionId and the fresh session keeps the UUID", async () => {
+    seedSession({
+      id: "sess-old",
+      claudeSessionId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    });
     mockBackendOk();
 
     await restartSession("sess-old");
@@ -78,7 +81,7 @@ describe("restartSession", () => {
     // Old PTY was closed via the existing close path.
     expect(mockedInvoke).toHaveBeenCalledWith("close_session", { id: "sess-old" });
 
-    // Exactly one fresh create with the SAME settings…
+    // Exactly one create with the SAME settings…
     const creates = createCalls();
     expect(creates).toHaveLength(1);
     expect(creates[0]).toMatchObject({
@@ -87,13 +90,16 @@ describe("restartSession", () => {
       shell: "gitbash",
       permissionMode: "plan",
     });
-    // …and explicitly WITHOUT resume: restart means "start clean", the
-    // maintainer decision for #13 — resume is a separate existing flow.
-    expect(creates[0].resumeSessionId).toBeUndefined();
+    // …and WITH resume: restart resumes the same Claude conversation
+    // (maintainer decision 2026-07-22, Issue #49) — same parametrization
+    // as the restore flow (useSessionRestore).
+    expect(creates[0].resumeSessionId).toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
     // A fresh session id — restarting must not recycle the dead PTY's id.
     expect(creates[0].id).not.toBe("sess-old");
 
-    // Store: old gone, exactly one new session in "starting" state.
+    // Store: old gone, exactly one new session in "starting" state that
+    // CARRIES the claudeSessionId forward — without it a SECOND restart
+    // would silently start fresh again.
     const sessions = useSessionStore.getState().sessions;
     expect(sessions.find((s) => s.id === "sess-old")).toBeUndefined();
     expect(sessions).toHaveLength(1);
@@ -102,8 +108,49 @@ describe("restartSession", () => {
       shell: "gitbash",
       permissionMode: "plan",
       status: "starting",
+      claudeSessionId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     });
+  });
+
+  it("edge case: session WITHOUT known claudeSessionId (discovery not yet run) starts fresh — no resume param, no error", async () => {
+    seedSession();
+    mockBackendOk();
+
+    await restartSession("sess-old");
+
+    const creates = createCalls();
+    expect(creates).toHaveLength(1);
+    // No UUID known → fresh spawn, exactly like before the resume change.
+    expect(creates[0].resumeSessionId).toBeUndefined();
+
+    const sessions = useSessionStore.getState().sessions;
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].status).toBe("starting");
     expect(sessions[0].claudeSessionId).toBeUndefined();
+    expect(useUIStore.getState().toasts).toHaveLength(0);
+  });
+
+  it("edge case: a second restart after a restart resumes as well (claudeSessionId survives the first restart)", async () => {
+    seedSession({
+      id: "sess-chain",
+      claudeSessionId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    });
+    mockBackendOk();
+
+    await restartSession("sess-chain");
+    const afterFirst = useSessionStore.getState().sessions[0];
+    expect(afterFirst.id).not.toBe("sess-chain");
+
+    await restartSession(afterFirst.id);
+
+    const creates = createCalls();
+    expect(creates).toHaveLength(2);
+    // Both restarts resumed the SAME Claude conversation.
+    expect(creates[0].resumeSessionId).toBe("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+    expect(creates[1].resumeSessionId).toBe("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+    const sessions = useSessionStore.getState().sessions;
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].claudeSessionId).toBe("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
   });
 
   it("legacy session without stored permissionMode falls back to the current settings default", async () => {

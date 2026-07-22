@@ -20,14 +20,23 @@ import type { SessionShell, CreateSessionResult } from "../../../store/sessionSt
 const restartsInFlight = new Set<string>();
 
 /**
- * Neustart einer Session (Issue #13): beendet die laufende Session und startet
- * eine FRISCHE Session im selben Projektordner mit denselben Einstellungen
- * (Shell, Permission-Mode). Bewusst KEIN `--resume` — Resume existiert als
- * eigener Flow; Neustart bedeutet "sauber neu anfangen".
+ * Neustart einer Session (Issue #13, Resume-Semantik seit Issue #49): beendet
+ * die laufende Session und RESUMED dieselbe Claude-Konversation im selben
+ * Projektordner mit denselben Einstellungen (Shell, Permission-Mode).
+ * Maintainer-Entscheid 2026-07-22: Neustart = `--resume`, wenn die
+ * `claudeSessionId` bekannt ist; ohne bekannte UUID (Discovery noch nicht
+ * gelaufen) frischer Start als Fallback — kein Fehler.
  *
  * Composition of the existing paths, no new Rust logic:
  * - close: `close_session` + `removeSession` (same as SessionList.handleClose)
- * - create: `create_session` + `addSession` (same as useSessionCreation)
+ * - create: `create_session` + `addSession` mit `resumeSessionId`
+ *   (same parametrization as useSessionRestore/useSessionCreation.resume)
+ *
+ * Die `claudeSessionId` wandert in das NEUE Session-Objekt (wie im
+ * Restore-Flow): das Backend skippt die UUID-Discovery bei Resume
+ * (manager.rs "Skipped on resume — UUID is already known"), der Store-Wert
+ * ist also die einzige Quelle — ohne Übernahme würde ein zweiter Neustart
+ * still wieder frisch starten.
  *
  * Shell wird konkret aus der Session übernommen (das Backend hat sie beim
  * Erstellen bereits plattformbewusst aufgelöst und zurückgeechot). Der
@@ -44,7 +53,9 @@ export async function restartSession(sessionId: string): Promise<void> {
 
   restartsInFlight.add(sessionId);
   try {
-    const { folder, title, shell, status } = session;
+    // claudeSessionId VOR removeSession festhalten — danach ist das alte
+    // Session-Objekt aus dem Store verschwunden.
+    const { folder, title, shell, status, claudeSessionId } = session;
     const permissionMode =
       session.permissionMode ?? useSettingsStore.getState().defaultPermissionMode;
 
@@ -99,6 +110,9 @@ export async function restartSession(sessionId: string): Promise<void> {
         title,
         shell,
         permissionMode,
+        // Resume der bisherigen Claude-Konversation; undefined = frischer
+        // Start (Rust: Option<String>, gleiche Parametrierung wie Restore).
+        resumeSessionId: claudeSessionId,
       });
 
       const sessions = useSessionStore.getState().sessions;
@@ -110,6 +124,10 @@ export async function restartSession(sessionId: string): Promise<void> {
         displayId: generateUniqueDisplayId(sessions),
         folder: result?.folder ?? folder,
         shell: (result?.shell ?? shell) as SessionShell,
+        // UUID weiterreichen (wie Restore): Discovery wird bei Resume
+        // backend-seitig geskippt — ohne Übernahme wäre ein ZWEITER
+        // Neustart wieder ein frischer Start.
+        claudeSessionId,
         permissionMode,
         isGitRepo: result?.isGitRepo,
         snapshotCommit: result?.snapshotCommit,
