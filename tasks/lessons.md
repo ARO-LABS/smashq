@@ -7,6 +7,14 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-07-23 — CSS-Opacity stapelt multiplikativ: disabled-Primitive in dimmenden Containern doppelt gedimmt
+
+**Kontext:** Settings-Aufräumen (#52). Der neue `ToggleSwitch` dimmt sich bei `disabled` selbst auf `opacity-40`; im Debug-Logging saß er zusätzlich in einem Container, der beim Deaktivieren ebenfalls `opacity-40` setzte — effektiv 0.4 × 0.4 ≈ 0.16, auf dunklem Grund fast unsichtbar. Der Implementer-Subagent hat es im Selbst-Review gemeldet (weil beide Vorgaben wörtlich befolgt wurden), erst der Koordinator-Entscheid löste es auf.
+
+**Fehler → Korrektur:** Dimm-Verantwortung doppelt vergeben (Primitive UND Container). Korrektur: Dimmung gehört auf GENAU eine Ebene — hier auf das disabled-Primitive (dimmt Label + Beschreibung mit), der Container behält nur `pointer-events-none`, `aria-disabled` und den Border-Zustandswechsel. Motion-Detail: die Fade-Transition wandert mit auf die Ebene, die jetzt die Opacity trägt (`transition-opacity` im ToggleSwitch-Label).
+
+**Regel:** Wenn ein Primitive einen eigenen Disabled-Opacity-Stil bekommt, alle Umgebungs-Container auf Doppel-Dimmung prüfen (CSS-Opacity multipliziert über die Baum-Hierarchie, sie überschreibt nicht). Faustregel: Zustands-Optik (Dimmen) ins Primitive, Zustands-Mechanik (pointer-events, aria) in den Container.
+
 ### 2026-07-23 — Design-Artifacts: Ist-Zustand muss 1:1 der realen App entsprechen und alles muss sichtbar sein
 
 **Kontext:** Design-Mockup für Config-Panel (Aufgaben-Tab + History-Redesign). Der Ist-Zustand war aus einem Explorations-Bericht rekonstruiert statt aus den echten Komponenten pixelgenau abgeleitet; der User konnte Ist vs. Soll nicht sauber eruieren und forderte zudem, dass nichts im Artifact versteckt oder verbuggt sein darf.

@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { DebugLoggingPanel } from "./DebugLoggingPanel";
-import { useSettingsStore } from "../../store/settingsStore";
+import { DebugLoggingSection } from "./DebugLoggingSection";
+import { useSettingsStore } from "../../../store/settingsStore";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(() => Promise.resolve()),
 }));
 
-describe("DebugLoggingPanel", () => {
+describe("DebugLoggingSection", () => {
   beforeEach(() => {
     useSettingsStore.setState({
       preferences: {
@@ -20,19 +20,19 @@ describe("DebugLoggingPanel", () => {
   });
 
   it("renders Komplett-aus radio selected by default", () => {
-    render(<DebugLoggingPanel />);
+    render(<DebugLoggingSection />);
     const offRadio = screen.getByRole("radio", { name: /Komplett aus/i });
     expect((offRadio as HTMLInputElement).checked).toBe(true);
   });
 
   it("disables sub-checkboxes while master is off", () => {
-    render(<DebugLoggingPanel />);
-    const sub = screen.getByRole("checkbox", { name: /Frontend-Errors/i }) as HTMLInputElement;
-    expect(sub.disabled).toBe(true);
+    render(<DebugLoggingSection />);
+    const sub = screen.getByRole("switch", { name: /Frontend-Errors/i });
+    expect(sub).toBeDisabled();
   });
 
   it("enables frontendLogging when master is switched on", () => {
-    render(<DebugLoggingPanel />);
+    render(<DebugLoggingSection />);
     const onRadio = screen.getByRole("radio", { name: /Aktiviert/i });
     fireEvent.click(onRadio);
     expect(useSettingsStore.getState().preferences.frontendLogging).toBe(true);
@@ -47,8 +47,8 @@ describe("DebugLoggingPanel", () => {
         scrollbackLines: 25_000,
       },
     });
-    render(<DebugLoggingPanel />);
-    const backendBox = screen.getByRole("checkbox", { name: /Log-Datei/i });
+    render(<DebugLoggingSection />);
+    const backendBox = screen.getByRole("switch", { name: /Log-Datei/i });
     fireEvent.click(backendBox);
     expect(useSettingsStore.getState().preferences.backendFileLogging).toBe(true);
   });
@@ -62,7 +62,7 @@ describe("DebugLoggingPanel", () => {
         scrollbackLines: 25_000,
       },
     });
-    render(<DebugLoggingPanel />);
+    render(<DebugLoggingSection />);
     const offRadio = screen.getByRole("radio", { name: /Komplett aus/i });
     fireEvent.click(offRadio);
     const prefs = useSettingsStore.getState().preferences;
@@ -71,16 +71,18 @@ describe("DebugLoggingPanel", () => {
     expect(prefs.performanceProfiler).toBe(false);
   });
 
-  it("renders the panel heading and all three sub-toggle labels", () => {
-    render(<DebugLoggingPanel />);
-    expect(screen.getByText("Debug-Logging")).toBeTruthy();
+  it("renders the section heading and all three sub-toggle labels", () => {
+    render(<DebugLoggingSection />);
+    expect(screen.getByRole("heading", { level: 4, name: "Debug-Logging" })).toBeTruthy();
+    // Frühere Panel-Header-Beschreibung lebt als erster Absatz in der Sektion weiter.
+    expect(screen.getByText(/Standardmäßig aus, um RAM und Disk/)).toBeTruthy();
     expect(screen.getByText("Frontend-Errors")).toBeTruthy();
     expect(screen.getByText("Log-Datei (NDJSON)")).toBeTruthy();
     expect(screen.getByText("Performance-Profiler")).toBeTruthy();
   });
 
   it("shows Aktiviert radio unselected by default", () => {
-    render(<DebugLoggingPanel />);
+    render(<DebugLoggingSection />);
     const onRadio = screen.getByRole("radio", { name: /Aktiviert/i }) as HTMLInputElement;
     expect(onRadio.checked).toBe(false);
   });
@@ -94,7 +96,7 @@ describe("DebugLoggingPanel", () => {
         scrollbackLines: 25_000,
       },
     });
-    render(<DebugLoggingPanel />);
+    render(<DebugLoggingSection />);
     const onRadio = screen.getByRole("radio", { name: /Aktiviert/i }) as HTMLInputElement;
     const offRadio = screen.getByRole("radio", { name: /Komplett aus/i }) as HTMLInputElement;
     expect(onRadio.checked).toBe(true);
@@ -110,7 +112,7 @@ describe("DebugLoggingPanel", () => {
         scrollbackLines: 25_000,
       },
     });
-    render(<DebugLoggingPanel />);
+    render(<DebugLoggingSection />);
     fireEvent.click(screen.getByRole("radio", { name: /Aktiviert/i }));
     const prefs = useSettingsStore.getState().preferences;
     expect(prefs.frontendLogging).toBe(true);
@@ -127,10 +129,10 @@ describe("DebugLoggingPanel", () => {
         scrollbackLines: 25_000,
       },
     });
-    render(<DebugLoggingPanel />);
+    render(<DebugLoggingSection />);
     for (const name of [/Frontend-Errors/i, /Log-Datei/i, /Performance-Profiler/i]) {
-      const box = screen.getByRole("checkbox", { name }) as HTMLInputElement;
-      expect(box.disabled).toBe(false);
+      const box = screen.getByRole("switch", { name });
+      expect(box).not.toBeDisabled();
     }
   });
 
@@ -143,11 +145,9 @@ describe("DebugLoggingPanel", () => {
         scrollbackLines: 25_000,
       },
     });
-    render(<DebugLoggingPanel />);
-    const profiler = screen.getByRole("checkbox", {
-      name: /Performance-Profiler/i,
-    }) as HTMLInputElement;
-    expect(profiler.checked).toBe(true);
+    render(<DebugLoggingSection />);
+    const profiler = screen.getByRole("switch", { name: /Performance-Profiler/i });
+    expect(profiler).toBeChecked();
   });
 
   it("unchecking the last enabled sub-toggle flips master back to off", () => {
@@ -159,8 +159,8 @@ describe("DebugLoggingPanel", () => {
         scrollbackLines: 25_000,
       },
     });
-    render(<DebugLoggingPanel />);
-    const frontendBox = screen.getByRole("checkbox", { name: /Frontend-Errors/i });
+    render(<DebugLoggingSection />);
+    const frontendBox = screen.getByRole("switch", { name: /Frontend-Errors/i });
     fireEvent.click(frontendBox);
     // No flags left enabled — anyEnabled is false, Komplett-aus is now selected
     expect(useSettingsStore.getState().preferences.frontendLogging).toBe(false);
@@ -177,8 +177,8 @@ describe("DebugLoggingPanel", () => {
         scrollbackLines: 25_000,
       },
     });
-    render(<DebugLoggingPanel />);
-    fireEvent.click(screen.getByRole("checkbox", { name: /Performance-Profiler/i }));
+    render(<DebugLoggingSection />);
+    fireEvent.click(screen.getByRole("switch", { name: /Performance-Profiler/i }));
     const prefs = useSettingsStore.getState().preferences;
     expect(prefs.frontendLogging).toBe(true);
     expect(prefs.performanceProfiler).toBe(true);
@@ -194,7 +194,7 @@ describe("DebugLoggingPanel", () => {
         scrollbackLines: 12_345,
       },
     });
-    render(<DebugLoggingPanel />);
+    render(<DebugLoggingSection />);
     fireEvent.click(screen.getByRole("radio", { name: /Aktiviert/i }));
     const prefs = useSettingsStore.getState().preferences;
     // scrollbackLines is unrelated to the logging master toggle and must survive.

@@ -4,9 +4,7 @@ import { ICONS, type LucideIcon } from "../../utils/icons";
 
 const Palette = ICONS.category.theme;
 const Monitor = ICONS.nav.sessions;
-const TerminalIcon = ICONS.action.terminal;
 const Bell = ICONS.category.notify;
-const Bug = ICONS.category.debug;
 const Cpu = ICONS.viewer.system;
 const InfoIcon = ICONS.toast.info;
 
@@ -21,6 +19,11 @@ export interface SettingsCategory {
  * Single-source schema for the categorized Settings view (Concept B Phase 6).
  * Order here = order in CategoryNav. New categories: add a new entry; existing
  * panels are imported via lazy() so the settings bundle stays split per panel.
+ *
+ * Tab-Konsolidierung (Issue #52): the former "terminal" tab lives on as the
+ * Terminal-Verlauf section inside "sessions"; the former "advanced" tab as the
+ * Debug-Logging section inside "system". PreferencesView resolves unknown ids
+ * (e.g. the removed ones) to the first category.
  */
 export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
   {
@@ -33,13 +36,7 @@ export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
     id: "sessions",
     label: "Sessions",
     icon: Monitor,
-    Panel: lazy(() => import("./NewSessionDefaultsPanel").then((m) => ({ default: m.NewSessionDefaultsPanel }))),
-  },
-  {
-    id: "terminal",
-    label: "Terminal",
-    icon: TerminalIcon,
-    Panel: lazy(() => import("./TerminalScrollbackPanel").then((m) => ({ default: m.TerminalScrollbackPanel }))),
+    Panel: lazy(() => import("./panels/SessionsPanel").then((m) => ({ default: m.SessionsPanel }))),
   },
   {
     id: "notifications",
@@ -52,12 +49,6 @@ export const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
     label: "System",
     icon: Cpu,
     Panel: lazy(() => import("./panels/SystemPanel").then((m) => ({ default: m.SystemPanel }))),
-  },
-  {
-    id: "advanced",
-    label: "Erweitert",
-    icon: Bug,
-    Panel: lazy(() => import("./DebugLoggingPanel").then((m) => ({ default: m.DebugLoggingPanel }))),
   },
   {
     id: "about",

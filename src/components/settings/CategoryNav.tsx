@@ -39,9 +39,10 @@ function CategoryNavItem({
       onClick={onClick}
       className={`
         flex items-center gap-2 px-3 py-2 mx-1 rounded-md text-sm text-left transition-colors
+        focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2
         ${isActive
-          ? "bg-accent-a10 text-accent"
-          : "text-neutral-400 hover:bg-hover-overlay hover:text-neutral-200"
+          ? "border-l-2 border-accent bg-accent-a05 text-accent"
+          : "border-l-2 border-transparent text-neutral-400 hover:bg-hover-overlay hover:text-neutral-200"
         }
       `}
       aria-current={isActive ? "page" : undefined}

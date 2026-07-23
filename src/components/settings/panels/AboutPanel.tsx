@@ -1,10 +1,12 @@
-import { useEffect, useState, type ReactNode } from "react";
+﻿import { useEffect, useState, type ReactNode } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { open } from "@tauri-apps/plugin-shell";
 import { wrapInvoke } from "../../../utils/perfLogger";
 import { logError, logWarn } from "../../../utils/errorLogger";
 import { ICONS, ICON_SIZE } from "../../../utils/icons";
 import { Button } from "../../ui/Button";
+import { SettingsPanelHeader } from "../shared/SettingsPanelHeader";
+import { SettingsSection } from "../shared/SettingsSection";
 
 const ExternalLinkIcon = ICONS.action.externalLink;
 const CopyIcon = ICONS.action.copy;
@@ -75,20 +77,13 @@ export function AboutPanel() {
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-2xl">
-      <header className="flex flex-col gap-1">
-        <div className="flex items-baseline gap-2">
-          <h3 className="text-sm font-semibold text-neutral-200">Über Smashq</h3>
-          <span className="text-xs font-mono text-neutral-500">v{version}</span>
-        </div>
-        <p className="text-xs text-neutral-500">
-          Claude-CLI-Sessions verwalten und überwachen.
-        </p>
-      </header>
+      <SettingsPanelHeader
+        title="Über Smashq"
+        titleAside={<span className="text-xs font-mono text-neutral-500">v{version}</span>}
+        description="Claude-CLI-Sessions verwalten und überwachen."
+      />
 
-      <section className="rounded-md shadow-hairline p-4 flex flex-col gap-3 bg-surface-base">
-        <h4 className="text-xs font-semibold text-neutral-300 uppercase tracking-wide">
-          Build-Info
-        </h4>
+      <SettingsSection title="Build-Info">
         <dl className="flex flex-col gap-2 text-sm">
           <InfoRow label="Version" value={version} />
           <InfoRow
@@ -97,7 +92,7 @@ export function AboutPanel() {
               <button
                 type="button"
                 onClick={() => openUrl(commitUrl)}
-                className="text-accent hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded-xs"
+                className="text-accent hover:underline focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 rounded-xs"
               >
                 {COMMIT}
               </button>
@@ -122,16 +117,13 @@ export function AboutPanel() {
             {copied ? "Kopiert" : "Diagnose kopieren"}
           </Button>
         </div>
-      </section>
+      </SettingsSection>
 
-      <section className="rounded-md shadow-hairline p-4 flex flex-col gap-2 bg-surface-base">
-        <h4 className="text-xs font-semibold text-neutral-300 uppercase tracking-wide">
-          Links
-        </h4>
+      <SettingsSection title="Links">
         <LinkRow label="Repository" onClick={() => openUrl(REPO_URL)} />
         <LinkRow label="Problem melden" onClick={() => openUrl(ISSUES_URL)} />
         <LinkRow label="Releases / Changelog" onClick={() => openUrl(RELEASES_URL)} />
-      </section>
+      </SettingsSection>
 
       <p className="text-xs text-neutral-500">© 2026 ARO-LABS · MIT-Lizenz</p>
     </div>
@@ -152,7 +144,7 @@ function LinkRow({ label, onClick }: { label: string; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-2 text-sm text-left text-neutral-300 hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded-xs -mx-1 px-1 py-0.5"
+      className="flex items-center gap-2 text-sm text-left text-neutral-300 hover:text-accent transition-colors focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 rounded-xs -mx-1 px-1 py-0.5"
     >
       <ExternalLinkIcon className={`${ICON_SIZE.card} shrink-0`} />
       <span>{label}</span>
