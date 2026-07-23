@@ -2,7 +2,7 @@
 // Types
 // ============================================================================
 
-interface ToggleSwitchProps {
+export interface ToggleSwitchProps {
   label: string;
   checked: boolean;
   onChange: (value: boolean) => void;
@@ -28,7 +28,7 @@ export function ToggleSwitch({ label, checked, onChange, description, disabled }
         aria-label={label}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative mt-0.5 h-[18px] w-8 shrink-0 rounded-full transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 ${
+        className={`relative mt-0.5 h-[18px] w-8 shrink-0 rounded-full transition-colors duration-200 focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 ${
           checked ? "bg-accent" : "bg-neutral-800 shadow-hairline"
         } disabled:cursor-not-allowed`}
       >
