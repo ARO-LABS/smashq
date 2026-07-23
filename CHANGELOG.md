@@ -7,11 +7,17 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 ## [Unreleased]
 
 ### Hinzugefügt
+- Config-Panel: Neuer Tab „Aufgaben" — offene Aufgaben des Projekts direkt im Panel abhaken, per Eingabezeile anlegen und in die große Aufgaben-View springen; Zähler-Badge am Tab.
+- Config-Panel History: Suche (Titel + Branch), Zeit-Gruppierung (Heute / Diese Woche / Älter), Original-Erstnachricht als Vorschau bei umbenannten Sessions, Inline-Umbenennen, Auswahl-Modus mit Sammel-Löschen (Bestätigungsstufe statt Undo), Skeleton-Ladezustand.
+- Config-Panel History: Laufende Sessions sind als „Aktiv" markiert und vor Doppel-Resume und Löschen geschützt.
 - Dokumentation „Betrieb hinter Corporate Proxy" im README: Proxy-Mechanismus und relevante Umgebungsvariablen für Auto-Updater, `gh`-Integration und Claude-CLI-Sessions, inkl. bekannter Lücken (kein OS-Proxy/PAC im Updater, macOS-GUI-Start ohne Shell-Profil-Variablen). (#25)
 - **Session-Neustart-Icon** auf der Session-Kachel (Hover-Leiste): beendet die laufende Session und startet eine frische Session im selben Projektordner mit denselben Einstellungen (Shell, Permission-Modus). Bewusst ohne `--resume` — Fortsetzen bleibt ein eigener Flow. (#13)
 - **„Im Terminal öffnen"-Button** an den Kanban-Auth-Fehlerkarten (Board und Board-Picker): öffnet das System-Terminal (Windows Terminal bzw. `cmd`, macOS Terminal.app, Linux best effort) direkt mit dem Fix-Befehl (`gh auth login` / `gh auth refresh -s read:project,project`), da diese Befehle interaktiv sind und ein echtes Terminal brauchen. Sicherheitsmodell: geschlossene Befehls-Allowlist im Rust-Backend — das Frontend sendet nur einen Diskriminator, nie einen Befehlsstring. (#38)
 - **GitHub-Auth/Scope-Preflight** in den Einstellungen (System-Panel): zeigt Anmeldestatus, Konto und Token-Scopes des `gh` CLI; fehlt `read:project`, erscheint der Hinweis samt kopierbarem Fix-Befehl und „Im Terminal öffnen"-Button — bevor das Kanban-Board am fehlenden Scope scheitert. (#38, Follow-up zu #10)
 - Neue Einstellung **„Automatisch nach Updates suchen"** (Einstellungen → System → Updates): schaltet den automatischen Update-Check (beim Start und alle 30 Minuten) ab. Standard ist **an** — Bestands-User behalten den Update-Kanal unverändert. Die manuelle Suche über das Versions-Badge in der Session-Leiste funktioniert unabhängig vom Schalter jederzeit. (#21)
+
+### Behoben
+- Config-Panel History: ASCII-Ersatzformen in Oberflächentexten durch echte Umlaute ersetzt („Session löschen", „Session gelöscht", „für").
 
 ### Sicherheit
 - Dependabot-High-Alerts behoben (#16): Build-Tooling `vite` auf 6.4.3 gehoben (inkl. `overrides`, damit auch die von vitest genutzten Kopien die gepatchte Version verwenden — schließt `server.fs.deny`-Bypass unter Windows und NTLMv2-Hash-Leak via launch-editor). Die Laufzeit-Abhängigkeit `linkify-it` (≥ 5.0.1, quadratische Komplexität in `match`) und `form-data` (≥ 4.0.6, CRLF-Injection) sind im Lockfile bereits auf gepatchten Versionen fixiert und wurden verifiziert.
