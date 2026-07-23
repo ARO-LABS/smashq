@@ -17,7 +17,7 @@ export interface ToggleSwitchProps {
 export function ToggleSwitch({ label, checked, onChange, description, disabled }: ToggleSwitchProps) {
   return (
     <label
-      className={`flex items-start gap-2.5 text-sm ${
+      className={`flex items-start gap-2.5 text-sm transition-opacity duration-200 ${
         disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
       }`}
     >
