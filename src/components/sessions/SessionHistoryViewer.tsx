@@ -50,7 +50,12 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
   const [error, setError] = useState<string | null>(null);
   const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
+  // Inline-Rename: genau eine Zeile editierbar — self-contained, damit der
+  // Auswahlmodus (Task 6) das Editieren einfach ignorieren/beenden kann.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
   const sessionTitleOverrides = useSettingsStore((s) => s.sessionTitleOverrides);
+  const setSessionTitleOverride = useSettingsStore((s) => s.setSessionTitleOverride);
   const removeRestorableSessionByClaudeId = useSettingsStore(
     (s) => s.removeRestorableSessionByClaudeId,
   );
@@ -139,6 +144,33 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
         return next;
       });
     }
+  };
+
+  const startEdit = (sessionId: string, currentTitle: string) => {
+    setEditingId(sessionId);
+    setEditValue(currentTitle);
+  };
+
+  /**
+   * Commit nach Pin-Rename-Konvention (ConfigPanelTabList): Enter UND Blur
+   * committen, Escape verwirft. Leerer oder unveränderter Wert überspringt
+   * den Store-Call bewusst — der Store ignoriert leere Werte zwar selbst,
+   * aber ein redundanter Override (== Original-Titel) wäre stiller Müll im
+   * persistierten Blob.
+   */
+  const commitEdit = (sessionId: string, effectiveTitle: string) => {
+    if (editingId !== sessionId) return;
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== effectiveTitle) {
+      setSessionTitleOverride(sessionId, trimmed);
+    }
+    setEditingId(null);
+    setEditValue("");
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditValue("");
   };
 
   useEffect(() => {
@@ -275,8 +307,13 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
                     ? () => onResumeSession(s.session_id, s.cwd, s.effectiveTitle)
                     : undefined
                 }
-                onRename={() => {}} // Task 5: Inline-Rename-Input wird hier angebunden
+                onRename={() => startEdit(s.session_id, s.effectiveTitle)}
                 onDelete={() => handleDelete(s.session_id, s.effectiveTitle)}
+                isEditing={editingId === s.session_id}
+                editValue={editValue}
+                onEditChange={setEditValue}
+                onEditCommit={() => commitEdit(s.session_id, s.effectiveTitle)}
+                onEditCancel={cancelEdit}
               />
             ))}
           </React.Fragment>

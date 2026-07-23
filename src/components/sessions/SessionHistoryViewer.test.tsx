@@ -543,16 +543,69 @@ describe("SessionHistoryViewer", () => {
       expect(screen.getByLabelText("Sessions werden geladen")).toBeInTheDocument();
     });
 
-    it("rename button exists per row and calls the handler seam (Task-5-Vorbereitung)", async () => {
-      mockInvoke.mockResolvedValue([mockSession]);
+  });
+
+  // ==========================================================================
+  // Inline-Rename (Task 5): Pencil startet Edit, Enter committet in den
+  // settingsStore, Escape/leer verwirft ohne Store-Write
+  // ==========================================================================
+
+  describe("Inline-Rename", () => {
+    it("pencil turns title into input; Enter writes sessionTitleOverrides", async () => {
+      mockInvoke.mockResolvedValue([{ ...mockSession, session_id: "u1", title: "Original" }]);
       render(<SessionHistoryViewer folder="C:\\p" />);
-      await waitFor(() => {
-        expect(screen.getByText("Fix login bug")).toBeInTheDocument();
-      });
-      const renameBtn = screen.getByTitle("Session umbenennen");
-      // Noch No-op (Task 5 implementiert das Editieren) — darf nicht werfen
-      fireEvent.click(renameBtn);
-      expect(screen.getByText("Fix login bug")).toBeInTheDocument();
+      await screen.findByText("Original");
+      fireEvent.click(screen.getByTitle("Session umbenennen"));
+      const input = screen.getByRole("textbox", { name: "Session-Titel bearbeiten" });
+      fireEvent.change(input, { target: { value: "Neuer Name" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      expect(useSettingsStore.getState().sessionTitleOverrides["u1"]).toBe("Neuer Name");
+      expect(await screen.findByText("Neuer Name")).toBeInTheDocument();
+    });
+
+    it("Escape cancels without writing (edge case)", async () => {
+      mockInvoke.mockResolvedValue([{ ...mockSession, session_id: "u1", title: "Original" }]);
+      render(<SessionHistoryViewer folder="C:\\p" />);
+      await screen.findByText("Original");
+      fireEvent.click(screen.getByTitle("Session umbenennen"));
+      const input = screen.getByRole("textbox", { name: "Session-Titel bearbeiten" });
+      fireEvent.change(input, { target: { value: "X" } });
+      fireEvent.keyDown(input, { key: "Escape" });
+      expect(useSettingsStore.getState().sessionTitleOverrides["u1"]).toBeUndefined();
+      expect(screen.getByText("Original")).toBeInTheDocument();
+    });
+
+    it("empty value commits as cancel, no override written (edge case)", async () => {
+      mockInvoke.mockResolvedValue([{ ...mockSession, session_id: "u1", title: "Original" }]);
+      render(<SessionHistoryViewer folder="C:\\p" />);
+      await screen.findByText("Original");
+      fireEvent.click(screen.getByTitle("Session umbenennen"));
+      const input = screen.getByRole("textbox", { name: "Session-Titel bearbeiten" });
+      fireEvent.change(input, { target: { value: "   " } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      expect(useSettingsStore.getState().sessionTitleOverrides["u1"]).toBeUndefined();
+      expect(screen.getByText("Original")).toBeInTheDocument();
+    });
+
+    it("editing shows the keyboard hint instead of the meta line", async () => {
+      mockInvoke.mockResolvedValue([{ ...mockSession, session_id: "u1", title: "Original" }]);
+      render(<SessionHistoryViewer folder="C:\\p" />);
+      await screen.findByText("Original");
+      fireEvent.click(screen.getByTitle("Session umbenennen"));
+      expect(screen.getByText("Enter übernehmen · Escape verwerfen")).toBeInTheDocument();
+      // Metazeile ist während des Editierens ausgeblendet
+      expect(screen.queryByTitle("Dauer")).not.toBeInTheDocument();
+    });
+
+    it("blur commits like Enter (Pin-Rename-Konvention)", async () => {
+      mockInvoke.mockResolvedValue([{ ...mockSession, session_id: "u1", title: "Original" }]);
+      render(<SessionHistoryViewer folder="C:\\p" />);
+      await screen.findByText("Original");
+      fireEvent.click(screen.getByTitle("Session umbenennen"));
+      const input = screen.getByRole("textbox", { name: "Session-Titel bearbeiten" });
+      fireEvent.change(input, { target: { value: "Blur-Name" } });
+      fireEvent.blur(input);
+      expect(useSettingsStore.getState().sessionTitleOverrides["u1"]).toBe("Blur-Name");
     });
   });
 });

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { ICONS } from "../../utils/icons";
 import { formatElapsed } from "../../utils/format";
 import {
@@ -27,6 +27,12 @@ export interface SessionHistoryRowProps {
   onResume?: () => void;
   onRename: () => void;
   onDelete: () => void;
+  /** Inline-Rename (Task 5): Zustand lebt im Viewer, damit nur eine Zeile editiert. */
+  isEditing: boolean;
+  editValue: string;
+  onEditChange: (value: string) => void;
+  onEditCommit: () => void;
+  onEditCancel: () => void;
 }
 
 /** Dauer aus Start/Ende — „–" wenn Zeitstempel fehlen oder inkonsistent sind. */
@@ -52,7 +58,22 @@ export const SessionHistoryRow: React.FC<SessionHistoryRowProps> = ({
   onResume,
   onRename,
   onDelete,
+  isEditing,
+  editValue,
+  onEditChange,
+  onEditCommit,
+  onEditCancel,
 }) => {
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-Fokus + Text markiert, sobald der Edit-Modus startet (Pin-Rename-Muster)
+  useEffect(() => {
+    if (isEditing && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [isEditing]);
+
   return (
     <div className="group flex flex-col gap-0.5 px-4 py-2 mx-1.5 rounded-md hover:bg-hover-overlay transition-colors">
       {/* Titelzeile */}
@@ -60,17 +81,38 @@ export const SessionHistoryRow: React.FC<SessionHistoryRowProps> = ({
         {isActive && (
           <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0" aria-hidden="true" />
         )}
-        <span
-          className="flex-1 truncate text-xs font-medium text-neutral-200"
-          title={effectiveTitle}
-        >
-          {effectiveTitle}
-        </span>
+        {isEditing ? (
+          <input
+            ref={editInputRef}
+            type="text"
+            value={editValue}
+            onChange={(e) => onEditChange(e.target.value)}
+            onBlur={onEditCommit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onEditCommit();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                onEditCancel();
+              }
+            }}
+            aria-label="Session-Titel bearbeiten"
+            className="flex-1 min-w-0 bg-surface-raised border border-accent rounded-sm px-2 text-xs font-medium text-neutral-200 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+          />
+        ) : (
+          <span
+            className="flex-1 truncate text-xs font-medium text-neutral-200"
+            title={effectiveTitle}
+          >
+            {effectiveTitle}
+          </span>
+        )}
         {isActive ? (
           <span className="px-1.5 py-px rounded-full bg-success/15 text-success text-[9.5px] font-bold tracking-wide uppercase shrink-0">
             Aktiv
           </span>
-        ) : (
+        ) : isEditing ? null : (
           <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
             {onResume && (
               <button
@@ -108,11 +150,13 @@ export const SessionHistoryRow: React.FC<SessionHistoryRowProps> = ({
         <div className="truncate text-[11px] text-neutral-500">{`„${preview}“`}</div>
       )}
 
-      {/* Metazeile — bei aktiven Sessions durch den Sperr-Hinweis ersetzt */}
+      {/* Metazeile — bei aktiven Sessions Sperr-Hinweis, beim Editieren Tastatur-Hinweis */}
       {isActive ? (
         <div className="text-[10.5px] text-neutral-500">
           Läuft gerade — Fortsetzen und Löschen gesperrt
         </div>
+      ) : isEditing ? (
+        <div className="text-[10.5px] text-neutral-500">Enter übernehmen · Escape verwerfen</div>
       ) : (
         <div className="flex items-center gap-3 flex-wrap text-[10.5px] text-neutral-500 tabular-nums">
           <span title={formatDateTime(session.started_at)}>
