@@ -144,7 +144,7 @@ export function SessionManagerView() {
           role="button"
           tabIndex={0}
           aria-label={leftNav.renderCollapsed ? "Navigation einblenden" : "Navigation ausblenden"}
-          title={leftNav.renderCollapsed ? "Klicken oder ziehen zum Öffnen" : "Ziehen zum Anpassen"}
+          title={leftNav.renderCollapsed ? "Klicken oder ziehen zum Öffnen" : "Klicken zum Schließen, ziehen zum Anpassen"}
           onClick={leftNav.onClick}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
@@ -284,7 +284,7 @@ export function SessionManagerView() {
                     role="button"
                     tabIndex={0}
                     aria-label={configResize.renderCollapsed ? "Konfiguration einblenden" : "Konfiguration ausblenden"}
-                    title={configResize.renderCollapsed ? "Klicken oder ziehen zum Öffnen" : "Ziehen zum Anpassen"}
+                    title={configResize.renderCollapsed ? "Klicken oder ziehen zum Öffnen" : "Klicken zum Schließen, ziehen zum Anpassen"}
                     onClick={configResize.onClick}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
@@ -327,7 +327,7 @@ export function SessionManagerView() {
                     role="button"
                     tabIndex={0}
                     aria-label={configResize.renderCollapsed ? "Vorschau einblenden" : "Vorschau ausblenden"}
-                    title={configResize.renderCollapsed ? "Klicken oder ziehen zum Öffnen" : "Ziehen zum Anpassen"}
+                    title={configResize.renderCollapsed ? "Klicken oder ziehen zum Öffnen" : "Klicken zum Schließen, ziehen zum Anpassen"}
                     onClick={configResize.onClick}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {

@@ -60,8 +60,17 @@ const COLLAPSE_HYSTERESIS = 40;
  * Both the left nav and the right config panel share this. The panel is
  * anchored to one edge of a flex row (`containerRef`); dragging the inner
  * rail changes the width, and — when `collapsible` — dragging past
- * `min - 40` snaps to a collapsed rail. `restore()` (wired to the rail's
- * onClick when collapsed) reopens to the last expanded width.
+ * `min - 40` snaps to a collapsed rail.
+ *
+ * onClick toggles the panel:
+ *   - collapsed  → restore() reopens to the last expanded width.
+ *   - expanded   → collapse() commits { width: current, collapsed: true }.
+ *
+ * suppressClickRef is doubly important here: a drag that ends on the rail
+ * fires a trailing synthetic click. Without suppression, a drag-to-resize
+ * ending while the panel is expanded would immediately collapse it again
+ * (the new else-branch). suppressClickRef ensures that trailing click is
+ * swallowed and only the drag commit fires.
  *
  * Live width lives in local state during a drag so the panel tracks the
  * cursor without writing to the store on every move; the store (and thus
@@ -157,15 +166,24 @@ export function useCollapsibleResize(
     onCommit({ width: lastWidthRef.current, collapsed: false });
   }, [onCommit]);
 
+  const collapse = useCallback(() => {
+    // lastWidthRef.current is kept in sync with `width` every render while the
+    // panel is expanded (line above: `if (!dragging && !collapsed)`), so it
+    // always reflects the current committed width — no width is lost on collapse.
+    onCommit({ width: lastWidthRef.current, collapsed: true });
+  }, [onCommit]);
+
   const onClick = useCallback(() => {
     // Swallow exactly one click if it was synthesized after a drag — otherwise
-    // dragging past the threshold to collapse would immediately re-open here.
+    // a drag-to-resize ending on the rail would immediately collapse the panel
+    // (new else-branch) or re-open a drag-collapsed panel (old restore branch).
     if (suppressClickRef.current) {
       suppressClickRef.current = false;
       return;
     }
     if (collapsed) restore();
-  }, [collapsed, restore]);
+    else collapse();
+  }, [collapsed, restore, collapse]);
 
   return {
     renderWidth: live?.width ?? width,

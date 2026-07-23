@@ -167,4 +167,60 @@ describe("useCollapsibleResize", () => {
     fireEvent.pointerUp(rail, { clientX: 700, pointerId: 1 });
     expect(onCommit).not.toHaveBeenCalled();
   });
+
+  it("(happy) click on expanded rail collapses with the current width", () => {
+    // Harness has width=300 and collapsed=false → click must commit collapsed:true
+    // preserving the pre-click width (300) so a subsequent restore gets back there.
+    const onCommit = vi.fn();
+    const { getByTestId } = render(
+      <Harness side="left" collapsed={false} onCommit={onCommit} />,
+    );
+    stubRect(getByTestId("container"), { left: 0, right: 1000 });
+    fireEvent.click(getByTestId("rail"));
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith({ width: 300, collapsed: true });
+  });
+
+  it("(edge) drag ending beyond threshold does NOT collapse via the trailing click", () => {
+    // After a committed drag the suppressClickRef swallows the next click.
+    // Now that the else-branch would collapse an expanded panel, we must verify the
+    // suppressed click is still harmless even with the new toggle logic.
+    const onCommit = vi.fn();
+    const { getByTestId } = render(
+      <Harness side="left" collapsed={false} onCommit={onCommit} />,
+    );
+    stubRect(getByTestId("container"), { left: 0, right: 1000 });
+    const rail = getByTestId("rail");
+    // Drag to a valid expanded width (350 > min 250).
+    fireEvent.pointerDown(rail, { clientX: 240, pointerId: 1 });
+    fireEvent.pointerMove(rail, { clientX: 350, pointerId: 1 });
+    fireEvent.pointerUp(rail, { clientX: 350, pointerId: 1 });
+    fireEvent.click(rail); // trailing synthetic click after drag — must be swallowed
+    // Only the drag commit must have fired; the click must not trigger a second commit.
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith({ width: 350, collapsed: false });
+  });
+
+  it("(edge) click-toggle roundtrip: collapse then restore to same width", () => {
+    // First click on expanded (collapsed=false) → commit collapsed:true with width=300.
+    // After the component is re-rendered with collapsed=true the next click restores.
+    const onCommit = vi.fn();
+    // Start expanded.
+    const { getByTestId, rerender } = render(
+      <Harness side="left" collapsed={false} onCommit={onCommit} />,
+    );
+    stubRect(getByTestId("container"), { left: 0, right: 1000 });
+
+    // Click 1: collapse.
+    fireEvent.click(getByTestId("rail"));
+    expect(onCommit).toHaveBeenNthCalledWith(1, { width: 300, collapsed: true });
+
+    // Simulate the store applying the collapse — re-render with collapsed=true.
+    rerender(<Harness side="left" collapsed={true} onCommit={onCommit} />);
+
+    // Click 2: restore.
+    fireEvent.click(getByTestId("rail"));
+    expect(onCommit).toHaveBeenNthCalledWith(2, { width: 300, collapsed: false });
+    expect(onCommit).toHaveBeenCalledTimes(2);
+  });
 });

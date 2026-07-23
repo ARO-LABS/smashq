@@ -16,6 +16,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **GitHub-Auth/Scope-Preflight** in den Einstellungen (System-Panel): zeigt Anmeldestatus, Konto und Token-Scopes des `gh` CLI; fehlt `read:project`, erscheint der Hinweis samt kopierbarem Fix-Befehl und „Im Terminal öffnen"-Button — bevor das Kanban-Board am fehlenden Scope scheitert. (#38, Follow-up zu #10)
 - Neue Einstellung **„Automatisch nach Updates suchen"** (Einstellungen → System → Updates): schaltet den automatischen Update-Check (beim Start und alle 30 Minuten) ab. Standard ist **an** — Bestands-User behalten den Update-Kanal unverändert. Die manuelle Suche über das Versions-Badge in der Session-Leiste funktioniert unabhängig vom Schalter jederzeit. (#21)
 
+### Geändert
+- Seitenleisten-Rails (Navigation + Config-Panel): Klick klappt das geöffnete Panel jetzt auch zu — bisher öffnete Klick nur; Ziehen zum Anpassen bleibt unverändert (4px-Schwelle trennt Klick von Drag).
+
 ### Behoben
 - Config-Panel History: ASCII-Ersatzformen in Oberflächentexten durch echte Umlaute ersetzt („Session löschen", „Session gelöscht", „für").
 

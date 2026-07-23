@@ -437,6 +437,33 @@ describe("SessionManagerView — ConfigPanel & Preview", () => {
     expect(screen.queryByTestId("config-panel")).toBeNull();
   });
 
+  it("klappt das Config-Panel per Rail-Klick zu wenn es geöffnet ist", () => {
+    // Integration-Level: Rail-Klick auf geöffnetes Panel muss ConfigPanel verschwinden lassen.
+    // Spiegelt den bestehenden Keyboard-Toggle-Test (Navigation ein/ausblenden).
+    useSessionStore.setState({
+      sessions: [mockSession("s-1")],
+      activeSessionId: "s-1",
+      layoutMode: "single",
+      gridSessionIds: [],
+      focusedGridSessionId: null,
+    });
+    useUIStore.setState({ previewFolder: null, configPanelCollapsed: false });
+
+    render(<SessionManagerView />);
+
+    // Voraussetzung: ConfigPanel sichtbar, Rail bietet "ausblenden" an.
+    expect(screen.getByTestId("config-panel")).toBeTruthy();
+    const rail = screen.getByRole("button", { name: "Konfiguration ausblenden" });
+
+    // Klick auf den Rail im geöffneten Zustand → Panel kollabiert.
+    act(() => {
+      fireEvent.click(rail);
+    });
+
+    expect(screen.queryByTestId("config-panel")).toBeNull();
+    expect(screen.getByRole("button", { name: "Konfiguration einblenden" })).toBeTruthy();
+  });
+
   it("rendert das ConfigPanel als Preview-Panel im Grid-Mode bei aktivem previewFolder", () => {
     useSessionStore.setState({
       sessions: [mockSession("A"), mockSession("B")],
