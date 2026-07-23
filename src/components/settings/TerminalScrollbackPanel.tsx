@@ -4,6 +4,9 @@ import {
   useSettingsStore,
   type ScrollbackPreset,
 } from "../../store/settingsStore";
+import { Select } from "../ui/Select";
+import { SettingsPanelHeader } from "./shared/SettingsPanelHeader";
+import { SettingsSection } from "./shared/SettingsSection";
 
 /**
  * Settings-UI for xterm-Scrollback-Limit (Phase 1 of scrollback-history-coverage).
@@ -30,32 +33,25 @@ export function TerminalScrollbackPanel() {
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-2xl">
-      <header className="flex flex-col gap-1">
-        <h3 className="text-sm font-semibold text-neutral-200">Terminal-Verlauf</h3>
-        <p className="text-xs text-neutral-500">
-          Wie viele Zeilen pro Terminal im Speicher gehalten werden.
-          Höhere Werte = mehr Verlauf zum Hochscrollen, mehr RAM-Verbrauch.
-        </p>
-      </header>
+      <SettingsPanelHeader
+        title="Terminal-Verlauf"
+        description="Wie viele Zeilen pro Terminal im Speicher gehalten werden. Höhere Werte = mehr Verlauf zum Hochscrollen, mehr RAM-Verbrauch."
+      />
 
-      <section className="rounded-md shadow-hairline p-4 flex flex-col gap-3 bg-surface-base">
-        <label className="flex flex-col gap-1.5 text-sm text-neutral-200">
-          <span className="text-xs font-medium text-neutral-300">Scrollback-Zeilen</span>
-          <select
-            value={current}
-            onChange={(e) => {
-              const next = sanitizeScrollbackLines(Number(e.target.value));
-              setPreferences({ scrollbackLines: next });
-            }}
-            className="w-56 rounded-md bg-surface-raised shadow-hairline text-neutral-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-accent focus:ring-inset transition-shadow duration-150"
-          >
-            {SCROLLBACK_PRESETS.map((preset) => (
-              <option key={preset} value={preset}>
-                {formatPresetLabel(preset)}
-              </option>
-            ))}
-          </select>
-        </label>
+      <SettingsSection title="Terminal-Verlauf">
+        <Select
+          label="Scrollback-Zeilen"
+          value={String(current)}
+          options={SCROLLBACK_PRESETS.map((preset) => ({
+            value: String(preset),
+            label: formatPresetLabel(preset),
+          }))}
+          onChange={(value) => {
+            const next = sanitizeScrollbackLines(Number(value));
+            setPreferences({ scrollbackLines: next });
+          }}
+          className="w-56"
+        />
 
         {showWarning && (
           <p className="text-xs text-warning">
@@ -68,7 +64,7 @@ export function TerminalScrollbackPanel() {
           Änderungen wirken auf neu geöffnete Sessions. Bestehende Terminals
           behalten ihren aktuellen Verlauf.
         </p>
-      </section>
+      </SettingsSection>
     </div>
   );
 }

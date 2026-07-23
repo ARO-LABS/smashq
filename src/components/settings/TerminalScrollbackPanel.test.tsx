@@ -16,7 +16,10 @@ beforeEach(() => {
 describe("TerminalScrollbackPanel", () => {
   it("renders the panel heading", () => {
     render(<TerminalScrollbackPanel />);
-    expect(screen.getByText("Terminal-Verlauf")).toBeTruthy();
+    // h3 = Panel-Header; die SettingsSection darunter trägt denselben Titel als h4.
+    expect(
+      screen.getByRole("heading", { level: 3, name: "Terminal-Verlauf" }),
+    ).toBeTruthy();
   });
 
   it("reflects the persisted scrollback value in the select", () => {

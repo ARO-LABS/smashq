@@ -1,4 +1,7 @@
 import { useSettingsStore } from "../../../store/settingsStore";
+import { ToggleSwitch } from "../../ui/ToggleSwitch";
+import { SettingsPanelHeader } from "../shared/SettingsPanelHeader";
+import { SettingsSection } from "../shared/SettingsSection";
 
 export function ThemePanel() {
   const theme = useSettingsStore((s) => s.theme);
@@ -6,15 +9,12 @@ export function ThemePanel() {
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-2xl">
-      <header className="flex flex-col gap-1">
-        <h3 className="text-sm font-semibold text-neutral-200">Darstellung</h3>
-        <p className="text-xs text-neutral-500">
-          Theme-Modus und Animation. Dark Mode ist Standard und auf den Concept-B-Look hin getuned.
-        </p>
-      </header>
+      <SettingsPanelHeader
+        title="Darstellung"
+        description="Theme-Modus und Animation. Dark Mode ist Standard und auf den Concept-B-Look hin getuned."
+      />
 
-      <section className="rounded-md shadow-hairline p-4 flex flex-col gap-3 bg-surface-base">
-        <h4 className="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Modus</h4>
+      <SettingsSection title="Modus">
         <div className="flex gap-2">
           <ModeButton mode="light" current={theme.mode} onSelect={(m) => setTheme({ mode: m })} />
           <ModeButton mode="dark" current={theme.mode} onSelect={(m) => setTheme({ mode: m })} />
@@ -22,45 +22,25 @@ export function ThemePanel() {
         <p className="text-xs text-neutral-500">
           Light Mode ist verfügbar, aber sekundär — Concept-B-Token sind primär für Dark optimiert.
         </p>
-      </section>
+      </SettingsSection>
 
-      <section className="rounded-md shadow-hairline p-4 flex flex-col gap-3 bg-surface-base">
-        <h4 className="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Bewegung</h4>
-        <label className="flex items-start gap-2 cursor-pointer text-sm">
-          <input
-            type="checkbox"
-            checked={theme.reducedMotion}
-            onChange={(e) => setTheme({ reducedMotion: e.target.checked })}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="text-neutral-200">Reduzierte Bewegung</span>
-            <span className="block text-xs text-neutral-500 mt-0.5">
-              Deaktiviert Animationen für bessere Lesbarkeit. Folgt sonst dem System-Setting.
-            </span>
-          </span>
-        </label>
-      </section>
+      <SettingsSection title="Bewegung">
+        <ToggleSwitch
+          label="Reduzierte Bewegung"
+          description="Deaktiviert Animationen für bessere Lesbarkeit. Folgt sonst dem System-Setting."
+          checked={theme.reducedMotion}
+          onChange={(v) => setTheme({ reducedMotion: v })}
+        />
+      </SettingsSection>
 
-      <section className="rounded-md shadow-hairline p-4 flex flex-col gap-3 bg-surface-base">
-        <h4 className="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Terminal</h4>
-        <label className="flex items-start gap-2 cursor-pointer text-sm">
-          <input
-            type="checkbox"
-            checked={theme.syncTerminalTheme ?? false}
-            onChange={(e) => setTheme({ syncTerminalTheme: e.target.checked })}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="text-neutral-200">Terminal-Farben an App-Theme koppeln</span>
-            <span className="block text-xs text-neutral-500 mt-0.5">
-              Koppelt Hintergrund und Vordergrund des Terminals an den Hell/Dunkel-Modus.
-              Standardmäßig aus — sonst überschreibt der Moduswechsel die Farben laufender
-              Programme. Wirkt auf neu gestartete Sessions.
-            </span>
-          </span>
-        </label>
-      </section>
+      <SettingsSection title="Terminal">
+        <ToggleSwitch
+          label="Terminal-Farben an App-Theme koppeln"
+          description="Koppelt Hintergrund und Vordergrund des Terminals an den Hell/Dunkel-Modus. Standardmäßig aus — sonst überschreibt der Moduswechsel die Farben laufender Programme. Wirkt auf neu gestartete Sessions."
+          checked={theme.syncTerminalTheme ?? false}
+          onChange={(v) => setTheme({ syncTerminalTheme: v })}
+        />
+      </SettingsSection>
     </div>
   );
 }
@@ -79,7 +59,7 @@ function ModeButton({
     <button
       type="button"
       onClick={() => onSelect(mode)}
-      className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
+      className={`px-3 py-1.5 rounded-md text-sm transition-colors focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 ${
         isActive
           ? "bg-accent-a15 text-accent ring-1 ring-accent"
           : "bg-surface-raised text-neutral-300 hover:bg-hover-overlay"

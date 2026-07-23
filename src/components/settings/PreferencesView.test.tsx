@@ -41,11 +41,11 @@ describe("PreferencesView", () => {
     });
     render(<PreferencesView />);
 
-    const toggle = await screen.findByRole("checkbox", {
+    const toggle = await screen.findByRole("switch", {
       name: /Terminal-Farben an App-Theme koppeln/i,
     });
     // Default off — the reported collision stays disabled until opted in.
-    expect((toggle as HTMLInputElement).checked).toBe(false);
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
 
     act(() => {
       fireEvent.click(toggle);

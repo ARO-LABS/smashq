@@ -1,4 +1,7 @@
 import { useSettingsStore } from "../../../store/settingsStore";
+import { ToggleSwitch } from "../../ui/ToggleSwitch";
+import { SettingsPanelHeader } from "../shared/SettingsPanelHeader";
+import { SettingsSection } from "../shared/SettingsSection";
 
 export function NotificationsPanel() {
   const notifications = useSettingsStore((s) => s.notifications);
@@ -8,49 +11,45 @@ export function NotificationsPanel() {
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-2xl">
-      <header className="flex flex-col gap-1">
-        <h3 className="text-sm font-semibold text-neutral-200">Benachrichtigungen</h3>
-        <p className="text-xs text-neutral-500">
-          Welche Events Toasts auslösen — und ob Sound dabei abgespielt wird.
-        </p>
-      </header>
+      <SettingsPanelHeader
+        title="Benachrichtigungen"
+        description="Welche Events Toasts auslösen — und ob Sound dabei abgespielt wird."
+      />
 
-      <section className="rounded-md shadow-hairline p-4 flex flex-col gap-3 bg-surface-base">
-        <h4 className="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Events</h4>
-        <Toggle
+      <SettingsSection title="Events">
+        <ToggleSwitch
           label="Benachrichtigungen aktiviert"
           checked={notifications.enabled}
           onChange={(v) => setNotifications({ enabled: v })}
         />
-        <Toggle
+        <ToggleSwitch
           label="Pipeline abgeschlossen"
           checked={notifications.pipelineComplete}
           disabled={!notifications.enabled}
           onChange={(v) => setNotifications({ pipelineComplete: v })}
         />
-        <Toggle
+        <ToggleSwitch
           label="Pipeline-Fehler"
           checked={notifications.pipelineError}
           disabled={!notifications.enabled}
           onChange={(v) => setNotifications({ pipelineError: v })}
         />
-        <Toggle
+        <ToggleSwitch
           label="QA-Gate Ergebnis"
           checked={notifications.qaGateResult}
           disabled={!notifications.enabled}
           onChange={(v) => setNotifications({ qaGateResult: v })}
         />
-        <Toggle
+        <ToggleSwitch
           label="Kosten-Warnung"
           checked={notifications.costAlert}
           disabled={!notifications.enabled}
           onChange={(v) => setNotifications({ costAlert: v })}
         />
-      </section>
+      </SettingsSection>
 
-      <section className="rounded-md shadow-hairline p-4 flex flex-col gap-3 bg-surface-base">
-        <h4 className="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Sound</h4>
-        <Toggle
+      <SettingsSection title="Sound">
+        <ToggleSwitch
           label="Sound aktiviert"
           checked={sound.enabled}
           onChange={(v) => setSound({ enabled: v })}
@@ -65,38 +64,10 @@ export function NotificationsPanel() {
             value={sound.volume}
             disabled={!sound.enabled}
             onChange={(e) => setSound({ volume: Number(e.target.value) })}
-            className="w-full accent-accent"
+            className="w-full accent-accent focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
           />
         </label>
-      </section>
+      </SettingsSection>
     </div>
-  );
-}
-
-function Toggle({
-  label,
-  checked,
-  onChange,
-  disabled = false,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <label
-      className={`flex items-center gap-2 text-sm ${
-        disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
-      }`}
-    >
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-      <span className="text-neutral-200">{label}</span>
-    </label>
   );
 }
