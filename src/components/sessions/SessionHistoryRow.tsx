@@ -1,7 +1,12 @@
 import React from "react";
 import { ICONS } from "../../utils/icons";
 import { formatElapsed } from "../../utils/format";
-import type { ClaudeSessionSummary } from "./SessionHistoryViewer";
+import {
+  formatDateTime,
+  formatModel,
+  formatRelativeDate,
+  type ClaudeSessionSummary,
+} from "./sessionHistoryHelpers";
 
 const GitBranch = ICONS.git.branch;
 const Bot = ICONS.library.agent;
@@ -22,9 +27,6 @@ export interface SessionHistoryRowProps {
   onResume?: () => void;
   onRename: () => void;
   onDelete: () => void;
-  formatRelativeDate: (iso: string) => string;
-  formatDateTime: (iso: string) => string;
-  formatModel: (m: string) => string;
 }
 
 /** Dauer aus Start/Ende — „–" wenn Zeitstempel fehlen oder inkonsistent sind. */
@@ -50,9 +52,6 @@ export const SessionHistoryRow: React.FC<SessionHistoryRowProps> = ({
   onResume,
   onRename,
   onDelete,
-  formatRelativeDate,
-  formatDateTime,
-  formatModel,
 }) => {
   return (
     <div className="group flex flex-col gap-0.5 px-4 py-2 mx-1.5 rounded-md hover:bg-hover-overlay transition-colors">
@@ -96,7 +95,7 @@ export const SessionHistoryRow: React.FC<SessionHistoryRowProps> = ({
                 "p-1 rounded hover:bg-error/10 text-neutral-400 hover:text-error transition-colors " +
                 (deletePending ? "opacity-40 cursor-not-allowed" : "")
               }
-              title="Session loeschen (in den Papierkorb)"
+              title="Session löschen (in den Papierkorb)"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>

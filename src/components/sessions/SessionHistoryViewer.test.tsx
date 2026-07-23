@@ -89,7 +89,7 @@ describe("SessionHistoryViewer", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Keine Claude-Sessions fuer dieses Projekt gefunden"),
+        screen.getByText("Keine Claude-Sessions für dieses Projekt gefunden"),
       ).toBeInTheDocument();
     });
   });
@@ -223,7 +223,7 @@ describe("SessionHistoryViewer", () => {
     });
 
     expect(
-      screen.getByTitle("Session loeschen (in den Papierkorb)"),
+      screen.getByTitle("Session löschen (in den Papierkorb)"),
     ).toBeInTheDocument();
   });
 
@@ -240,7 +240,7 @@ describe("SessionHistoryViewer", () => {
       expect(screen.getByText("Fix login bug")).toBeInTheDocument();
     });
 
-    const deleteButtons = screen.getAllByTitle("Session loeschen (in den Papierkorb)");
+    const deleteButtons = screen.getAllByTitle("Session löschen (in den Papierkorb)");
     expect(deleteButtons).toHaveLength(2);
 
     await act(async () => {
@@ -260,12 +260,12 @@ describe("SessionHistoryViewer", () => {
       sessionId: "sess-001",
     });
 
-    // Success toast surfaces with the Memory-pruefen action
+    // Success toast surfaces with the Memory-prüfen action
     const toasts = useUIStore.getState().toasts;
     const successToast = toasts.find((t) => t.type === "success");
     expect(successToast).toBeDefined();
-    expect(successToast?.title).toBe("Session geloescht");
-    expect(successToast?.action?.label).toBe("Memory pruefen");
+    expect(successToast?.title).toBe("Session gelöscht");
+    expect(successToast?.action?.label).toBe("Memory prüfen");
   });
 
   it("rolls back optimistic removal and shows an error toast on failure", async () => {
@@ -281,7 +281,7 @@ describe("SessionHistoryViewer", () => {
       expect(screen.getByText("Fix login bug")).toBeInTheDocument();
     });
 
-    const deleteBtn = screen.getByTitle("Session loeschen (in den Papierkorb)");
+    const deleteBtn = screen.getByTitle("Session löschen (in den Papierkorb)");
 
     await act(async () => {
       fireEvent.click(deleteBtn);
@@ -295,10 +295,10 @@ describe("SessionHistoryViewer", () => {
     const toasts = useUIStore.getState().toasts;
     const errorToast = toasts.find((t) => t.type === "error");
     expect(errorToast).toBeDefined();
-    expect(errorToast?.title).toBe("Loeschen fehlgeschlagen");
+    expect(errorToast?.title).toBe("Löschen fehlgeschlagen");
   });
 
-  it("Memory-pruefen-action switches the active tab to Library", async () => {
+  it("Memory-prüfen-action switches the active tab to Library", async () => {
     mockInvoke.mockImplementation((cmd: string) => {
       if (cmd === "scan_claude_sessions") return Promise.resolve([mockSession]);
       if (cmd === "delete_claude_session") return Promise.resolve(undefined);
@@ -312,7 +312,7 @@ describe("SessionHistoryViewer", () => {
     });
 
     await act(async () => {
-      fireEvent.click(screen.getByTitle("Session loeschen (in den Papierkorb)"));
+      fireEvent.click(screen.getByTitle("Session löschen (in den Papierkorb)"));
     });
 
     await waitFor(() => {
@@ -326,7 +326,7 @@ describe("SessionHistoryViewer", () => {
       successToast!.action!.onClick();
     });
 
-    // The "Memory pruefen" action opens the Library in its own detached window.
+    // The "Memory prüfen" action opens the Library in its own detached window.
     expect(mockInvoke).toHaveBeenCalledWith("open_detached_window", {
       view: "library",
       title: "Bibliothek",
@@ -350,7 +350,7 @@ describe("SessionHistoryViewer", () => {
       expect(screen.getByText("Fix login bug")).toBeInTheDocument();
     });
 
-    const deleteBtn = screen.getByTitle("Session loeschen (in den Papierkorb)") as HTMLButtonElement;
+    const deleteBtn = screen.getByTitle("Session löschen (in den Papierkorb)") as HTMLButtonElement;
 
     await act(async () => {
       fireEvent.click(deleteBtn);
@@ -400,7 +400,7 @@ describe("SessionHistoryViewer", () => {
     });
 
     const deleteBtns = screen.getAllByTitle(
-      "Session loeschen (in den Papierkorb)",
+      "Session löschen (in den Papierkorb)",
     );
     expect(deleteBtns).toHaveLength(2);
 
@@ -417,8 +417,8 @@ describe("SessionHistoryViewer", () => {
     expect(screen.queryByText("Add unit tests")).not.toBeInTheDocument();
 
     const toasts = useUIStore.getState().toasts;
-    expect(toasts.some((t) => t.type === "error" && t.title === "Loeschen fehlgeschlagen")).toBe(true);
-    expect(toasts.some((t) => t.type === "success" && t.title === "Session geloescht")).toBe(true);
+    expect(toasts.some((t) => t.type === "error" && t.title === "Löschen fehlgeschlagen")).toBe(true);
+    expect(toasts.some((t) => t.type === "success" && t.title === "Session gelöscht")).toBe(true);
   });
 
   it("clears sessionRestore + sessionTitleOverrides after delete-success", async () => {
@@ -449,7 +449,7 @@ describe("SessionHistoryViewer", () => {
     });
 
     await act(async () => {
-      fireEvent.click(screen.getByTitle("Session loeschen (in den Papierkorb)"));
+      fireEvent.click(screen.getByTitle("Session löschen (in den Papierkorb)"));
     });
 
     await waitFor(() => {
@@ -518,7 +518,7 @@ describe("SessionHistoryViewer", () => {
       render(<SessionHistoryViewer folder="C:\\p" onResumeSession={vi.fn()} />);
       expect(await screen.findByText("Aktiv")).toBeInTheDocument();
       expect(screen.queryByTitle("Session fortsetzen")).not.toBeInTheDocument();
-      expect(screen.queryByTitle("Session loeschen (in den Papierkorb)")).not.toBeInTheDocument();
+      expect(screen.queryByTitle("Session löschen (in den Papierkorb)")).not.toBeInTheDocument();
       expect(
         screen.getByText("Läuft gerade — Fortsetzen und Löschen gesperrt"),
       ).toBeInTheDocument();

@@ -5,6 +5,20 @@
 
 import type { SessionStatus } from "../../store/sessionStore";
 
+/** Session-Zusammenfassung aus dem Rust-Scanner (matcht `ClaudeSessionSummary` in file_reader.rs). */
+export interface ClaudeSessionSummary {
+  session_id: string;
+  title: string;
+  started_at: string;
+  ended_at: string;
+  model: string;
+  user_turns: number;
+  total_messages: number;
+  subagent_count: number;
+  git_branch: string;
+  cwd: string;
+}
+
 /**
  * Struktureller Subset von ClaudeSessionSummary, den die History-UI
  * durchreicht (Task 4 übergibt volle Summaries — TypeScript matcht strukturell).
@@ -97,4 +111,41 @@ export function buildRunningClaudeIds(
     if (s.claudeSessionId && LIVE_STATUSES.has(s.status)) ids.add(s.claudeSessionId);
   }
   return ids;
+}
+
+// ============================================================================
+// Format-Helper (Anzeige — pure, deshalb hier statt in den Komponenten)
+// ============================================================================
+
+export function formatDateTime(isoString: string): string {
+  if (!isoString) return "–";
+  const date = new Date(isoString);
+  return date.toLocaleString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export function formatModel(model: string): string {
+  if (!model) return "";
+  if (model.includes("opus")) return "Opus";
+  if (model.includes("sonnet")) return "Sonnet";
+  if (model.includes("haiku")) return "Haiku";
+  return model;
+}
+
+export function formatRelativeDate(isoString: string): string {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return "Heute";
+  if (diffDays === 1) return "Gestern";
+  if (diffDays < 7) return `Vor ${diffDays} Tagen`;
+  return formatDateTime(isoString);
 }

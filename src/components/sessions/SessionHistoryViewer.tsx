@@ -11,28 +11,12 @@ import {
   buildRunningClaudeIds,
   groupSessionsByTime,
   matchesHistoryQuery,
+  type ClaudeSessionSummary,
 } from "./sessionHistoryHelpers";
 
 const RefreshCw = ICONS.action.refresh;
 const SearchIcon = ICONS.action.search;
 const ClearIcon = ICONS.action.close;
-
-// ============================================================================
-// Types (matches Rust ClaudeSessionSummary)
-// ============================================================================
-
-export interface ClaudeSessionSummary {
-  session_id: string;
-  title: string;
-  started_at: string;
-  ended_at: string;
-  model: string;
-  user_turns: number;
-  total_messages: number;
-  subagent_count: number;
-  git_branch: string;
-  cwd: string;
-}
 
 /** Summary + abgeleitete Anzeige-Felder (Override-Titel, Rename-Vorschau). */
 type EnrichedSummary = ClaudeSessionSummary & {
@@ -47,43 +31,6 @@ type EnrichedSummary = ClaudeSessionSummary & {
 interface SessionHistoryViewerProps {
   folder: string;
   onResumeSession?: (sessionId: string, cwd: string, title?: string) => void;
-}
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function formatDateTime(isoString: string): string {
-  if (!isoString) return "–";
-  const date = new Date(isoString);
-  return date.toLocaleString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatModel(model: string): string {
-  if (!model) return "";
-  if (model.includes("opus")) return "Opus";
-  if (model.includes("sonnet")) return "Sonnet";
-  if (model.includes("haiku")) return "Haiku";
-  return model;
-}
-
-function formatRelativeDate(isoString: string): string {
-  if (!isoString) return "";
-  const date = new Date(isoString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return "Heute";
-  if (diffDays === 1) return "Gestern";
-  if (diffDays < 7) return `Vor ${diffDays} Tagen`;
-  return formatDateTime(isoString);
 }
 
 /** Balkenbreiten der drei Skeleton-Zeilen (Titel / Vorschau / Meta). */
@@ -136,7 +83,7 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
    * `pendingDeletes` blocks redundant re-clicks on the same row while a
    * delete is in-flight; the trash button reflects this via `disabled`.
    *
-   * The toast offers a "Memory pruefen"-action that jumps to the Library
+   * The toast offers a "Memory prüfen"-action that jumps to the Library
    * tab where projektweite Memory-Eintraege gepflegt werden — die Library
    * ist Single Source of Truth fuer Memory-Hygiene.
    */
@@ -159,11 +106,11 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
       removeRestorableSessionByClaudeId(sessionId);
       addToast({
         type: "success",
-        title: "Session geloescht",
+        title: "Session gelöscht",
         message: title,
         duration: 8000,
         action: {
-          label: "Memory pruefen",
+          label: "Memory prüfen",
           onClick: () =>
             invoke("open_detached_window", { view: "library", title: "Bibliothek" }).catch(
               (err) => logError("SessionHistoryViewer.openLibrary", err),
@@ -181,7 +128,7 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
       logError("SessionHistoryViewer.deleteSession", err);
       addToast({
         type: "error",
-        title: "Loeschen fehlgeschlagen",
+        title: "Löschen fehlgeschlagen",
         message: getErrorMessage(err),
         duration: 8000,
       });
@@ -202,6 +149,7 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
   if (loading) {
     return (
       <div
+        role="status"
         aria-label="Sessions werden geladen"
         className="flex flex-col h-full overflow-y-auto pb-2"
       >
@@ -236,7 +184,7 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
   if (sessions.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-neutral-400 text-sm py-8">
-        Keine Claude-Sessions fuer dieses Projekt gefunden
+        Keine Claude-Sessions für dieses Projekt gefunden
       </div>
     );
   }
@@ -282,6 +230,7 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          aria-label="Sessions durchsuchen"
           placeholder="Titel oder Branch durchsuchen …"
           className="flex-1 min-w-0 bg-transparent text-xs text-neutral-200 placeholder:text-neutral-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-inset rounded-sm"
         />
@@ -328,9 +277,6 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
                 }
                 onRename={() => {}} // Task 5: Inline-Rename-Input wird hier angebunden
                 onDelete={() => handleDelete(s.session_id, s.effectiveTitle)}
-                formatRelativeDate={formatRelativeDate}
-                formatDateTime={formatDateTime}
-                formatModel={formatModel}
               />
             ))}
           </React.Fragment>
