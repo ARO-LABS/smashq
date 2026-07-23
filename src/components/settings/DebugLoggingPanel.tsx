@@ -97,11 +97,12 @@ export function DebugLoggingPanel() {
           </label>
         </fieldset>
 
+        {/* Container dimmt bewusst NICHT selbst: die disabled-ToggleSwitches dimmen
+            ihre Zeile (inkl. Description) bereits auf opacity-40 — eine zusätzliche
+            Container-Opacity würde multiplikativ stapeln (0.4 × 0.4 ≈ 0.16). */}
         <div
-          className={`pl-6 space-y-3 border-l-2 transition-opacity duration-200 ${
-            anyEnabled
-              ? "border-accent opacity-100"
-              : "border-neutral-700 opacity-40 pointer-events-none"
+          className={`pl-6 space-y-3 border-l-2 ${
+            anyEnabled ? "border-accent" : "border-neutral-700 pointer-events-none"
           }`}
           aria-disabled={!anyEnabled}
         >
