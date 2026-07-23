@@ -40,9 +40,10 @@ export interface UseCollapsibleResizeResult {
   isDragging: boolean;
   handleProps: CollapsibleResizeHandlers;
   /**
-   * Click handler for the rail. Restores (reopens) when collapsed, no-op when
-   * open — and suppresses exactly one click synthesized right after a drag, so
-   * dragging past the threshold to collapse does not immediately re-open.
+   * Click handler for the rail. Toggles the panel: restores (reopens) when
+   * collapsed, collapses when open — and suppresses exactly one click
+   * synthesized right after a drag, so a committed drag does not immediately
+   * re-open (after drag-to-collapse) or collapse (after drag-to-resize).
    */
   onClick: () => void;
   /** Programmatic restore (reopen to the last expanded width). */
@@ -167,9 +168,10 @@ export function useCollapsibleResize(
   }, [onCommit]);
 
   const collapse = useCallback(() => {
-    // lastWidthRef.current is kept in sync with `width` every render while the
-    // panel is expanded (line above: `if (!dragging && !collapsed)`), so it
-    // always reflects the current committed width — no width is lost on collapse.
+    // lastWidthRef.current is kept in sync with `width` by the render-body
+    // assignment near the top of the hook (`if (!dragging && !collapsed)`), so
+    // it always reflects the current committed width — no width is lost on
+    // collapse.
     onCommit({ width: lastWidthRef.current, collapsed: true });
   }, [onCommit]);
 
