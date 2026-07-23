@@ -1,25 +1,27 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ICONS } from "../../utils/icons";
 import { getErrorMessage } from "../../utils/adpError";
 import { logError } from "../../utils/errorLogger";
-import { formatElapsed } from "../../utils/format";
 import { useSettingsStore } from "../../store/settingsStore";
+import { useSessionStore } from "../../store/sessionStore";
 import { useUIStore } from "../../store/uiStore";
+import { SessionHistoryRow } from "./SessionHistoryRow";
+import {
+  buildRunningClaudeIds,
+  groupSessionsByTime,
+  matchesHistoryQuery,
+} from "./sessionHistoryHelpers";
 
 const RefreshCw = ICONS.action.refresh;
-const GitBranch = ICONS.git.branch;
-const Bot = ICONS.library.agent;
-const MessageSquare = ICONS.git.comment;
-const Clock = ICONS.tasks.clock;
-const Play = ICONS.action.run;
-const Trash2 = ICONS.action.trash;
+const SearchIcon = ICONS.action.search;
+const ClearIcon = ICONS.action.close;
 
 // ============================================================================
 // Types (matches Rust ClaudeSessionSummary)
 // ============================================================================
 
-interface ClaudeSessionSummary {
+export interface ClaudeSessionSummary {
   session_id: string;
   title: string;
   started_at: string;
@@ -31,6 +33,12 @@ interface ClaudeSessionSummary {
   git_branch: string;
   cwd: string;
 }
+
+/** Summary + abgeleitete Anzeige-Felder (Override-Titel, Rename-Vorschau). */
+type EnrichedSummary = ClaudeSessionSummary & {
+  effectiveTitle: string;
+  preview: string | null;
+};
 
 // ============================================================================
 // Props
@@ -57,13 +65,6 @@ function formatDateTime(isoString: string): string {
   });
 }
 
-function formatDuration(startIso: string, endIso: string): string {
-  if (!startIso || !endIso) return "–";
-  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
-  if (ms < 0) return "–";
-  return formatElapsed(ms);
-}
-
 function formatModel(model: string): string {
   if (!model) return "";
   if (model.includes("opus")) return "Opus";
@@ -85,6 +86,13 @@ function formatRelativeDate(isoString: string): string {
   return formatDateTime(isoString);
 }
 
+/** Balkenbreiten der drei Skeleton-Zeilen (Titel / Vorschau / Meta). */
+const SKELETON_WIDTHS: ReadonlyArray<readonly [string, string, string]> = [
+  ["72%", "46%", "58%"],
+  ["58%", "64%", "40%"],
+  ["82%", "38%", "52%"],
+];
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -94,11 +102,14 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState("");
   const sessionTitleOverrides = useSettingsStore((s) => s.sessionTitleOverrides);
   const removeRestorableSessionByClaudeId = useSettingsStore(
     (s) => s.removeRestorableSessionByClaudeId,
   );
   const addToast = useUIStore((s) => s.addToast);
+  const liveSessions = useSessionStore((s) => s.sessions);
+  const runningIds = useMemo(() => buildRunningClaudeIds(liveSessions), [liveSessions]);
 
   const loadSessions = async () => {
     setLoading(true);
@@ -190,9 +201,20 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full text-neutral-400 text-sm py-8">
-        <RefreshCw className="w-4 h-4 animate-spin mr-2" />
-        Sessions werden geladen...
+      <div
+        aria-label="Sessions werden geladen"
+        className="flex flex-col h-full overflow-y-auto pb-2"
+      >
+        <div className="px-4 py-3 text-[11px] font-semibold tracking-widest uppercase text-neutral-500">
+          Sessions werden geladen …
+        </div>
+        {SKELETON_WIDTHS.map((widths, i) => (
+          <div key={i} className="flex flex-col gap-1.5 px-4 py-2 mx-1.5">
+            <div className="h-[11px] rounded bg-hover-overlay" style={{ width: widths[0] }} />
+            <div className="h-[9px] rounded bg-hover-overlay" style={{ width: widths[1] }} />
+            <div className="h-[8px] rounded bg-hover-overlay" style={{ width: widths[2] }} />
+          </div>
+        ))}
       </div>
     );
   }
@@ -219,97 +241,101 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
     );
   }
 
+  const enriched: EnrichedSummary[] = sessions.map((s) => {
+    const overrideTitle = sessionTitleOverrides[s.session_id]?.trim();
+    const effectiveTitle = overrideTitle || s.title;
+    // Vorschau nur, wenn ein Override den Titel ersetzt — der Rust-Scanner
+    // nutzt bereits die erste User-Nachricht als Titel, sonst wäre die
+    // Vorschau eine reine Dopplung.
+    const preview = overrideTitle && s.title !== effectiveTitle ? s.title : null;
+    return { ...s, effectiveTitle, preview };
+  });
+  const filtered = enriched.filter((s) => matchesHistoryQuery(s, s.effectiveTitle, query));
+  const groups = groupSessionsByTime(filtered);
+  const hasQuery = query.trim().length > 0;
+
   return (
-    <div className="flex flex-col gap-2 p-2 h-full overflow-y-auto">
+    <div className="flex flex-col h-full overflow-y-auto pb-2">
       {/* Header */}
-      <div className="flex items-center justify-between mb-1">
-        <span className="ae-body-sm">
-          {sessions.length} {sessions.length === 1 ? "Session" : "Sessions"}
+      <div className="flex items-center justify-between px-4 py-3">
+        <span className="text-[11px] font-semibold tracking-widest uppercase text-neutral-500">
+          {hasQuery
+            ? `${filtered.length} von ${sessions.length} Sessions`
+            : `${sessions.length} ${sessions.length === 1 ? "Session" : "Sessions"}`}
         </span>
-        <button
-          onClick={loadSessions}
-          className="text-xs text-neutral-500 hover:text-neutral-200 transition-colors px-2 py-0.5 rounded hover:bg-hover-overlay"
-          title="Neu laden"
-        >
-          <RefreshCw className="w-3 h-3" />
-        </button>
+        <div className="flex items-center gap-1">
+          {/* Task 6: Hier kommt der Auswahlmodus-Toggle hin (Mehrfachauswahl + Bulk-Delete). */}
+          <button
+            onClick={loadSessions}
+            className="text-xs text-neutral-500 hover:text-neutral-200 transition-colors px-2 py-0.5 rounded hover:bg-hover-overlay"
+            title="Neu laden"
+          >
+            <RefreshCw className="w-3 h-3" />
+          </button>
+        </div>
       </div>
 
-      {/* Session list */}
-      <div className="flex flex-col gap-1.5">
-        {sessions.map((session) => {
-          const overrideTitle = sessionTitleOverrides[session.session_id]?.trim();
-          const effectiveTitle = overrideTitle || session.title;
+      {/* Suche */}
+      <div className="mx-3 mb-1 flex items-center gap-2 px-2.5 py-1.5 bg-surface-raised border border-neutral-800 rounded-md">
+        <SearchIcon className="w-3 h-3 text-neutral-500 shrink-0" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Titel oder Branch durchsuchen …"
+          className="flex-1 min-w-0 bg-transparent text-xs text-neutral-200 placeholder:text-neutral-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-inset rounded-sm"
+        />
+        {query.length > 0 && (
+          <button
+            onClick={() => setQuery("")}
+            aria-label="Suche leeren"
+            className="p-0.5 rounded text-neutral-500 hover:text-neutral-200 transition-colors shrink-0"
+          >
+            <ClearIcon className="w-3 h-3" />
+          </button>
+        )}
+      </div>
 
-          return (
+      {/* Liste: Gruppen oder Kein-Treffer-Zustand */}
+      {filtered.length === 0 && hasQuery ? (
+        <div className="flex flex-col items-center justify-center flex-1 gap-1 px-4 py-8 text-center">
+          <SearchIcon className="w-4 h-4 text-neutral-600" />
+          <span className="text-xs text-neutral-400">{`Keine Session passt zu „${query}“.`}</span>
+          <span className="text-[11px] text-neutral-500">Suchbegriff ändern oder leeren.</span>
+        </div>
+      ) : (
+        groups.map((group) => (
+          <React.Fragment key={group.key}>
             <div
-              key={session.session_id}
-              className="bg-surface-raised border border-neutral-700 rounded-none px-3 py-2 text-sm group"
+              data-testid={`history-group-${group.key}`}
+              className="flex items-baseline gap-1.5 px-4 pt-3 pb-1 text-[10px] font-bold tracking-widest uppercase text-neutral-500"
             >
-            {/* Title + Resume button */}
-            <div className="flex items-start gap-2">
-              <div className="text-neutral-200 font-medium leading-snug line-clamp-2 flex-1">
-                {effectiveTitle}
-              </div>
-              {onResumeSession && (
-                <button
-                  onClick={() => onResumeSession(session.session_id, session.cwd, effectiveTitle)}
-                  className="shrink-0 mt-0.5 p-1 rounded hover:bg-accent-a15 text-neutral-400 hover:text-accent transition-colors opacity-0 group-hover:opacity-100"
-                  title="Session fortsetzen"
-                >
-                  <Play className="w-3.5 h-3.5" />
-                </button>
-              )}
-              <button
-                onClick={() => handleDelete(session.session_id, effectiveTitle)}
-                disabled={pendingDeletes.has(session.session_id)}
-                className={
-                  "shrink-0 mt-0.5 p-1 rounded hover:bg-error/10 text-neutral-400 hover:text-error transition-colors " +
-                  (pendingDeletes.has(session.session_id)
-                    ? "opacity-40 cursor-not-allowed"
-                    : "opacity-0 group-hover:opacity-100")
+              <span>{group.label}</span>
+              <span className="font-mono font-medium opacity-70">{group.sessions.length}</span>
+            </div>
+            {group.sessions.map((s) => (
+              <SessionHistoryRow
+                key={s.session_id}
+                session={s}
+                effectiveTitle={s.effectiveTitle}
+                preview={s.preview}
+                isActive={runningIds.has(s.session_id)}
+                deletePending={pendingDeletes.has(s.session_id)}
+                onResume={
+                  onResumeSession
+                    ? () => onResumeSession(s.session_id, s.cwd, s.effectiveTitle)
+                    : undefined
                 }
-                title="Session loeschen (in den Papierkorb)"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Metadata row */}
-            <div className="flex items-center gap-3 mt-1.5 text-xs text-neutral-400 flex-wrap">
-              <span title={formatDateTime(session.started_at)}>
-                {formatRelativeDate(session.started_at)}
-              </span>
-              <span className="flex items-center gap-1" title="Dauer">
-                <Clock className="w-3 h-3" />
-                {formatDuration(session.started_at, session.ended_at)}
-              </span>
-              <span className="flex items-center gap-1" title="User-Prompts">
-                <MessageSquare className="w-3 h-3" />
-                {session.user_turns}
-              </span>
-              {session.subagent_count > 0 && (
-                <span className="flex items-center gap-1" title="Subagents">
-                  <Bot className="w-3 h-3" />
-                  {session.subagent_count}
-                </span>
-              )}
-              {session.git_branch && (
-                <span className="flex items-center gap-1 truncate max-w-[120px]" title={session.git_branch}>
-                  <GitBranch className="w-3 h-3 shrink-0" />
-                  {session.git_branch}
-                </span>
-              )}
-              {session.model && (
-                <span className="text-neutral-500" title={session.model}>
-                  {formatModel(session.model)}
-                </span>
-              )}
-            </div>
-            </div>
-          );
-        })}
-      </div>
+                onRename={() => {}} // Task 5: Inline-Rename-Input wird hier angebunden
+                onDelete={() => handleDelete(s.session_id, s.effectiveTitle)}
+                formatRelativeDate={formatRelativeDate}
+                formatDateTime={formatDateTime}
+                formatModel={formatModel}
+              />
+            ))}
+          </React.Fragment>
+        ))
+      )}
     </div>
   );
 };

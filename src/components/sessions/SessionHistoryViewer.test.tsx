@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent, act } from "@testing-library/react"
 import SessionHistoryViewer from "./SessionHistoryViewer";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useUIStore } from "../../store/uiStore";
+import { useSessionStore } from "../../store/sessionStore";
 
 // Mock @tauri-apps/api/core
 const mockInvoke = vi.fn();
@@ -50,12 +51,14 @@ describe("SessionHistoryViewer", () => {
       },
     });
     useUIStore.setState({ toasts: [] });
+    useSessionStore.setState({ sessions: [] });
   });
 
   it("shows loading state initially", () => {
     mockInvoke.mockReturnValue(new Promise(() => {}));
     render(<SessionHistoryViewer folder="/test/project" />);
-    expect(screen.getByText("Sessions werden geladen...")).toBeInTheDocument();
+    // Skeleton-Container traegt das aria-label — stabiler Hook statt Textabgleich
+    expect(screen.getByLabelText("Sessions werden geladen")).toBeInTheDocument();
   });
 
   it("renders session list", async () => {
@@ -140,7 +143,10 @@ describe("SessionHistoryViewer", () => {
       expect(screen.getByText("test123")).toBeInTheDocument();
     });
 
+    // Der Original-Titel ist nicht mehr Titelzeile — er erscheint nur noch
+    // als Vorschau in typografischen Anführungszeichen (History-Redesign).
     expect(screen.queryByText("Fix login bug")).not.toBeInTheDocument();
+    expect(screen.getByText("„Fix login bug“")).toBeInTheDocument();
 
     const resumeBtn = screen.getByTitle("Session fortsetzen");
     fireEvent.click(resumeBtn);
@@ -169,10 +175,11 @@ describe("SessionHistoryViewer", () => {
       expect(screen.getByText("Fix login bug")).toBeInTheDocument();
     });
 
-    // mockSession has 2 subagents, mockSession2 has 0
-    expect(screen.getByText("2")).toBeInTheDocument(); // subagent count for session 1
-    // Session 2 should not have a subagent count displayed
-    // (5 and 12 are user_turns, not subagent counts)
+    // mockSession has 2 subagents, mockSession2 has 0. Query via title
+    // attribute because the group header also renders a bare count ("2").
+    const subagentBadges = screen.getAllByTitle("Subagents");
+    expect(subagentBadges).toHaveLength(1);
+    expect(subagentBadges[0]).toHaveTextContent("2");
   });
 
   it("refreshes on button click", async () => {
@@ -450,5 +457,102 @@ describe("SessionHistoryViewer", () => {
     });
 
     expect(useSettingsStore.getState().sessionTitleOverrides[ID]).toBeUndefined();
+  });
+
+  // ==========================================================================
+  // History-Redesign (Task 4): Gruppierung, Suche, Aktiv-Status, Vorschau,
+  // Skeleton
+  // ==========================================================================
+
+  describe("History-Redesign", () => {
+    it("groups sessions by time with German group labels", async () => {
+      const today = new Date().toISOString();
+      const old = "2020-01-01T10:00:00Z";
+      mockInvoke.mockResolvedValue([
+        { ...mockSession, session_id: "s-new", started_at: today, ended_at: today },
+        { ...mockSession, session_id: "s-old", started_at: old, ended_at: old },
+      ]);
+      render(<SessionHistoryViewer folder="C:\\p" />);
+      // Testid statt Textquery: „Heute" existiert auch als relatives Datum
+      // in der Metazeile — der Testid trifft eindeutig den Gruppen-Header.
+      expect(await screen.findByTestId("history-group-today")).toHaveTextContent("Heute");
+      expect(screen.getByTestId("history-group-older")).toHaveTextContent("Älter");
+    });
+
+    it("search filters by title, shows honest count and empty message", async () => {
+      mockInvoke.mockResolvedValue([
+        { ...mockSession, session_id: "a", title: "Kanban Board bauen" },
+        { ...mockSession, session_id: "b", title: "Updater fixen" },
+      ]);
+      render(<SessionHistoryViewer folder="C:\\p" />);
+      const input = await screen.findByPlaceholderText("Titel oder Branch durchsuchen …");
+      fireEvent.change(input, { target: { value: "kanban" } });
+      expect(screen.getByText("1 von 2 Sessions")).toBeInTheDocument();
+      expect(screen.getByText("Kanban Board bauen")).toBeInTheDocument();
+      expect(screen.queryByText("Updater fixen")).not.toBeInTheDocument();
+      fireEvent.change(input, { target: { value: "zzz-nichts" } });
+      expect(screen.getByText(/Keine Session passt zu/)).toBeInTheDocument();
+      expect(screen.getByText("0 von 2 Sessions")).toBeInTheDocument();
+    });
+
+    it("clear button empties the query and restores the full list", async () => {
+      mockInvoke.mockResolvedValue([
+        { ...mockSession, session_id: "a", title: "Kanban Board bauen" },
+        { ...mockSession, session_id: "b", title: "Updater fixen" },
+      ]);
+      render(<SessionHistoryViewer folder="C:\\p" />);
+      const input = await screen.findByPlaceholderText("Titel oder Branch durchsuchen …");
+      // X-Button erscheint erst bei nicht-leerer Query
+      expect(screen.queryByLabelText("Suche leeren")).not.toBeInTheDocument();
+      fireEvent.change(input, { target: { value: "kanban" } });
+      fireEvent.click(screen.getByLabelText("Suche leeren"));
+      expect(screen.getByText("2 Sessions")).toBeInTheDocument();
+      expect(screen.getByText("Updater fixen")).toBeInTheDocument();
+    });
+
+    it("marks a running session as active and hides its actions (Doppel-Resume-Schutz)", async () => {
+      mockInvoke.mockResolvedValue([{ ...mockSession, session_id: "uuid-live" }]);
+      useSessionStore.setState({
+        sessions: [{ id: "s1", claudeSessionId: "uuid-live", status: "running" }] as never,
+      });
+      render(<SessionHistoryViewer folder="C:\\p" onResumeSession={vi.fn()} />);
+      expect(await screen.findByText("Aktiv")).toBeInTheDocument();
+      expect(screen.queryByTitle("Session fortsetzen")).not.toBeInTheDocument();
+      expect(screen.queryByTitle("Session loeschen (in den Papierkorb)")).not.toBeInTheDocument();
+      expect(
+        screen.getByText("Läuft gerade — Fortsetzen und Löschen gesperrt"),
+      ).toBeInTheDocument();
+    });
+
+    it("shows preview with original first message only when a rename override exists", async () => {
+      mockInvoke.mockResolvedValue([
+        { ...mockSession, session_id: "u1", title: "Erste Nachricht der Session" },
+        { ...mockSession, session_id: "u2", title: "Unbenannte Erstnachricht" },
+      ]);
+      useSettingsStore.setState({ sessionTitleOverrides: { u1: "Mein Name" } });
+      render(<SessionHistoryViewer folder="C:\\p" />);
+      expect(await screen.findByText("Mein Name")).toBeInTheDocument();
+      expect(screen.getByText(/Erste Nachricht der Session/)).toBeInTheDocument();
+      // Nicht umbenannte Session: Titel erscheint genau einmal, keine Vorschau-Dopplung
+      expect(screen.getAllByText(/Unbenannte Erstnachricht/)).toHaveLength(1);
+    });
+
+    it("skeleton loading state exposes the loading label (edge case)", () => {
+      mockInvoke.mockReturnValue(new Promise(() => {}));
+      render(<SessionHistoryViewer folder="C:\\p" />);
+      expect(screen.getByLabelText("Sessions werden geladen")).toBeInTheDocument();
+    });
+
+    it("rename button exists per row and calls the handler seam (Task-5-Vorbereitung)", async () => {
+      mockInvoke.mockResolvedValue([mockSession]);
+      render(<SessionHistoryViewer folder="C:\\p" />);
+      await waitFor(() => {
+        expect(screen.getByText("Fix login bug")).toBeInTheDocument();
+      });
+      const renameBtn = screen.getByTitle("Session umbenennen");
+      // Noch No-op (Task 5 implementiert das Editieren) — darf nicht werfen
+      fireEvent.click(renameBtn);
+      expect(screen.getByText("Fix login bug")).toBeInTheDocument();
+    });
   });
 });
