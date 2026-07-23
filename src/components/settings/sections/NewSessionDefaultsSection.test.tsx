@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { NewSessionDefaultsSection } from "./NewSessionDefaultsPanel";
-import { useSettingsStore } from "../../store/settingsStore";
+import { NewSessionDefaultsSection } from "./NewSessionDefaultsSection";
+import { useSettingsStore } from "../../../store/settingsStore";
 
 const openMock = vi.fn();
 vi.mock("@tauri-apps/plugin-dialog", () => ({
@@ -9,7 +9,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 }));
 
 const invokeMock = vi.fn();
-vi.mock("../../utils/perfLogger", () => ({
+vi.mock("../../../utils/perfLogger", () => ({
   wrapInvoke: (...args: unknown[]) => invokeMock(...args),
 }));
 

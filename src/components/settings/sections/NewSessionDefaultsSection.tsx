@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { useSettingsStore, type SettingsState, type PermissionMode } from "../../store/settingsStore";
-import { logError } from "../../utils/errorLogger";
-import { wrapInvoke } from "../../utils/perfLogger";
-import { ICONS, ICON_SIZE } from "../../utils/icons";
-import { Button } from "../ui/Button";
-import { Select } from "../ui/Select";
-import { SettingsSection } from "./shared/SettingsSection";
+import { useSettingsStore, type SettingsState, type PermissionMode } from "../../../store/settingsStore";
+import { logError } from "../../../utils/errorLogger";
+import { wrapInvoke } from "../../../utils/perfLogger";
+import { ICONS, ICON_SIZE } from "../../../utils/icons";
+import { Button } from "../../ui/Button";
+import { Select } from "../../ui/Select";
+import { SettingsSection } from "../shared/SettingsSection";
 
 const FolderOpenIcon = ICONS.action.folderOpen;
 

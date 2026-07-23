@@ -3,9 +3,9 @@ import {
   sanitizeScrollbackLines,
   useSettingsStore,
   type ScrollbackPreset,
-} from "../../store/settingsStore";
-import { Select } from "../ui/Select";
-import { SettingsSection } from "./shared/SettingsSection";
+} from "../../../store/settingsStore";
+import { Select } from "../../ui/Select";
+import { SettingsSection } from "../shared/SettingsSection";
 
 /**
  * Settings-Sektion für das xterm-Scrollback-Limit (Phase 1 of

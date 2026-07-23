@@ -1,6 +1,6 @@
 import { SettingsPanelHeader } from "../shared/SettingsPanelHeader";
-import { NewSessionDefaultsSection } from "../NewSessionDefaultsPanel";
-import { TerminalScrollbackSection } from "../TerminalScrollbackPanel";
+import { NewSessionDefaultsSection } from "../sections/NewSessionDefaultsSection";
+import { TerminalScrollbackSection } from "../sections/TerminalScrollbackSection";
 
 /**
  * Sessions-Tab (Tab-Konsolidierung, Issue #52): fasst die frueheren

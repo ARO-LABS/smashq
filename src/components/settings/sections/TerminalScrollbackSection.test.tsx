@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { TerminalScrollbackSection } from "./TerminalScrollbackPanel";
-import { useSettingsStore } from "../../store/settingsStore";
+import { TerminalScrollbackSection } from "./TerminalScrollbackSection";
+import { useSettingsStore } from "../../../store/settingsStore";
 
 function setScrollback(lines: number) {
   useSettingsStore.setState((s) => ({

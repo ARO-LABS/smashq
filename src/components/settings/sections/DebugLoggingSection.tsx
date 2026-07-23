@@ -1,6 +1,6 @@
-import { useSettingsStore, type AppPreferencesSettings } from "../../store/settingsStore";
-import { ToggleSwitch } from "../ui/ToggleSwitch";
-import { SettingsSection } from "./shared/SettingsSection";
+import { useSettingsStore, type AppPreferencesSettings } from "../../../store/settingsStore";
+import { ToggleSwitch } from "../../ui/ToggleSwitch";
+import { SettingsSection } from "../shared/SettingsSection";
 
 type LoggingFlag = keyof Pick<
   AppPreferencesSettings,

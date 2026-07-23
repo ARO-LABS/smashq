@@ -9,7 +9,7 @@ import { SettingsPanelHeader } from "../shared/SettingsPanelHeader";
 import { SettingsSection } from "../shared/SettingsSection";
 import { ToolRow, type ToolStatus } from "../system/ToolRow";
 import { GhAuthSection, type GhAuthStatus } from "../system/GhAuthSection";
-import { DebugLoggingSection } from "../DebugLoggingPanel";
+import { DebugLoggingSection } from "../sections/DebugLoggingSection";
 
 const RefreshIcon = ICONS.action.refresh;
 const LoadingIcon = ICONS.action.loading;

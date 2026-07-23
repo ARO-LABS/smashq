@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { DebugLoggingSection } from "./DebugLoggingPanel";
-import { useSettingsStore } from "../../store/settingsStore";
+import { DebugLoggingSection } from "./DebugLoggingSection";
+import { useSettingsStore } from "../../../store/settingsStore";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(() => Promise.resolve()),
