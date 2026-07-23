@@ -373,7 +373,7 @@ graph TD
 
     SessionMgr --> SessionList["SessionList / SessionGrid"]
     SessionMgr --> Terminal["SessionTerminal (xterm.js)"]
-    SessionMgr --> ConfigPanel["ConfigPanel<br/>(ClaudeMd, Skills, Hooks,<br/>GitHub, Worktrees)"]
+    SessionMgr --> ConfigPanel["ConfigPanel<br/>(CLAUDE.md, Skills, Hooks, Settings,<br/>Agents, GitHub, Worktrees,<br/>Aufgaben, History)"]
     SessionMgr --> BottomPanel["AgentBottomPanel"]
 
     PipelineView --> Dashboard["DashboardMap (Isometric 2.5D)"]
@@ -1268,7 +1268,7 @@ classDiagram
 | FA-C01 | Settings persistent speichern | MUSS | `tauriStorage.ts` + AppData JSON |
 | FA-C02 | Backup-Rotation (max 3) | SOLLTE | `settings.rs` |
 | FA-C03 | Favoriten-System | SOLLTE | `settingsStore.ts` |
-| FA-C04 | Session-History | SOLLTE | `sessionHistoryStore.ts` |
+| FA-C04 | Session-History | SOLLTE | `SessionHistoryViewer.tsx` + `sessionHistoryHelpers.ts` + `scan_claude_sessions` (Rust) |
 
 ---
 
