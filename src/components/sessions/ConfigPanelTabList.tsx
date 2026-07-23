@@ -338,7 +338,7 @@ function TasksTabBadge({ folder }: { folder: string }) {
   return (
     <span
       data-testid="tasks-tab-badge"
-      aria-label={`${openCount} offene Aufgaben`}
+      aria-label={`${openCount} offene Aufgabe${openCount === 1 ? "" : "n"}`}
       className="ml-0.5 min-w-3.5 h-3.5 px-0.5 rounded-full bg-accent text-surface-base text-[9px] font-bold font-mono inline-flex items-center justify-center"
     >
       {openCount > 9 ? "9+" : openCount}

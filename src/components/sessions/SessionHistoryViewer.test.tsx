@@ -728,6 +728,28 @@ describe("SessionHistoryViewer", () => {
       expect(screen.getByRole("button", { name: "Löschen" })).toBeInTheDocument();
     });
 
+    it("changing the search query disarms the confirm step (edge case)", async () => {
+      // Wächtertest für den query-Eintrag im Disarm-Effect-Dep-Array: eine
+      // geänderte Suche verschiebt die sichtbare Menge — der scharfe Zustand
+      // darf das nicht überleben (die Auswahl selbst bleibt bestehen).
+      mockInvoke.mockResolvedValue([
+        { ...mockSession, session_id: "a", title: "A" },
+        { ...mockSession, session_id: "b", title: "B" },
+      ]);
+      render(<SessionHistoryViewer folder="C:\\p" />);
+      await screen.findByText("A");
+      fireEvent.click(screen.getByTitle("Auswahl-Modus"));
+      fireEvent.click(screen.getByRole("checkbox", { name: "Session auswählen: A" }));
+      fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+      expect(screen.getByRole("button", { name: "Wirklich löschen? (1)" })).toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText("Sessions durchsuchen"), {
+        target: { value: "B" },
+      });
+      // Query geändert → entschärft; die Auswahl (1) bleibt bestehen
+      expect(screen.getByRole("button", { name: "Löschen" })).toBeInTheDocument();
+      expect(screen.getByText("1 ausgewählt")).toBeInTheDocument();
+    });
+
     it("refresh during the bulk loop cannot resurrect successfully deleted rows (ghost rows)", async () => {
       // Deletes hängen an einem steuerbaren Gate, damit wir MITTEN im
       // Bulk-Lauf einen Refresh auslösen können: der Scan sieht die Dateien
