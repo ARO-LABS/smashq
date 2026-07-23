@@ -17,6 +17,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - Neue Einstellung **„Automatisch nach Updates suchen"** (Einstellungen → System → Updates): schaltet den automatischen Update-Check (beim Start und alle 30 Minuten) ab. Standard ist **an** — Bestands-User behalten den Update-Kanal unverändert. Die manuelle Suche über das Versions-Badge in der Session-Leiste funktioniert unabhängig vom Schalter jederzeit. (#21)
 
 ### Geändert
+- Aufgaben: Neue Aufgaben haben keinen automatischen Termin mehr — der Termin-Chip („überfällig"/„heute"/…) erscheint nur noch bei bewusst gesetztem Datum. Termin-Feld mit Leerzustand („Kein Termin") und „Termin entfernen"; Termin-Gruppierung mit Bucket „Ohne Termin"; „In Kalender" nur mit gesetztem Termin. Bestehende Aufgaben werden beim Update einmalig auf „kein Termin" zurückgesetzt.
 - Seitenleisten-Rails (Navigation + Config-Panel): Klick klappt das geöffnete Panel jetzt auch zu — bisher öffnete Klick nur; Ziehen zum Anpassen bleibt unverändert (4px-Schwelle trennt Klick von Drag).
 
 ### Behoben
