@@ -208,11 +208,11 @@ describe("SystemPanel — Layer-B", () => {
 
     render(<SystemPanel />);
 
-    const toggle = screen.getByLabelText(
-      "Automatisch nach Updates suchen",
-    ) as HTMLInputElement;
+    const toggle = screen.getByRole("switch", {
+      name: "Automatisch nach Updates suchen",
+    });
     // Default AN — Bestands-User verlieren den Update-Kanal nicht still.
-    expect(toggle.checked).toBe(true);
+    expect(toggle).toBeChecked();
     // Hinweis auf den weiterhin möglichen manuellen Check ist sichtbar.
     expect(
       screen.getByText(/manuelle Suche über das Versions-Badge/i),
@@ -223,7 +223,7 @@ describe("SystemPanel — Layer-B", () => {
     await waitFor(() => {
       expect(useSettingsStore.getState().autoUpdateEnabled).toBe(false);
     });
-    expect(toggle.checked).toBe(false);
+    expect(toggle).not.toBeChecked();
   });
 
   // macOS branch of `claudeInstallHint()` has no coverage otherwise: jsdom's UA
