@@ -156,6 +156,21 @@ describe("TaskRow", () => {
     expect(btn?.className).toContain("border-error");
   });
 
+  it("renders no deadline chip and no overdue border for a task without Termin", () => {
+    const task = makeTask({ startsAt: null, endsAt: null });
+
+    const { container } = render(
+      <TaskRow task={task} onSelect={vi.fn()} selected={false} showSource />,
+    );
+
+    // Kein Termin → kein Chip …
+    expect(screen.queryByText(/^(überfällig|heute|morgen|\d+ Tage)$/)).toBeNull();
+    // … und niemals Overdue-Styling
+    const btn = container.querySelector("button");
+    expect(btn?.className).not.toContain("border-error");
+    expect(btn?.className).toContain("border-transparent");
+  });
+
   it("does NOT apply error border when task is overdue but selected", () => {
     const yesterday = Date.now() - 86_400_000;
     const task = makeTask({ startsAt: yesterday, status: "open" });

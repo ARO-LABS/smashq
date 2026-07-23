@@ -87,6 +87,71 @@ describe("TaskDetail — happy path (pane, open task)", () => {
   });
 });
 
+// ── In Kalender (nullable Termin) ──────────────────────────────────────
+
+describe("TaskDetail — In Kalender button vs. Termin", () => {
+  it("disables 'In Kalender' in pane mode when the task has no Termin", () => {
+    render(
+      <TaskDetail
+        task={makeTask({ startsAt: null, endsAt: null })}
+        mode="pane"
+        availableProjects={PROJECTS}
+        onUpdate={vi.fn()}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+        onDelete={vi.fn()}
+        onExportIcs={vi.fn()}
+      />,
+    );
+
+    const btn = screen.getByRole("button", {
+      name: "In Kalender exportieren",
+    }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+    expect(btn.title).toBe("Erst Termin setzen");
+  });
+
+  it("keeps 'In Kalender' enabled in pane mode when a Termin is set", () => {
+    render(
+      <TaskDetail
+        task={makeTask()}
+        mode="pane"
+        availableProjects={PROJECTS}
+        onUpdate={vi.fn()}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+        onDelete={vi.fn()}
+        onExportIcs={vi.fn()}
+      />,
+    );
+
+    const btn = screen.getByRole("button", {
+      name: "In Kalender exportieren",
+    }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+  });
+
+  it("disables the calmini in accordion mode when the task has no Termin", () => {
+    render(
+      <TaskDetail
+        task={makeTask({ startsAt: null, endsAt: null })}
+        mode="accordion"
+        availableProjects={PROJECTS}
+        onUpdate={vi.fn()}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+        onDelete={vi.fn()}
+        onExportIcs={vi.fn()}
+      />,
+    );
+
+    const btn = screen.getByRole("button", {
+      name: "In Kalender exportieren",
+    }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
+});
+
 // ── Add subtask UX ─────────────────────────────────────────────────────
 
 describe("TaskDetail — add subtask (pane)", () => {

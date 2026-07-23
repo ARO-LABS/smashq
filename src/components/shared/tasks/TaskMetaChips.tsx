@@ -75,8 +75,9 @@ function dateTimeInputToEpoch(dateStr: string, timeStr: string): number {
   return d.getTime();
 }
 
-/** Return a human-readable label for the slot: "DD.MM. HH:MM–HH:MM". */
+/** Return a human-readable label for the slot: "DD.MM. HH:MM–HH:MM" — or "Kein Termin". */
 function slotDisplayLabel(task: TaskItem): string {
+  if (task.startsAt === null || task.endsAt === null) return "Kein Termin";
   const datePart = new Date(task.startsAt).toLocaleDateString("de-DE", {
     day: "2-digit",
     month: "2-digit",
@@ -301,12 +302,18 @@ function SlotChip({
   const [bisTime, setBisTime] = useState<string>("");
   const [bisHint, setBisHint] = useState<boolean>(false);
 
-  // Sync local state when the popover opens
+  // Kein Termin → default duration; sonst bestehende Dauer beibehalten.
+  const slotDuration =
+    task.startsAt !== null && task.endsAt !== null
+      ? task.endsAt - task.startsAt
+      : SLOT_MS;
+
+  // Sync local state when the popover opens (kein Termin → empty inputs)
   useEffect(() => {
     if (!open) return;
-    setVonDate(epochToDateInput(task.startsAt));
-    setVonTime(epochToTimeInput(task.startsAt));
-    setBisTime(epochToTimeInput(task.endsAt));
+    setVonDate(task.startsAt === null ? "" : epochToDateInput(task.startsAt));
+    setVonTime(task.startsAt === null ? "" : epochToTimeInput(task.startsAt));
+    setBisTime(task.endsAt === null ? "" : epochToTimeInput(task.endsAt));
     setBisHint(false);
   }, [open, task.startsAt, task.endsAt]);
 
@@ -315,7 +322,7 @@ function SlotChip({
     if (!newDate) return;
     const newStartsAt = dateTimeInputToEpoch(newDate, vonTime);
     // Preserve the existing duration when the user shifts the start.
-    const newEndsAt = newStartsAt + (task.endsAt - task.startsAt);
+    const newEndsAt = newStartsAt + slotDuration;
     setBisTime(epochToTimeInput(newEndsAt));
     setBisHint(false);
     onUpdate({ startsAt: newStartsAt, endsAt: newEndsAt });
@@ -326,7 +333,7 @@ function SlotChip({
     if (!vonDate) return;
     const newStartsAt = dateTimeInputToEpoch(vonDate, newTime);
     // Preserve the existing duration when the user shifts the start.
-    const newEndsAt = newStartsAt + (task.endsAt - task.startsAt);
+    const newEndsAt = newStartsAt + slotDuration;
     setBisTime(epochToTimeInput(newEndsAt));
     setBisHint(false);
     onUpdate({ startsAt: newStartsAt, endsAt: newEndsAt });
@@ -621,11 +628,12 @@ export function TaskMetaChips({
           onUpdate={onUpdate}
         />
 
-        {/* "In Kalender" calmini */}
+        {/* "In Kalender" calmini — ohne Termin gibt es kein Zeitfenster zu exportieren */}
         <button
           type="button"
           onClick={onExportIcs}
-          title="In Kalender exportieren"
+          disabled={task.startsAt === null}
+          title={task.startsAt === null ? "Erst Termin setzen" : "In Kalender exportieren"}
           aria-label="In Kalender exportieren"
           className="flex items-center justify-center w-[26px] h-6 rounded-md shadow-hairline bg-surface-base text-neutral-400 hover:text-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
         >

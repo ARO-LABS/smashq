@@ -13,7 +13,8 @@
  * subtask toggle fixed here is fixed in both surfaces at once.
  *
  * In-Kalender button:
- * Calls `onExportIcs` (optional prop); always enabled (every task has a slot).
+ * Calls `onExportIcs` (optional prop); disabled while the task has no Termin
+ * (startsAt === null) — there is no time window to export then.
  * The spec wires this to `invoke("export_task_ics", …)` at the parent level
  * so TaskDetail stays backend-agnostic.
  *
@@ -324,7 +325,8 @@ function PaneDetail({
           <span className="w-[66px] shrink-0" aria-hidden="true" />
           <button
             type="button"
-            disabled={false}
+            disabled={task.startsAt === null}
+            title={task.startsAt === null ? "Erst Termin setzen" : undefined}
             onClick={onExportIcs}
             aria-label="In Kalender exportieren"
             className="calbtn inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-base shadow-hairline text-[11px] text-neutral-400 hover:text-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors ml-1 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"

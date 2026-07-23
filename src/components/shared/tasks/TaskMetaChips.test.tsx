@@ -216,6 +216,91 @@ describe("TaskMetaChips — edge cases", () => {
   });
 });
 
+// ── Kein Termin (nullable slot) ───────────────────────────────────────
+
+describe("TaskMetaChips — task without Termin", () => {
+  it("shows 'Kein Termin' on the slot chip when startsAt is null", () => {
+    const task = makeTask({ startsAt: null, endsAt: null });
+    render(
+      <TaskMetaChips
+        task={task}
+        layout="chiprow"
+        availableProjects={PROJECTS}
+        onUpdate={vi.fn()}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Kein Termin")).toBeTruthy();
+  });
+
+  it("opens the slot popover with empty date/time inputs when no Termin is set", () => {
+    const task = makeTask({ startsAt: null, endsAt: null });
+    const { container } = render(
+      <TaskMetaChips
+        task={task}
+        layout="chiprow"
+        availableProjects={PROJECTS}
+        onUpdate={vi.fn()}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Kein Termin"));
+
+    const dateInput = container.querySelector('input[type="date"]') as HTMLInputElement;
+    const timeInputs = container.querySelectorAll('input[type="time"]');
+    expect(dateInput.value).toBe("");
+    expect(timeInputs).toHaveLength(2);
+    timeInputs.forEach((input) => {
+      expect((input as HTMLInputElement).value).toBe("");
+    });
+  });
+
+  it("disables the 'In Kalender' calmini when the task has no Termin", () => {
+    const task = makeTask({ startsAt: null, endsAt: null });
+    render(
+      <TaskMetaChips
+        task={task}
+        layout="chiprow"
+        availableProjects={PROJECTS}
+        onUpdate={vi.fn()}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+        onExportIcs={vi.fn()}
+      />,
+    );
+
+    const calBtn = screen.getByRole("button", {
+      name: /In Kalender exportieren/,
+    }) as HTMLButtonElement;
+    expect(calBtn.disabled).toBe(true);
+    expect(calBtn.title).toBe("Erst Termin setzen");
+  });
+
+  it("keeps the 'In Kalender' calmini enabled when a Termin is set", () => {
+    const task = makeTask();
+    render(
+      <TaskMetaChips
+        task={task}
+        layout="chiprow"
+        availableProjects={PROJECTS}
+        onUpdate={vi.fn()}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+        onExportIcs={vi.fn()}
+      />,
+    );
+
+    const calBtn = screen.getByRole("button", {
+      name: /In Kalender exportieren/,
+    }) as HTMLButtonElement;
+    expect(calBtn.disabled).toBe(false);
+  });
+});
+
 // ── SlotChip behavior ─────────────────────────────────────────────────
 
 describe("SlotChip behavior", () => {

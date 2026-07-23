@@ -365,4 +365,24 @@ describe("groupByDeadline", () => {
     const groups = groupByDeadline(tasks);
     expect(groups[0].tasks.map((t) => t.title)).toEqual(["A", "B"]);
   });
+
+  it("none: startsAt null (kein Termin) → 'Ohne Termin' bucket", () => {
+    pinClock();
+    const tasks = [makeTask({ startsAt: null, endsAt: null })];
+    const groups = groupByDeadline(tasks);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].bucket).toBe("none");
+    expect(groups[0].label).toBe("Ohne Termin");
+  });
+
+  it("'none' is ordered LAST, after all timed buckets", () => {
+    pinClock();
+    const tasks = [
+      makeTask({ startsAt: null, endsAt: null }),
+      makeTask({ startsAt: NOW + 8 * ONE_DAY }),
+      makeTask({ startsAt: NOW - ONE_HOUR }),
+    ];
+    const groups = groupByDeadline(tasks);
+    expect(groups.map((g) => g.bucket)).toEqual(["overdue", "later", "none"]);
+  });
 });

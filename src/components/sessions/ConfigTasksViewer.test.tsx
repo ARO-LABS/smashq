@@ -87,6 +87,22 @@ describe("ConfigTasksViewer", () => {
     expect(screen.getAllByText("1/2")).toHaveLength(1);
   });
 
+  it("renders no meta row for a task without Termin and without subtasks", () => {
+    // addTask ohne Datum → Termin null → weder Chip noch Tally → Zeile entfällt.
+    useTasksStore.getState().addTask({ title: "Alpha", projectKey: KEY });
+    const { container } = render(<ConfigTasksViewer folder={FOLDER} />);
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    // Die Meta-Zeile ist das einzige DIV mit mt-0.5 (Checkbox/Pfeil sind Buttons).
+    expect(container.querySelector('div[class*="mt-0.5"]')).toBeNull();
+  });
+
+  it("renders the meta row with deadline chip when a Termin is set", () => {
+    const id = useTasksStore.getState().addTask({ title: "Alpha", projectKey: KEY });
+    useTasksStore.getState().updateTask(id, { startsAt: Date.now() - 86_400_000 });
+    render(<ConfigTasksViewer folder={FOLDER} />);
+    expect(screen.getByText("überfällig")).toBeInTheDocument();
+  });
+
   it("Escape clears the quick-add input without creating a task (edge case)", () => {
     render(<ConfigTasksViewer folder={FOLDER} />);
     const input = screen.getByPlaceholderText("Aufgabe hinzufügen …");

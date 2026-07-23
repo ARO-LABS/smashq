@@ -80,6 +80,24 @@ describe("sanitizeTask slots", () => {
     expect(t.endsAt).toBe(9000 + SLOT_MS);
   });
 
+  it("missing slot yields no Termin (both null, no default slot)", () => {
+    const t = sanitizeTask({ ...base })!;
+    expect(t.startsAt).toBeNull();
+    expect(t.endsAt).toBeNull();
+  });
+
+  it("enforces the pair invariant: endsAt without startsAt → both null", () => {
+    const t = sanitizeTask({ ...base, endsAt: 5000 })!;
+    expect(t.startsAt).toBeNull();
+    expect(t.endsAt).toBeNull();
+  });
+
+  it("heals a half state: valid startsAt with garbage endsAt → clamped window", () => {
+    const t = sanitizeTask({ ...base, startsAt: 5000, endsAt: "kaputt" })!;
+    expect(t.startsAt).toBe(5000);
+    expect(t.endsAt).toBe(5000 + SLOT_MS);
+  });
+
   it("drops a legacy archived task (archive→delete migration)", () => {
     // archivedAt set = the user archived (≈ deleted) it pre-redesign → do not resurrect.
     expect(sanitizeTask({ ...base, startsAt: 1, endsAt: 2, archivedAt: 123 })).toBeNull();
@@ -200,10 +218,11 @@ describe("useTasksStore mutations", () => {
     expect(useTasksStore.getState().tasks).toHaveLength(0);
   });
 
-  it("addTask without slot gets a default 30-min window", () => {
+  it("addTask without date creates a task without Termin (both null)", () => {
     const id = useTasksStore.getState().addTask({ title: "A" });
     const t = useTasksStore.getState().tasks.find((x) => x.id === id)!;
-    expect(t.endsAt - t.startsAt).toBe(SLOT_MS);
+    expect(t.startsAt).toBeNull();
+    expect(t.endsAt).toBeNull();
   });
 
   it("addTask honors a lone startsAt with a default 30-min endsAt", () => {
@@ -223,6 +242,22 @@ describe("useTasksStore mutations", () => {
     const id = useTasksStore.getState().addTask({ title: "A", startsAt: 1000, endsAt: 1000 + SLOT_MS });
     useTasksStore.getState().updateTask(id, { startsAt: 5000, endsAt: 10 });
     const t = useTasksStore.getState().tasks.find((x) => x.id === id)!;
+    expect(t.endsAt).toBe(5000 + SLOT_MS);
+  });
+
+  it("updateTask with startsAt: null removes the Termin (both null)", () => {
+    const id = useTasksStore.getState().addTask({ title: "A", startsAt: 1000, endsAt: 1000 + SLOT_MS });
+    useTasksStore.getState().updateTask(id, { startsAt: null });
+    const t = useTasksStore.getState().tasks.find((x) => x.id === id)!;
+    expect(t.startsAt).toBeNull();
+    expect(t.endsAt).toBeNull();
+  });
+
+  it("updateTask sets a Termin on a previously termless task (default 30-min window)", () => {
+    const id = useTasksStore.getState().addTask({ title: "A" });
+    useTasksStore.getState().updateTask(id, { startsAt: 5000 });
+    const t = useTasksStore.getState().tasks.find((x) => x.id === id)!;
+    expect(t.startsAt).toBe(5000);
     expect(t.endsAt).toBe(5000 + SLOT_MS);
   });
 
@@ -279,6 +314,48 @@ describe("tasks selectors", () => {
     const id = useTasksStore.getState().addTask({ title: "x", projectKey: "c:/p" });
     useTasksStore.getState().completeTask(id);
     expect(selectNextTask("c:/p")(useTasksStore.getState())).toBeUndefined();
+  });
+});
+
+describe("tasksStore persist migration v3 (Termin optional)", () => {
+  beforeEach(resetTasks);
+
+  it("migrate v2 → v3 nulls ALL existing Termine (one-time cut)", async () => {
+    localStorage.setItem(
+      "smashq-tasks",
+      JSON.stringify({
+        state: {
+          tasks: [
+            { id: "a", title: "Mit Termin", startsAt: 1000, endsAt: 1000 + SLOT_MS },
+            { id: "b", title: "Auch mit Termin", startsAt: 99_000, endsAt: 99_000 + SLOT_MS },
+          ],
+        },
+        version: 2,
+      }),
+    );
+    await useTasksStore.persist.rehydrate();
+    const tasks = useTasksStore.getState().tasks;
+    expect(tasks).toHaveLength(2);
+    for (const t of tasks) {
+      expect(t.startsAt).toBeNull();
+      expect(t.endsAt).toBeNull();
+    }
+  });
+
+  it("merge (same-version rehydrate) does NOT null set Termine", async () => {
+    localStorage.setItem(
+      "smashq-tasks",
+      JSON.stringify({
+        state: {
+          tasks: [{ id: "a", title: "Mit Termin", startsAt: 1000, endsAt: 1000 + SLOT_MS }],
+        },
+        version: 3,
+      }),
+    );
+    await useTasksStore.persist.rehydrate();
+    const t = useTasksStore.getState().tasks[0];
+    expect(t.startsAt).toBe(1000);
+    expect(t.endsAt).toBe(1000 + SLOT_MS);
   });
 });
 

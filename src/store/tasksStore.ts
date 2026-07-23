@@ -20,10 +20,10 @@ export interface TaskItem {
   projectKey: string | null;
   title: string;
   status: TaskStatus;
-  /** Appointment start, epoch ms. Every task is a timed Termin. */
-  startsAt: number;
-  /** Appointment end, epoch ms (>= startsAt). Default startsAt + SLOT_MS. */
-  endsAt: number;
+  /** Appointment start, epoch ms; null = kein Termin (pair invariant with endsAt). */
+  startsAt: number | null;
+  /** Appointment end, epoch ms (>= startsAt); null = kein Termin. Both are null or both set. */
+  endsAt: number | null;
   note?: string;
   subtasks: Subtask[];
   source: TaskSource;
@@ -92,13 +92,15 @@ export function sanitizeTask(value: unknown): TaskItem | null {
   const legacy =
     typeof v.deadline === "number" && Number.isFinite(v.deadline) ? v.deadline : null;
 
-  let slot: { startsAt: number; endsAt: number };
+  // Pair invariant: both null ("kein Termin") or both set. A lone endsAt
+  // (startsRaw null) is a half state and collapses to "kein Termin".
+  let slot: { startsAt: number | null; endsAt: number | null };
   if (startsRaw !== null) {
     slot = { startsAt: startsRaw, endsAt: endsRaw !== null && endsRaw >= startsRaw ? endsRaw : startsRaw + SLOT_MS };
   } else if (legacy !== null) {
     slot = { startsAt: legacy, endsAt: legacy + SLOT_MS };
   } else {
-    slot = defaultSlot();
+    slot = { startsAt: null, endsAt: null };
   }
 
   const result: TaskItem = {
@@ -207,7 +209,8 @@ export const useTasksStore = create<TasksState>()(
         // Honor an explicit startsAt even without endsAt (default +30 min), and
         // clamp an inverted slot — keeps addTask's write path consistent with
         // updateTask/sanitizeTask so no code path can persist endsAt < startsAt.
-        const slot =
+        // No input date → no Termin (both null): a Termin exists only on request.
+        const slot: { startsAt: number | null; endsAt: number | null } =
           input.startsAt != null
             ? {
                 startsAt: input.startsAt,
@@ -216,7 +219,7 @@ export const useTasksStore = create<TasksState>()(
                     ? input.endsAt
                     : input.startsAt + SLOT_MS,
               }
-            : defaultSlot();
+            : { startsAt: null, endsAt: null };
         const task: TaskItem = {
           id,
           projectKey: input.projectKey ?? null,
@@ -244,11 +247,29 @@ export const useTasksStore = create<TasksState>()(
             // a UI form can realistically corrupt so we never persist values
             // sanitizeTask would reject on the next load.
             if ("startsAt" in fields || "endsAt" in fields) {
-              const s = toFiniteNumber(next.startsAt, t.startsAt);
-              let e = toFiniteNumber(next.endsAt, t.endsAt);
-              if (e < s) e = s + SLOT_MS;
-              next.startsAt = s;
-              next.endsAt = e;
+              // Explicit `startsAt: null` removes the Termin; a garbage value
+              // falls back to the previous startsAt (which may itself be null).
+              // Either way the pair invariant (both null or both set) is
+              // enforced here so no half state can ever persist.
+              const rawStart = fields.startsAt === null ? null : next.startsAt;
+              const s =
+                typeof rawStart === "number" && Number.isFinite(rawStart)
+                  ? rawStart
+                  : fields.startsAt === null
+                    ? null
+                    : t.startsAt;
+              if (s === null) {
+                next.startsAt = null;
+                next.endsAt = null;
+              } else {
+                let e =
+                  typeof next.endsAt === "number" && Number.isFinite(next.endsAt)
+                    ? next.endsAt
+                    : s + SLOT_MS;
+                if (e < s) e = s + SLOT_MS;
+                next.startsAt = s;
+                next.endsAt = e;
+              }
             }
             if ("subtasks" in fields) {
               next.subtasks = Array.isArray(fields.subtasks)
@@ -289,10 +310,18 @@ export const useTasksStore = create<TasksState>()(
       name: "smashq-tasks",
       storage: createJSONStorage(() => tasksStorage),
       partialize: (state) => ({ tasks: state.tasks }),
-      version: 2,
-      migrate: (persisted: unknown): { tasks: TaskItem[] } => {
+      version: 3,
+      migrate: (persisted: unknown, fromVersion: number): { tasks: TaskItem[] } => {
         const p = persisted as { tasks?: unknown } | null;
-        return { tasks: sanitizeTasks(p?.tasks) };
+        const tasks = sanitizeTasks(p?.tasks);
+        // v3 "Termin optional": one-time cut (deliberate user decision) — all
+        // pre-v3 Termine were auto-stamped default slots, not chosen dates, so
+        // they are nulled once. merge below must NOT do this: it runs on every
+        // rehydrate and would wipe deliberately set dates.
+        if (fromVersion < 3) {
+          return { tasks: tasks.map((t) => ({ ...t, startsAt: null, endsAt: null })) };
+        }
+        return { tasks };
       },
       // Heal corruption in the SYNCHRONOUS merge path: it returns the state
       // that feeds the first render, and — critically — it does NOT reference

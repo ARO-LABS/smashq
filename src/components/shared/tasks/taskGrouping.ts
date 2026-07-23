@@ -19,7 +19,7 @@ import type { TaskItem } from "../../../store/tasksStore";
 
 export type TaskFilter = "all" | "open" | "done";
 
-export type DeadlineBucket = "overdue" | "today" | "week" | "later";
+export type DeadlineBucket = "overdue" | "today" | "week" | "later" | "none";
 
 export interface ProjectOption {
   key: string | null;
@@ -33,6 +33,7 @@ const BUCKET_LABELS: Record<DeadlineBucket, string> = {
   today: "Heute",
   week: "Diese Woche",
   later: "Später",
+  none: "Ohne Termin",
 };
 
 // ── Internal helpers ──────────────────────────────────────────────────
@@ -44,8 +45,10 @@ function startOfDay(nowMs: number): number {
   return d.getTime();
 }
 
-/** Classify a startsAt epoch into one of the four timed buckets. */
-function classifyDeadline(startsAt: number, nowMs: number): DeadlineBucket {
+/** Classify a startsAt epoch into a timed bucket; null (kein Termin) → "none". */
+function classifyDeadline(startsAt: number | null, nowMs: number): DeadlineBucket {
+  if (startsAt === null) return "none";
+
   const todayStart = startOfDay(nowMs);
   const tomorrowStart = todayStart + 86_400_000;
   // "This week" = next 7 calendar days from today (exclusive of today itself)
@@ -186,10 +189,11 @@ export function groupByProject(
 // ── groupByDeadline ───────────────────────────────────────────────────
 
 /**
- * Group a flat list of tasks into four slot buckets, evaluated against
+ * Group a flat list of tasks into slot buckets, evaluated against
  * `Date.now()` at call time (pure w.r.t. inputs, but reads the clock).
  *
- * Bucket order: overdue → today → week → later.
+ * Bucket order: overdue → today → week → later → none (kein Termin last —
+ * timed work stays on top, undated work never pushes it down).
  * Empty buckets are omitted from the result.
  * Task order within each bucket mirrors the input order.
  */
@@ -205,13 +209,14 @@ export function groupByDeadline(tasks: TaskItem[]): {
     today: [],
     week: [],
     later: [],
+    none: [],
   };
 
   for (const task of tasks) {
     buckets[classifyDeadline(task.startsAt, nowMs)].push(task);
   }
 
-  const ORDER: DeadlineBucket[] = ["overdue", "today", "week", "later"];
+  const ORDER: DeadlineBucket[] = ["overdue", "today", "week", "later", "none"];
 
   return ORDER.filter((b) => buckets[b].length > 0).map((b) => ({
     bucket: b,

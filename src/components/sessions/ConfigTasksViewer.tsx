@@ -114,7 +114,10 @@ function TaskRowCompact({ task }: { task: TaskItem }): JSX.Element {
         >
           {task.title}
         </div>
-        {!done && (
+        {/* Meta-Zeile nur, wenn sie Inhalt hätte: Termin-Chip oder Subtask-Tally.
+            Ohne die Bedingung bliebe bei terminlosen Aufgaben eine leere Zeile
+            (Geister-Abstand) unter dem Titel stehen. */}
+        {!done && (task.startsAt !== null || subtaskTally !== null) && (
           <div className="flex items-center gap-1.5 mt-0.5">
             <TaskDeadlineChip task={task} compact />
             {subtaskTally !== null && (

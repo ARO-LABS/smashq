@@ -101,6 +101,10 @@ export interface TaskDeadlineChipProps {
 }
 
 export function TaskDeadlineChip({ task, compact }: TaskDeadlineChipProps): JSX.Element | null {
+  // Kein Termin → kein Chip. computeDeadlineSeverity/formatDeadlineRelative
+  // keep their non-null number signatures; this guard is the single gate.
+  if (task.startsAt === null) return null;
+
   const severity = computeDeadlineSeverity(task.startsAt);
 
   const label = formatDeadlineRelative(task.startsAt, compact);
