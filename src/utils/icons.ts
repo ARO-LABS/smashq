@@ -45,7 +45,7 @@ import {
   // config viewers
   Code2, Cpu, Server, Shield, ShieldOff,
   // settings categories
-  Bell, Bug, Palette,
+  Bell, Palette,
   // misc
   Pin, NotebookPen,
   // tasks
@@ -158,7 +158,6 @@ export const ICONS = {
   /** Settings-category glyphs (categories.ts). */
   category: {
     notify: Bell,
-    debug: Bug,
     theme: Palette,
   },
   pin: Pin,

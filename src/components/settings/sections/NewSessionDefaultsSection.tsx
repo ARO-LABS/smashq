@@ -57,7 +57,7 @@ function useDetectedShells(): ShellOption[] | null {
             .map((s) => ({ value: s.id as ShellValue, label: s.label ?? s.id })),
         );
       })
-      .catch((err) => logError("NewSessionDefaultsPanel.detectShells", err));
+      .catch((err) => logError("NewSessionDefaultsSection.detectShells", err));
     return () => {
       cancelled = true;
     };
@@ -103,7 +103,7 @@ export function NewSessionDefaultsSection() {
         setDefaultProjectPath(selected);
       }
     } catch (err) {
-      logError("NewSessionDefaultsPanel.pickFolder", err);
+      logError("NewSessionDefaultsSection.pickFolder", err);
     } finally {
       setPicking(false);
     }

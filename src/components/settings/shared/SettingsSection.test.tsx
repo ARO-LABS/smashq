@@ -30,4 +30,15 @@ describe("SettingsPanelHeader", () => {
     expect(screen.getByText("Darstellung")).toBeInTheDocument();
     expect(screen.getByText("Theme-Modus und Animation.")).toBeInTheDocument();
   });
+
+  it("rendert optionalen titleAside-Slot", () => {
+    render(
+      <SettingsPanelHeader
+        title="Über Smashq"
+        description="App-Infos."
+        titleAside={<span>v1.0.24</span>}
+      />,
+    );
+    expect(screen.getByText("v1.0.24")).toBeInTheDocument();
+  });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+﻿import { useEffect, useState, type ReactNode } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { open } from "@tauri-apps/plugin-shell";
 import { wrapInvoke } from "../../../utils/perfLogger";
@@ -92,7 +92,7 @@ export function AboutPanel() {
               <button
                 type="button"
                 onClick={() => openUrl(commitUrl)}
-                className="text-accent hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded-xs"
+                className="text-accent hover:underline focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 rounded-xs"
               >
                 {COMMIT}
               </button>
@@ -144,7 +144,7 @@ function LinkRow({ label, onClick }: { label: string; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-2 text-sm text-left text-neutral-300 hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded-xs -mx-1 px-1 py-0.5"
+      className="flex items-center gap-2 text-sm text-left text-neutral-300 hover:text-accent transition-colors focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 rounded-xs -mx-1 px-1 py-0.5"
     >
       <ExternalLinkIcon className={`${ICON_SIZE.card} shrink-0`} />
       <span>{label}</span>
