@@ -18,14 +18,23 @@ describe("groupSessionsByTime", () => {
 
   it("buckets sessions into Heute / Diese Woche / Aelter and keeps order within groups", () => {
     const groups = groupSessionsByTime(
-      [mk("a", "2026-07-23T09:00:00Z"), mk("b", "2026-07-20T09:00:00Z"), mk("c", "2026-06-01T09:00:00Z")],
+      [
+        mk("a", "2026-07-23T09:00:00Z"),
+        mk("a2", "2026-07-23T10:00:00Z"),
+        mk("b", "2026-07-20T09:00:00Z"),
+        mk("c", "2026-06-01T09:00:00Z"),
+      ],
       now
     );
     expect(groups.map((g) => g.key)).toEqual(["today", "week", "older"]);
     expect(groups[0].label).toBe("Heute");
     expect(groups[1].label).toBe("Diese Woche");
     expect(groups[2].label).toBe("Älter");
-    expect(groups[0].sessions.map((s) => s.session_id)).toEqual(["a"]);
+    expect(groups[0].sessions.map((s) => s.session_id)).toEqual(["a", "a2"]);
+  });
+
+  it("returns an empty array for no sessions", () => {
+    expect(groupSessionsByTime([], now)).toEqual([]);
   });
 
   it("omits empty groups", () => {

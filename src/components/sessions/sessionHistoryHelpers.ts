@@ -3,7 +3,12 @@
  * Bewusst UI-frei, damit sie ohne DOM testbar sind.
  */
 
-/** Minimaler Shape, den die Helpers brauchen (Subset von ClaudeSessionSummary). */
+import type { SessionStatus } from "../../store/sessionStore";
+
+/**
+ * Struktureller Subset von ClaudeSessionSummary, den die History-UI
+ * durchreicht (Task 4 übergibt volle Summaries — TypeScript matcht strukturell).
+ */
 export interface HistorySessionLike {
   session_id: string;
   title: string;
@@ -24,6 +29,9 @@ const GROUP_LABELS: Record<HistoryGroupKey, string> = {
   week: "Diese Woche",
   older: "Älter",
 };
+
+/** Anzeige-Reihenfolge der Gruppen — UI-Vertrag, deshalb explizit statt Object.keys. */
+const GROUP_ORDER: HistoryGroupKey[] = ["today", "week", "older"];
 
 function startOfDay(d: Date): number {
   const c = new Date(d);
@@ -57,9 +65,11 @@ export function groupSessionsByTime<T extends HistorySessionLike>(
     }
   }
 
-  return (Object.keys(buckets) as HistoryGroupKey[])
-    .filter((k) => buckets[k].length > 0)
-    .map((k) => ({ key: k, label: GROUP_LABELS[k], sessions: buckets[k] }));
+  return GROUP_ORDER.filter((k) => buckets[k].length > 0).map((k) => ({
+    key: k,
+    label: GROUP_LABELS[k],
+    sessions: buckets[k],
+  }));
 }
 
 /** Suche über effektiven Titel (inkl. Override) und Branch, case-insensitive. */
@@ -77,10 +87,10 @@ export function matchesHistoryQuery(
 }
 
 /** Live = Prozess existiert noch (starting/running/waiting). done/error = beendet. */
-const LIVE_STATUSES = new Set(["starting", "running", "waiting"]);
+const LIVE_STATUSES: ReadonlySet<SessionStatus> = new Set(["starting", "running", "waiting"]);
 
 export function buildRunningClaudeIds(
-  sessions: ReadonlyArray<{ claudeSessionId?: string; status: string }>
+  sessions: ReadonlyArray<{ claudeSessionId?: string; status: SessionStatus }>
 ): Set<string> {
   const ids = new Set<string>();
   for (const s of sessions) {
