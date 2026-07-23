@@ -1,4 +1,7 @@
 import { useSettingsStore, type AppPreferencesSettings } from "../../store/settingsStore";
+import { ToggleSwitch } from "../ui/ToggleSwitch";
+import { SettingsPanelHeader } from "./shared/SettingsPanelHeader";
+import { SettingsSection } from "./shared/SettingsSection";
 
 type LoggingFlag = keyof Pick<
   AppPreferencesSettings,
@@ -52,15 +55,14 @@ export function DebugLoggingPanel() {
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-2xl">
-      <header className="flex flex-col gap-1">
-        <h3 className="text-sm font-semibold text-neutral-200">Debug-Logging</h3>
-        <p className="text-xs text-neutral-500">
-          Standardmäßig aus, um RAM und Disk im Daily-Use zu sparen.
-          Beim aktiven Debuggen einschalten.
-        </p>
-      </header>
+      <SettingsPanelHeader
+        title="Debug-Logging"
+        description="Standardmäßig aus, um RAM und Disk im Daily-Use zu sparen. Beim aktiven Debuggen einschalten."
+      />
 
-      <section className="rounded-md shadow-hairline p-4 flex flex-col gap-4 bg-surface-base">
+      {/* Titel dupliziert vorübergehend den Panel-Header — wird durch die
+          Tab-Konsolidierung (Task 7) im selben PR aufgelöst. */}
+      <SettingsSection title="Debug-Logging">
         <fieldset className="space-y-2">
           <legend className="sr-only">Master-Schalter</legend>
           <label className="flex items-start gap-2 cursor-pointer text-sm text-neutral-200">
@@ -69,7 +71,7 @@ export function DebugLoggingPanel() {
               name="logging-master"
               checked={!anyEnabled}
               onChange={() => handleMasterChange(false)}
-              className="mt-0.5 accent-accent"
+              className="mt-0.5 accent-accent focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
             />
             <span>
               <span className="block">Komplett aus (empfohlen)</span>
@@ -84,7 +86,7 @@ export function DebugLoggingPanel() {
               name="logging-master"
               checked={anyEnabled}
               onChange={() => handleMasterChange(true)}
-              className="mt-0.5 accent-accent"
+              className="mt-0.5 accent-accent focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
             />
             <span>
               <span className="block">Aktiviert</span>
@@ -104,25 +106,17 @@ export function DebugLoggingPanel() {
           aria-disabled={!anyEnabled}
         >
           {SUB_TOGGLES.map((toggle) => (
-            <label
+            <ToggleSwitch
               key={toggle.key}
-              className="flex items-start gap-2 cursor-pointer text-sm text-neutral-200"
-            >
-              <input
-                type="checkbox"
-                checked={preferences[toggle.key]}
-                disabled={!anyEnabled}
-                onChange={(e) => setPreferences({ [toggle.key]: e.target.checked })}
-                className="mt-0.5 accent-accent disabled:cursor-not-allowed"
-              />
-              <span>
-                <span className="block">{toggle.label}</span>
-                <span className="block text-xs text-neutral-500">{toggle.help}</span>
-              </span>
-            </label>
+              label={toggle.label}
+              description={toggle.help}
+              checked={preferences[toggle.key]}
+              disabled={!anyEnabled}
+              onChange={(value) => setPreferences({ [toggle.key]: value })}
+            />
           ))}
         </div>
-      </section>
+      </SettingsSection>
     </div>
   );
 }

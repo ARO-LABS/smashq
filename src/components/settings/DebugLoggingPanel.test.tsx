@@ -27,8 +27,8 @@ describe("DebugLoggingPanel", () => {
 
   it("disables sub-checkboxes while master is off", () => {
     render(<DebugLoggingPanel />);
-    const sub = screen.getByRole("checkbox", { name: /Frontend-Errors/i }) as HTMLInputElement;
-    expect(sub.disabled).toBe(true);
+    const sub = screen.getByRole("switch", { name: /Frontend-Errors/i });
+    expect(sub).toBeDisabled();
   });
 
   it("enables frontendLogging when master is switched on", () => {
@@ -48,7 +48,7 @@ describe("DebugLoggingPanel", () => {
       },
     });
     render(<DebugLoggingPanel />);
-    const backendBox = screen.getByRole("checkbox", { name: /Log-Datei/i });
+    const backendBox = screen.getByRole("switch", { name: /Log-Datei/i });
     fireEvent.click(backendBox);
     expect(useSettingsStore.getState().preferences.backendFileLogging).toBe(true);
   });
@@ -73,7 +73,10 @@ describe("DebugLoggingPanel", () => {
 
   it("renders the panel heading and all three sub-toggle labels", () => {
     render(<DebugLoggingPanel />);
-    expect(screen.getByText("Debug-Logging")).toBeTruthy();
+    // "Debug-Logging" existiert vorübergehend doppelt (Panel-h3 + Sektions-h4);
+    // die Tab-Konsolidierung (Task 7) löst die Dopplung im selben PR auf —
+    // daher Heading-Level-Query statt getByText.
+    expect(screen.getByRole("heading", { level: 3, name: "Debug-Logging" })).toBeTruthy();
     expect(screen.getByText("Frontend-Errors")).toBeTruthy();
     expect(screen.getByText("Log-Datei (NDJSON)")).toBeTruthy();
     expect(screen.getByText("Performance-Profiler")).toBeTruthy();
@@ -129,8 +132,8 @@ describe("DebugLoggingPanel", () => {
     });
     render(<DebugLoggingPanel />);
     for (const name of [/Frontend-Errors/i, /Log-Datei/i, /Performance-Profiler/i]) {
-      const box = screen.getByRole("checkbox", { name }) as HTMLInputElement;
-      expect(box.disabled).toBe(false);
+      const box = screen.getByRole("switch", { name });
+      expect(box).not.toBeDisabled();
     }
   });
 
@@ -144,10 +147,8 @@ describe("DebugLoggingPanel", () => {
       },
     });
     render(<DebugLoggingPanel />);
-    const profiler = screen.getByRole("checkbox", {
-      name: /Performance-Profiler/i,
-    }) as HTMLInputElement;
-    expect(profiler.checked).toBe(true);
+    const profiler = screen.getByRole("switch", { name: /Performance-Profiler/i });
+    expect(profiler).toBeChecked();
   });
 
   it("unchecking the last enabled sub-toggle flips master back to off", () => {
@@ -160,7 +161,7 @@ describe("DebugLoggingPanel", () => {
       },
     });
     render(<DebugLoggingPanel />);
-    const frontendBox = screen.getByRole("checkbox", { name: /Frontend-Errors/i });
+    const frontendBox = screen.getByRole("switch", { name: /Frontend-Errors/i });
     fireEvent.click(frontendBox);
     // No flags left enabled — anyEnabled is false, Komplett-aus is now selected
     expect(useSettingsStore.getState().preferences.frontendLogging).toBe(false);
@@ -178,7 +179,7 @@ describe("DebugLoggingPanel", () => {
       },
     });
     render(<DebugLoggingPanel />);
-    fireEvent.click(screen.getByRole("checkbox", { name: /Performance-Profiler/i }));
+    fireEvent.click(screen.getByRole("switch", { name: /Performance-Profiler/i }));
     const prefs = useSettingsStore.getState().preferences;
     expect(prefs.frontendLogging).toBe(true);
     expect(prefs.performanceProfiler).toBe(true);

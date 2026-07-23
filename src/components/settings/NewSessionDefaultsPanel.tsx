@@ -5,6 +5,9 @@ import { logError } from "../../utils/errorLogger";
 import { wrapInvoke } from "../../utils/perfLogger";
 import { ICONS, ICON_SIZE } from "../../utils/icons";
 import { Button } from "../ui/Button";
+import { Select } from "../ui/Select";
+import { SettingsPanelHeader } from "./shared/SettingsPanelHeader";
+import { SettingsSection } from "./shared/SettingsSection";
 
 const FolderOpenIcon = ICONS.action.folderOpen;
 
@@ -105,30 +108,25 @@ export function NewSessionDefaultsPanel() {
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-2xl">
-      <header className="flex flex-col gap-1">
-        <h3 className="text-sm font-semibold text-neutral-200">Neue Session</h3>
-        <p className="text-xs text-neutral-500">
-          Diese Werte starten beim Klick auf <span className="text-neutral-300">+ Neue Session</span> sofort eine Sitzung.
-        </p>
-      </header>
+      <SettingsPanelHeader
+        title="Neue Session"
+        description={
+          <>
+            Diese Werte starten beim Klick auf <span className="text-neutral-300">+ Neue Session</span> sofort eine Sitzung.
+          </>
+        }
+      />
 
-      <section className="rounded-md shadow-hairline p-4 flex flex-col gap-4 bg-surface-base">
+      {/* Titel dupliziert vorübergehend den Panel-Header — wird durch die
+          Tab-Konsolidierung (Task 7) im selben PR aufgelöst. */}
+      <SettingsSection title="Neue Session">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="default-shell" className="text-xs font-medium text-neutral-300">
-            Standard-Shell
-          </label>
-          <select
-            id="default-shell"
+          <Select
+            label="Standard-Shell"
             value={defaultShell}
-            onChange={(e) => setDefaultShell(e.target.value as SettingsState["defaultShell"])}
-            className="w-full rounded-md bg-surface-raised shadow-hairline text-neutral-200 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-accent focus:ring-inset transition-shadow duration-150"
-          >
-            {shellOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            options={shellOptions}
+            onChange={(v) => setDefaultShell(v as SettingsState["defaultShell"])}
+          />
           {detectedShells !== null && (
             <p className="text-xs text-neutral-500">
               Angezeigt werden nur Shells, die auf diesem Gerät gefunden wurden.
@@ -137,21 +135,12 @@ export function NewSessionDefaultsPanel() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="default-permission-mode" className="text-xs font-medium text-neutral-300">
-            Permission-Modus
-          </label>
-          <select
-            id="default-permission-mode"
+          <Select
+            label="Permission-Modus"
             value={defaultPermissionMode}
-            onChange={(e) => setDefaultPermissionMode(e.target.value as PermissionMode)}
-            className="w-full rounded-md bg-surface-raised shadow-hairline text-neutral-200 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-accent focus:ring-inset transition-shadow duration-150"
-          >
-            {PERMISSION_MODE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            options={PERMISSION_MODE_OPTIONS}
+            onChange={(v) => setDefaultPermissionMode(v as PermissionMode)}
+          />
           <p className="text-xs text-neutral-500">{activeModeHint}</p>
         </div>
 
@@ -187,7 +176,7 @@ export function NewSessionDefaultsPanel() {
             </p>
           )}
         </div>
-      </section>
+      </SettingsSection>
     </div>
   );
 }
