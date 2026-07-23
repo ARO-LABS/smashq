@@ -378,6 +378,40 @@ describe("SlotChip behavior", () => {
     expect(lastCall.endsAt - lastCall.startsAt).toBe(90 * 60_000); // duration kept, not snapped to 30
   });
 
+  it("changing the Von date with a set Termin preserves the existing duration", () => {
+    const onUpdate = vi.fn();
+    const startsAt = BASE_STARTS_AT; // 2026-06-07 10:00 lokal
+    const endsAt = BASE_STARTS_AT + 90 * 60_000; // 90 min
+    const task = makeTask({ startsAt, endsAt });
+
+    const { container } = render(
+      <TaskMetaChips
+        task={task}
+        layout="chiprow"
+        availableProjects={PROJECTS}
+        onUpdate={onUpdate}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+      />,
+    );
+
+    const allButtons = screen.getAllByRole("button");
+    const slotBtn = allButtons.find((btn) => btn.textContent?.match(/\d{2}\.\d{2}\./));
+    fireEvent.click(slotBtn!);
+
+    const dateInput = container.querySelector('input[type="date"]') as HTMLInputElement;
+    fireEvent.change(dateInput, { target: { value: "2026-06-08" } });
+
+    expect(onUpdate).toHaveBeenCalled();
+    const lastCall = onUpdate.mock.calls[onUpdate.mock.calls.length - 1][0] as {
+      startsAt: number;
+      endsAt: number;
+    };
+    // Lokale Datums-Konstruktion (kein UTC-Epoch hardcoden)
+    expect(lastCall.startsAt).toBe(new Date("2026-06-08T10:00:00").getTime());
+    expect(lastCall.endsAt - lastCall.startsAt).toBe(90 * 60_000);
+  });
+
   it("setting Bis before Von clamps so endsAt >= startsAt", () => {
     const onUpdate = vi.fn();
     const startsAt = BASE_STARTS_AT; // 10:00
@@ -409,5 +443,188 @@ describe("SlotChip behavior", () => {
     expect(onUpdate).toHaveBeenCalled();
     const lastCall = onUpdate.mock.calls[onUpdate.mock.calls.length - 1][0] as { startsAt: number; endsAt: number };
     expect(lastCall.endsAt).toBeGreaterThanOrEqual(lastCall.startsAt);
+  });
+});
+
+// ── SlotChip — Leerzustand-Stil (Task 2) ──────────────────────────────
+
+describe("SlotChip — Leerzustand-Stil", () => {
+  it("renders the empty chip dashed + sans; a set Termin stays mono without dash (regression)", () => {
+    const empty = render(
+      <TaskMetaChips
+        task={makeTask({ startsAt: null, endsAt: null })}
+        layout="chiprow"
+        availableProjects={PROJECTS}
+        onUpdate={vi.fn()}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+      />,
+    );
+
+    const emptyLabel = screen.getByText("Kein Termin");
+    expect(emptyLabel.className).not.toContain("font-mono");
+    const emptyBtn = emptyLabel.closest("button")!;
+    expect(emptyBtn.className).toContain("border-dashed");
+    expect(emptyBtn.className).toContain("border-neutral-700");
+    expect(emptyBtn.className).toContain("text-neutral-500");
+    empty.unmount();
+
+    render(
+      <TaskMetaChips
+        task={makeTask()}
+        layout="chiprow"
+        availableProjects={PROJECTS}
+        onUpdate={vi.fn()}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+      />,
+    );
+
+    const monoLabel = screen.getByText(/\d{2}\.\d{2}\.\s+\d{2}:\d{2}–\d{2}:\d{2}/);
+    expect(monoLabel.className).toContain("font-mono");
+    expect(monoLabel.closest("button")!.className).not.toContain("border-dashed");
+  });
+
+  it("shows the hint 'Datum wählen legt den Termin an.' only while no Termin is set", () => {
+    const empty = render(
+      <TaskMetaChips
+        task={makeTask({ startsAt: null, endsAt: null })}
+        layout="chiprow"
+        availableProjects={PROJECTS}
+        onUpdate={vi.fn()}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText("Kein Termin"));
+    expect(screen.getByText("Datum wählen legt den Termin an.")).toBeTruthy();
+    empty.unmount();
+
+    render(
+      <TaskMetaChips
+        task={makeTask()}
+        layout="chiprow"
+        availableProjects={PROJECTS}
+        onUpdate={vi.fn()}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+      />,
+    );
+    const allButtons = screen.getAllByRole("button");
+    const slotBtn = allButtons.find((btn) => btn.textContent?.match(/\d{2}\.\d{2}\./));
+    fireEvent.click(slotBtn!);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.queryByText("Datum wählen legt den Termin an.")).toBeNull();
+  });
+});
+
+// ── SlotChip — Uhrzeit-Defaults beim Datum-Wählen (Task 2) ────────────
+
+describe("SlotChip — Uhrzeit-Defaults beim Datum-Wählen", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    // Feste lokale Uhr: 2026-06-07 14:12 → nächste halbe Stunde = 14:30
+    vi.setSystemTime(new Date("2026-06-07T14:12:00").getTime());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function renderEmptyTask(onUpdate: ReturnType<typeof vi.fn>): HTMLElement {
+    const { container } = render(
+      <TaskMetaChips
+        task={makeTask({ startsAt: null, endsAt: null })}
+        layout="chiprow"
+        availableProjects={PROJECTS}
+        onUpdate={onUpdate}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText("Kein Termin"));
+    return container;
+  }
+
+  it("picking a FUTURE date with empty time defaults to 09:00 local + 30 min", () => {
+    const onUpdate = vi.fn();
+    const container = renderEmptyTask(onUpdate);
+
+    const dateInput = container.querySelector('input[type="date"]') as HTMLInputElement;
+    fireEvent.change(dateInput, { target: { value: "2026-06-10" } });
+
+    const expectedStart = new Date("2026-06-10T09:00:00").getTime();
+    expect(onUpdate).toHaveBeenCalledWith({
+      startsAt: expectedStart,
+      endsAt: expectedStart + SLOT_MS,
+    });
+
+    // Inputs füllen sich sichtbar
+    const timeInputs = container.querySelectorAll('input[type="time"]');
+    expect((timeInputs[0] as HTMLInputElement).value).toBe("09:00");
+    expect((timeInputs[1] as HTMLInputElement).value).toBe("09:30");
+  });
+
+  it("picking TODAY with empty time defaults to the next half-hour boundary (14:12 → 14:30)", () => {
+    const onUpdate = vi.fn();
+    const container = renderEmptyTask(onUpdate);
+
+    const dateInput = container.querySelector('input[type="date"]') as HTMLInputElement;
+    fireEvent.change(dateInput, { target: { value: "2026-06-07" } });
+
+    const expectedStart = new Date("2026-06-07T14:30:00").getTime();
+    expect(onUpdate).toHaveBeenCalledWith({
+      startsAt: expectedStart,
+      endsAt: expectedStart + SLOT_MS,
+    });
+
+    const timeInputs = container.querySelectorAll('input[type="time"]');
+    expect((timeInputs[0] as HTMLInputElement).value).toBe("14:30");
+    expect((timeInputs[1] as HTMLInputElement).value).toBe("15:00");
+  });
+});
+
+// ── SlotChip — Termin entfernen (Task 2) ──────────────────────────────
+
+describe("SlotChip — Termin entfernen", () => {
+  it("click calls onUpdate with both null and closes the popover", () => {
+    const onUpdate = vi.fn();
+    render(
+      <TaskMetaChips
+        task={makeTask()}
+        layout="chiprow"
+        availableProjects={PROJECTS}
+        onUpdate={onUpdate}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+      />,
+    );
+
+    const allButtons = screen.getAllByRole("button");
+    const slotBtn = allButtons.find((btn) => btn.textContent?.match(/\d{2}\.\d{2}\./));
+    fireEvent.click(slotBtn!);
+
+    const removeBtn = screen.getByRole("button", { name: /Termin entfernen/ });
+    fireEvent.click(removeBtn);
+
+    expect(onUpdate).toHaveBeenCalledWith({ startsAt: null, endsAt: null });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("is not rendered while the task has no Termin", () => {
+    render(
+      <TaskMetaChips
+        task={makeTask({ startsAt: null, endsAt: null })}
+        layout="chiprow"
+        availableProjects={PROJECTS}
+        onUpdate={vi.fn()}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Kein Termin"));
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.queryByText("Termin entfernen")).toBeNull();
   });
 });

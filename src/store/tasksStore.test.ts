@@ -342,6 +342,26 @@ describe("tasksStore persist migration v3 (Termin optional)", () => {
     }
   });
 
+  it("migrate with an ALREADY-v3 blob keeps set Termine (guard discriminates on fromVersion)", () => {
+    // Wächtertest: pinnt die `fromVersion < 3`-Bedingung selbst. Ohne diesen
+    // Test bliebe ein unbedingtes Nullen unbemerkt grün (der v2-Test oben
+    // erwartet ja Nullen) — und würde beim nächsten Schema-Bump alle bewusst
+    // gesetzten Termine wegwischen.
+    const migrate = useTasksStore.persist.getOptions().migrate;
+    expect(migrate).toBeDefined();
+    const out = migrate?.(
+      {
+        tasks: [
+          { id: "a", title: "Mit Termin", startsAt: 1000, endsAt: 1000 + SLOT_MS },
+        ],
+      },
+      3,
+    ) as { tasks: { startsAt: number | null; endsAt: number | null }[] };
+    expect(out.tasks).toHaveLength(1);
+    expect(out.tasks[0].startsAt).toBe(1000);
+    expect(out.tasks[0].endsAt).toBe(1000 + SLOT_MS);
+  });
+
   it("merge (same-version rehydrate) does NOT null set Termine", async () => {
     localStorage.setItem(
       "smashq-tasks",

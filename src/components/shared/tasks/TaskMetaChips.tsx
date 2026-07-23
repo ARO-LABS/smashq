@@ -19,7 +19,7 @@ import type { JSX } from "react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ICONS } from "../../../utils/icons";
 import type { TaskItem, UpdateTaskFields } from "../../../store/tasksStore";
-import { SLOT_MS } from "../../../store/tasksStore";
+import { SLOT_MS, defaultSlot } from "../../../store/tasksStore";
 import { StatusDot } from "./StatusDot";
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -295,6 +295,9 @@ function SlotChip({
   const containerRef = useClickOutside<HTMLDivElement>(open, onClose);
   const SlotIcon = ICONS.tasks.deadline;
   const ChevronDown = ICONS.action.collapse;
+  const CloseIcon = ICONS.action.close;
+
+  const hasTermin = task.startsAt !== null && task.endsAt !== null;
 
   // Local editor state — initialized from task when popover opens
   const [vonDate, setVonDate] = useState<string>("");
@@ -320,6 +323,26 @@ function SlotChip({
   const handleVonDateChange = (newDate: string): void => {
     setVonDate(newDate);
     if (!newDate) return;
+    if (!vonTime) {
+      // Datum ohne Uhrzeit gewählt (Termin wird gerade erst angelegt):
+      // Start-Zeit-Default herleiten. Heute → nächste halbe Stunde
+      // (defaultSlot rundet Date.now() auf die kommende :00/:30 auf), sonst
+      // 09:00 lokal. Warum defaultSlot statt fixer Zeit: eine 09:00 am
+      // heutigen Nachmittag läge in der Vergangenheit und wäre sofort
+      // „überfällig". (Randfall kurz vor Mitternacht: defaultSlot kann auf
+      // den Folgetag überlaufen — der Sync-Effect zieht die Inputs dann vom
+      // aktualisierten Task nach.)
+      const isToday = newDate === epochToDateInput(Date.now());
+      const newStartsAt = isToday
+        ? defaultSlot().startsAt
+        : dateTimeInputToEpoch(newDate, "09:00");
+      const newEndsAt = newStartsAt + SLOT_MS;
+      setVonTime(epochToTimeInput(newStartsAt));
+      setBisTime(epochToTimeInput(newEndsAt));
+      setBisHint(false);
+      onUpdate({ startsAt: newStartsAt, endsAt: newEndsAt });
+      return;
+    }
     const newStartsAt = dateTimeInputToEpoch(newDate, vonTime);
     // Preserve the existing duration when the user shifts the start.
     const newEndsAt = newStartsAt + slotDuration;
@@ -354,15 +377,24 @@ function SlotChip({
     onUpdate({ startsAt, endsAt });
   };
 
+  const handleRemoveTermin = (): void => {
+    onUpdate({ startsAt: null, endsAt: null });
+    onClose();
+  };
+
   const displayLabel = slotDisplayLabel(task);
 
+  // Leerzustand: gestrichelter neutraler Chip in sans — „Kein Termin" ist
+  // Platzhalter-Text, kein Zeitwert, deshalb bewusst KEIN mono.
   const chipContent = (
     <>
       <SlotIcon className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
-      <span className="font-mono">{displayLabel}</span>
+      <span className={hasTermin ? "font-mono" : undefined}>{displayLabel}</span>
       <ChevronDown className="w-2.5 h-2.5 text-neutral-500" aria-hidden="true" />
     </>
   );
+
+  const emptyChipClasses = "border border-dashed border-neutral-700 text-neutral-500";
 
   return (
     <div ref={containerRef} className="relative">
@@ -370,7 +402,10 @@ function SlotChip({
         <button
           type="button"
           onClick={onToggle}
-          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10.5px] text-neutral-300 cursor-pointer hover:bg-hover-overlay focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+          className={[
+            "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10.5px] cursor-pointer hover:bg-hover-overlay focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2",
+            hasTermin ? "text-neutral-300" : emptyChipClasses,
+          ].join(" ")}
           aria-expanded={open}
           aria-haspopup="dialog"
         >
@@ -384,7 +419,10 @@ function SlotChip({
           <button
             type="button"
             onClick={onToggle}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs hover:bg-hover-overlay focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+            className={[
+              "flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs hover:bg-hover-overlay focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2",
+              hasTermin ? "" : emptyChipClasses,
+            ].join(" ")}
             aria-expanded={open}
             aria-haspopup="dialog"
           >
@@ -434,6 +472,25 @@ function SlotChip({
                 </span>
               )}
             </div>
+
+            {/* Leerzustand-Hint: nur solange kein Termin gesetzt ist */}
+            {!hasTermin && (
+              <span className="text-[10px] text-neutral-500">
+                Datum wählen legt den Termin an.
+              </span>
+            )}
+
+            {/* Footer: Termin entfernen — nur bei gesetztem Termin */}
+            {hasTermin && (
+              <button
+                type="button"
+                onClick={handleRemoveTermin}
+                className="flex items-center gap-1.5 self-start bg-error/10 text-error hover:bg-error/20 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+              >
+                <CloseIcon className="w-3 h-3 shrink-0" aria-hidden="true" />
+                Termin entfernen
+              </button>
+            )}
           </div>
         </Popover>
       )}
