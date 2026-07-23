@@ -171,7 +171,7 @@ describe("ConfigPanelTabList", () => {
     mockInvoke.mockImplementation(makeInvokeImpl({}));
   });
 
-  it("renders all 8 fixed tabs while presence is loading (anti-flash)", () => {
+  it("renders all nine fixed tabs while presence is loading (anti-flash)", () => {
     // Presence-detection useEffect runs on mount but awaits async work —
     // first render happens with presence === null, so all tabs must be visible.
     render(<ConfigPanelTabList folder="/test" />);
@@ -179,6 +179,8 @@ describe("ConfigPanelTabList", () => {
     expect(screen.getByTitle("CLAUDE.md")).toBeTruthy();
     expect(screen.getByTitle("Skills")).toBeTruthy();
     expect(screen.getByTitle("Hooks")).toBeTruthy();
+    expect(screen.getByTitle("Settings")).toBeTruthy();
+    expect(screen.getByTitle("Agents")).toBeTruthy();
     expect(screen.getByTitle("GitHub")).toBeTruthy();
     expect(screen.getByTitle("Worktrees")).toBeTruthy();
     expect(screen.getByTitle("Aufgaben")).toBeTruthy();
@@ -670,12 +672,10 @@ describe("Aufgaben-Tab", () => {
 
   it("renders the Aufgaben tab with open-count badge for the panel folder", async () => {
     // Use the real store API instead of hand-built task shapes:
-    useTasksStore.setState({ tasks: [] });
-    const t1 = useTasksStore.getState().addTask({ title: "A", projectKey: "c:/projekte/smashq" });
+    useTasksStore.getState().addTask({ title: "A", projectKey: "c:/projekte/smashq" });
     useTasksStore.getState().addTask({ title: "C", projectKey: "c:/andere" });
     const t2 = useTasksStore.getState().addTask({ title: "B", projectKey: "c:/projekte/smashq" });
     useTasksStore.getState().completeTask(t2);
-    void t1;
     render(<ConfigPanelTabList folder={"C:\\Projekte\\smashq"} />);
     const tab = await screen.findByRole("button", { name: /Aufgaben/ });
     expect(tab).toBeInTheDocument();
@@ -683,7 +683,6 @@ describe("Aufgaben-Tab", () => {
   });
 
   it("hides the badge when the project has no open tasks (edge case)", async () => {
-    useTasksStore.setState({ tasks: [] });
     render(<ConfigPanelTabList folder={"C:\\Projekte\\smashq"} />);
     const tab = await screen.findByRole("button", { name: /Aufgaben/ });
     expect(within(tab).queryByTestId("tasks-tab-badge")).not.toBeInTheDocument();

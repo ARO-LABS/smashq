@@ -180,6 +180,12 @@ export const selectOpenTasksForProject =
       .filter((t) => t.status !== "done" && t.projectKey === projectKey)
       .sort((a, b) => a.sortIndex - b.sortIndex);
 
+/** Anzahl offener (nicht-done) Aufgaben eines Projekts — primitive-safe fuer Badge-Subscriptions. */
+export const selectOpenTaskCountForProject =
+  (projectKey: string | null) =>
+  (state: TasksState): number =>
+    state.tasks.filter((t) => t.status !== "done" && t.projectKey === projectKey).length;
+
 /** The derived "nächste" task: lowest-sortIndex open task of a project. */
 export const selectNextTask =
   (projectKey: string | null) =>

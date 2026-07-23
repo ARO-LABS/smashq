@@ -6,7 +6,7 @@ import { useUIStore, type ConfigSubTab } from "../../store/uiStore";
 import { useSettingsStore, normalizeProjectKey } from "../../store/settingsStore";
 import { logError } from "../../utils/errorLogger";
 import { CONFIG_TABS, type PresenceKey } from "./configPanelShared";
-import { useTasksStore } from "../../store/tasksStore";
+import { useTasksStore, selectOpenTaskCountForProject } from "../../store/tasksStore";
 
 // Single source of truth: derive the presence map shape from PresenceKey so a
 // new presence-gated tab forces a compile error here until setPresence supplies it.
@@ -333,14 +333,13 @@ export function ConfigPanelTabList({ folder, size = "md", isPrimary = true }: Co
 
 function TasksTabBadge({ folder }: { folder: string }) {
   const key = normalizeProjectKey(folder);
-  const openCount = useTasksStore(
-    (s) => s.tasks.filter((t) => t.status !== "done" && t.projectKey === key).length
-  );
+  const openCount = useTasksStore((s) => selectOpenTaskCountForProject(key)(s));
   if (openCount === 0) return null;
   return (
     <span
       data-testid="tasks-tab-badge"
-      className="ml-0.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-accent text-surface-base text-[9px] font-bold font-mono inline-flex items-center justify-center"
+      aria-label={`${openCount} offene Aufgaben`}
+      className="ml-0.5 min-w-[14px] h-3.5 px-0.5 rounded-full bg-accent text-surface-base text-[9px] font-bold font-mono inline-flex items-center justify-center"
     >
       {openCount > 9 ? "9+" : openCount}
     </span>
