@@ -101,19 +101,23 @@ describe("ConfigTasksViewer", () => {
     expect(screen.queryByRole("button", { name: /Erledigt/ })).not.toBeInTheDocument();
   });
 
-  it("renders open tasks in sortIndex order (addTask order)", () => {
+  it("renders open tasks in sortIndex order, not insertion order", () => {
     useTasksStore.getState().addTask({ title: "Erste", projectKey: KEY });
     useTasksStore.getState().addTask({ title: "Zweite", projectKey: KEY });
     useTasksStore.getState().addTask({ title: "Dritte", projectKey: KEY });
+    // Diskriminierend: "Erste" ans Ende schieben — ohne die sortIndex-Sortierung
+    // im Component bliebe die Array-Reihenfolge (Insertion Order) bestehen.
+    const first = useTasksStore.getState().tasks[0].id;
+    useTasksStore.getState().reorderTask(first, 9999);
     render(<ConfigTasksViewer folder={FOLDER} />);
     // DOM-Reihenfolge der Checkbox-Buttons = Render-Reihenfolge der Zeilen.
     const labels = screen
       .getAllByRole("button", { name: /^Aufgabe erledigen: / })
       .map((btn) => btn.getAttribute("aria-label"));
     expect(labels).toEqual([
-      "Aufgabe erledigen: Erste",
       "Aufgabe erledigen: Zweite",
       "Aufgabe erledigen: Dritte",
+      "Aufgabe erledigen: Erste",
     ]);
   });
 
