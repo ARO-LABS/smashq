@@ -65,7 +65,7 @@ function QuickAddRow({ onAdd }: { onAdd: (title: string) => void }): JSX.Element
         }}
         placeholder="Aufgabe hinzufügen …"
         aria-label="Aufgabe hinzufügen"
-        className="flex-1 min-w-0 bg-transparent text-[11px] text-neutral-300 placeholder:text-neutral-600 focus-visible:outline-none"
+        className="flex-1 min-w-0 bg-transparent text-[11px] text-neutral-300 placeholder:text-neutral-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-inset rounded-sm"
       />
     </div>
   );

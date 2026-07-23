@@ -100,4 +100,30 @@ describe("ConfigTasksViewer", () => {
     render(<ConfigTasksViewer folder={FOLDER} />);
     expect(screen.queryByRole("button", { name: /Erledigt/ })).not.toBeInTheDocument();
   });
+
+  it("renders open tasks in sortIndex order (addTask order)", () => {
+    useTasksStore.getState().addTask({ title: "Erste", projectKey: KEY });
+    useTasksStore.getState().addTask({ title: "Zweite", projectKey: KEY });
+    useTasksStore.getState().addTask({ title: "Dritte", projectKey: KEY });
+    render(<ConfigTasksViewer folder={FOLDER} />);
+    // DOM-Reihenfolge der Checkbox-Buttons = Render-Reihenfolge der Zeilen.
+    const labels = screen
+      .getAllByRole("button", { name: /^Aufgabe erledigen: / })
+      .map((btn) => btn.getAttribute("aria-label"));
+    expect(labels).toEqual([
+      "Aufgabe erledigen: Erste",
+      "Aufgabe erledigen: Zweite",
+      "Aufgabe erledigen: Dritte",
+    ]);
+  });
+
+  it("row hover-arrow opens the big Aufgaben window", () => {
+    useTasksStore.getState().addTask({ title: "Alpha", projectKey: KEY });
+    render(<ConfigTasksViewer folder={FOLDER} />);
+    fireEvent.click(screen.getByRole("button", { name: "In Aufgaben-View öffnen: Alpha" }));
+    expect(mockInvoke).toHaveBeenCalledWith("open_detached_window", {
+      view: "tasks",
+      title: "Aufgaben",
+    });
+  });
 });
