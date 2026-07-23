@@ -165,9 +165,10 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
 
   /**
    * Commit nach Pin-Rename-Konvention (ConfigPanelTabList): Enter UND Blur
-   * committen, Escape verwirft. Leerer oder unveränderter Wert überspringt
-   * den Store-Call bewusst — der Store ignoriert leere Werte zwar selbst,
-   * aber ein redundanter Write wäre stiller Müll im persistierten Blob.
+   * committen, Escape verwirft. Der Store guardet leere UND unveränderte
+   * Writes bereits selbst — der Guard hier existiert zusätzlich, um
+   * redundante Store-Calls und unnötiges Clear/Override-Verzweigen gar
+   * nicht erst auszulösen (Blur nach Enter committet z.B. doppelt).
    * Rename ZURÜCK zum Original-Scanner-Titel löscht den Override, statt ein
    * Duplikat des Originals zu persistieren (M6, Review Task 5).
    */
@@ -190,11 +191,13 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
     setEditValue("");
   };
 
-  // Bestätigungsstufe entschärfen, sobald sich die Auswahl ändert — der User
-  // soll nie eine andere Menge löschen als die, für die er scharf gestellt hat.
+  // Bestätigungsstufe entschärfen, sobald sich die Auswahl ODER der
+  // Suchfilter ändert — der User soll nie eine andere Menge löschen als die,
+  // für die er scharf gestellt hat. Bei Query-Wechsel bleibt die gefilterte
+  // Auswahl bestehen, aber der scharfe Zustand nicht.
   useEffect(() => {
     setConfirmArmed(false);
-  }, [selected]);
+  }, [selected, query]);
 
   const enterSelectionMode = () => {
     // Offenes Rename NUR per State beenden (cancelEdit) — niemals das
@@ -263,6 +266,19 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
       }
     }
 
+    // Refresh-Fenster mitten im Bulk-Lauf: ein „Neu laden" während die
+    // Deletes noch laufen sieht die Dateien teilweise noch auf Platte und
+    // schreibt die Zeilen zurück in den State — nichts würde diese Geister
+    // danach wieder entfernen. Deshalb idempotent nachräumen: NUR die
+    // erfolgreich gelöschten IDs filtern. Dadurch ist die Reihenfolge zum
+    // Failed-Re-Insert darunter egal — re-inserierte fehlgeschlagene Zeilen
+    // matchen den Filter nie.
+    const failedIds = new Set(failed.map((f) => f.id));
+    const succeededIds = new Set(
+      originals.filter((o) => !failedIds.has(o.id)).map((o) => o.id),
+    );
+    setSessions((current) => current.filter((s) => !succeededIds.has(s.session_id)));
+
     if (failed.length > 0) {
       setSessions((current) => {
         const next = [...current];
@@ -288,7 +304,7 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
       title:
         ok === total
           ? `${ok} Session${ok === 1 ? "" : "s"} gelöscht`
-          : `${ok} von ${total} Sessions gelöscht`,
+          : `${ok} von ${total} Session${total === 1 ? "" : "s"} gelöscht`,
       duration: 8000,
       action: {
         label: "Memory prüfen",

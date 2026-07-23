@@ -728,6 +728,56 @@ describe("SessionHistoryViewer", () => {
       expect(screen.getByRole("button", { name: "Löschen" })).toBeInTheDocument();
     });
 
+    it("refresh during the bulk loop cannot resurrect successfully deleted rows (ghost rows)", async () => {
+      // Deletes hängen an einem steuerbaren Gate, damit wir MITTEN im
+      // Bulk-Lauf einen Refresh auslösen können: der Scan sieht die Dateien
+      // noch und schreibt a+b zurück in den State (Geister). Nach dem
+      // Gate-Release müssen die erfolgreich gelöschten Zeilen wieder weg sein.
+      let releaseDeletes: () => void = () => {};
+      const deleteGate = new Promise<void>((res) => {
+        releaseDeletes = res;
+      });
+      // Dritte, NICHT selektierte Session C hält die Liste nicht-leer —
+      // sonst würde der Empty-State-Early-Return den Neu-laden-Button
+      // (und damit das Refresh-Fenster) aus dem DOM nehmen.
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === "scan_claude_sessions")
+          return Promise.resolve([
+            { ...mockSession, session_id: "a", title: "A" },
+            { ...mockSession, session_id: "b", title: "B" },
+            { ...mockSession, session_id: "c", title: "C" },
+          ]);
+        if (cmd === "delete_claude_session") return deleteGate;
+        return Promise.resolve(undefined);
+      });
+      render(<SessionHistoryViewer folder="C:\\p" />);
+      await screen.findByText("A");
+      fireEvent.click(screen.getByTitle("Auswahl-Modus"));
+      fireEvent.click(screen.getByRole("checkbox", { name: "Session auswählen: A" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "Session auswählen: B" }));
+      fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+      fireEvent.click(screen.getByRole("button", { name: "Wirklich löschen? (2)" }));
+      // Optimistisch entfernt, Deletes in-flight am Gate
+      expect(screen.queryByText("A")).not.toBeInTheDocument();
+      // Refresh mitten im Bulk-Lauf → Geister erscheinen wieder
+      await act(async () => {
+        fireEvent.click(screen.getByTitle("Neu laden"));
+      });
+      expect(screen.getByText("A")).toBeInTheDocument();
+      expect(screen.getByText("B")).toBeInTheDocument();
+      // Deletes laufen durch — der Cleanup muss die Geister entfernen
+      await act(async () => {
+        releaseDeletes();
+        await deleteGate;
+      });
+      await waitFor(() => {
+        expect(screen.queryByText("A")).not.toBeInTheDocument();
+        expect(screen.queryByText("B")).not.toBeInTheDocument();
+      });
+      // Die unbeteiligte Session überlebt den Cleanup
+      expect(screen.getByText("C")).toBeInTheDocument();
+    });
+
     it("group header click selects all non-active sessions of the group", async () => {
       const today = new Date().toISOString();
       mockInvoke.mockResolvedValue([
