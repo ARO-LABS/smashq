@@ -15,6 +15,7 @@
 import { mockIPC, clearMocks } from "@tauri-apps/api/mocks";
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
+import type { ClaudeSessionSummary } from "../components/sessions/sessionHistoryHelpers";
 
 // ---------------------------------------------------------------------------
 // IPC handler installation
@@ -324,26 +325,17 @@ export function buildScanClaudeSessionsHandler(projectsRoot: string): IPCHandler
 }
 
 /**
- * Test-only shape of a Claude session summary, mirroring Rust's
- * `ClaudeSessionSummary` struct (file_reader.rs:137-148). Use this in
- * tests to type the result of `invoke<TestClaudeSessionSummary[]>("scan_claude_sessions", ...)`.
+ * Test-only alias for the frontend summary type, which itself mirrors Rust's
+ * `ClaudeSessionSummary` struct (src-tauri/src/session/file_reader/session_history.rs:17-28).
+ * Alias statt Shape-Kopie: eine Drift zwischen Test-Typ und Produktions-Typ
+ * ist damit strukturell unmöglich. Use this in tests to type the result of
+ * `invoke<TestClaudeSessionSummary[]>("scan_claude_sessions", ...)`.
  *
  * KNOWN LIMITATION: this JS handler hard-codes `subagent_count: 0`. The
  * real Rust scanner counts `subagents/*.meta.json` files. Tests that need
  * to assert subagent_count must use Layer A (src-tauri/tests/) instead.
  */
-export interface TestClaudeSessionSummary {
-  session_id: string;
-  title: string;
-  started_at: string;
-  ended_at: string;
-  model: string;
-  user_turns: number;
-  total_messages: number;
-  subagent_count: number;
-  git_branch: string;
-  cwd: string;
-}
+export type TestClaudeSessionSummary = ClaudeSessionSummary;
 
 async function parseJsonlFile(
   path: string,

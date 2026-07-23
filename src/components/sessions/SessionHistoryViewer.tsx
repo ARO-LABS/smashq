@@ -56,6 +56,7 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
   const [editValue, setEditValue] = useState("");
   const sessionTitleOverrides = useSettingsStore((s) => s.sessionTitleOverrides);
   const setSessionTitleOverride = useSettingsStore((s) => s.setSessionTitleOverride);
+  const clearSessionTitleOverride = useSettingsStore((s) => s.clearSessionTitleOverride);
   const removeRestorableSessionByClaudeId = useSettingsStore(
     (s) => s.removeRestorableSessionByClaudeId,
   );
@@ -155,14 +156,19 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
    * Commit nach Pin-Rename-Konvention (ConfigPanelTabList): Enter UND Blur
    * committen, Escape verwirft. Leerer oder unveränderter Wert überspringt
    * den Store-Call bewusst — der Store ignoriert leere Werte zwar selbst,
-   * aber ein redundanter Override (== Original-Titel) wäre stiller Müll im
-   * persistierten Blob.
+   * aber ein redundanter Write wäre stiller Müll im persistierten Blob.
+   * Rename ZURÜCK zum Original-Scanner-Titel löscht den Override, statt ein
+   * Duplikat des Originals zu persistieren (M6, Review Task 5).
    */
-  const commitEdit = (sessionId: string, effectiveTitle: string) => {
+  const commitEdit = (sessionId: string, effectiveTitle: string, originalTitle: string) => {
     if (editingId !== sessionId) return;
     const trimmed = editValue.trim();
     if (trimmed && trimmed !== effectiveTitle) {
-      setSessionTitleOverride(sessionId, trimmed);
+      if (trimmed === originalTitle) {
+        clearSessionTitleOverride(sessionId);
+      } else {
+        setSessionTitleOverride(sessionId, trimmed);
+      }
     }
     setEditingId(null);
     setEditValue("");
@@ -312,7 +318,7 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
                 isEditing={editingId === s.session_id}
                 editValue={editValue}
                 onEditChange={setEditValue}
-                onEditCommit={() => commitEdit(s.session_id, s.effectiveTitle)}
+                onEditCommit={() => commitEdit(s.session_id, s.effectiveTitle, s.title)}
                 onEditCancel={cancelEdit}
               />
             ))}

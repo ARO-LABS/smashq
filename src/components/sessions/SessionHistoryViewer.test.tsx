@@ -597,6 +597,35 @@ describe("SessionHistoryViewer", () => {
       expect(screen.queryByTitle("Dauer")).not.toBeInTheDocument();
     });
 
+    it("rename back to the original scanner title clears the override (M6)", async () => {
+      mockInvoke.mockResolvedValue([{ ...mockSession, session_id: "u1", title: "Original" }]);
+      useSettingsStore.setState({ sessionTitleOverrides: { u1: "Umbenannt" } });
+      render(<SessionHistoryViewer folder="C:\\p" />);
+      await screen.findByText("Umbenannt");
+      fireEvent.click(screen.getByTitle("Session umbenennen"));
+      const input = screen.getByRole("textbox", { name: "Session-Titel bearbeiten" });
+      fireEvent.change(input, { target: { value: "Original" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      // Kein Duplikat-Override im persistierten Blob — der Eintrag verschwindet
+      expect(useSettingsStore.getState().sessionTitleOverrides["u1"]).toBeUndefined();
+      expect(screen.getByText("Original")).toBeInTheDocument();
+    });
+
+    it("commit with unchanged value writes nothing (skip branch, edge case)", async () => {
+      mockInvoke.mockResolvedValue([{ ...mockSession, session_id: "u1", title: "Original" }]);
+      useSettingsStore.setState({ sessionTitleOverrides: { u1: "Umbenannt" } });
+      render(<SessionHistoryViewer folder="C:\\p" />);
+      await screen.findByText("Umbenannt");
+      const before = useSettingsStore.getState().sessionTitleOverrides;
+      fireEvent.click(screen.getByTitle("Session umbenennen"));
+      const input = screen.getByRole("textbox", { name: "Session-Titel bearbeiten" });
+      // Kein change-Event — Wert bleibt der effektive Titel
+      fireEvent.keyDown(input, { key: "Enter" });
+      // Referenz-Gleichheit beweist: kein Store-Write, nicht mal ein No-op-Write
+      expect(useSettingsStore.getState().sessionTitleOverrides).toBe(before);
+      expect(useSettingsStore.getState().sessionTitleOverrides["u1"]).toBe("Umbenannt");
+    });
+
     it("blur commits like Enter (Pin-Rename-Konvention)", async () => {
       mockInvoke.mockResolvedValue([{ ...mockSession, session_id: "u1", title: "Original" }]);
       render(<SessionHistoryViewer folder="C:\\p" />);
