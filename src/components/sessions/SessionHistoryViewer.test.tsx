@@ -637,4 +637,112 @@ describe("SessionHistoryViewer", () => {
       expect(useSettingsStore.getState().sessionTitleOverrides["u1"]).toBe("Blur-Name");
     });
   });
+
+  // ==========================================================================
+  // Auswahl-Modus + Sammel-Löschen (Task 6): Checkboxen, Bestätigungsstufe,
+  // Gruppen-Auswahl, EIN Sammel-Toast, ehrlicher Partial-Failure-Rollback
+  // ==========================================================================
+
+  describe("Auswahl-Modus + Sammel-Löschen", () => {
+    it("selects sessions and deletes after the confirm step with one summary toast", async () => {
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === "scan_claude_sessions")
+          return Promise.resolve([
+            { ...mockSession, session_id: "a", title: "A" },
+            { ...mockSession, session_id: "b", title: "B" },
+          ]);
+        return Promise.resolve(undefined);
+      });
+      // JSX-Attribut-Literale escapen NICHT — folder als TS-Expression übergeben,
+      // damit Prop und Assertion durch dieselbe Escape-Verarbeitung laufen.
+      render(<SessionHistoryViewer folder={"C:\\p"} />);
+      await screen.findByText("A");
+      fireEvent.click(screen.getByTitle("Auswahl-Modus"));
+      fireEvent.click(screen.getByRole("checkbox", { name: "Session auswählen: A" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "Session auswählen: B" }));
+      expect(screen.getByText("2 ausgewählt")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+      // Bestätigungsstufe: erster Klick löscht noch nichts
+      expect(mockInvoke).not.toHaveBeenCalledWith("delete_claude_session", expect.anything());
+      fireEvent.click(screen.getByRole("button", { name: "Wirklich löschen? (2)" }));
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("delete_claude_session", {
+          folder: "C:\\p",
+          sessionId: "a",
+        });
+        expect(mockInvoke).toHaveBeenCalledWith("delete_claude_session", {
+          folder: "C:\\p",
+          sessionId: "b",
+        });
+      });
+      const toasts = useUIStore.getState().toasts;
+      expect(toasts).toHaveLength(1);
+      expect(toasts[0].title).toBe("2 Sessions gelöscht");
+    });
+
+    it("active sessions not selectable; partial failure restores failed rows and reports honestly", async () => {
+      mockInvoke.mockImplementation((cmd: string, args?: { sessionId?: string }) => {
+        if (cmd === "scan_claude_sessions")
+          return Promise.resolve([
+            { ...mockSession, session_id: "live", title: "Live" },
+            { ...mockSession, session_id: "x", title: "X" },
+            { ...mockSession, session_id: "y", title: "Y" },
+          ]);
+        if (cmd === "delete_claude_session" && args?.sessionId === "y")
+          return Promise.reject(new Error("io"));
+        return Promise.resolve(undefined);
+      });
+      useSessionStore.setState({
+        sessions: [{ id: "s1", claudeSessionId: "live", status: "running" }] as never,
+      });
+      render(<SessionHistoryViewer folder="C:\\p" />);
+      await screen.findByText("Live");
+      fireEvent.click(screen.getByTitle("Auswahl-Modus"));
+      expect(
+        screen.queryByRole("checkbox", { name: "Session auswählen: Live" }),
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("checkbox", { name: "Session auswählen: X" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "Session auswählen: Y" }));
+      fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+      fireEvent.click(screen.getByRole("button", { name: "Wirklich löschen? (2)" }));
+      // Y kommt zurück (Rollback), X bleibt gelöscht — ehrlicher Teil-Erfolg
+      expect(await screen.findByText("Y")).toBeInTheDocument();
+      expect(screen.queryByText("X")).not.toBeInTheDocument();
+      const toasts = useUIStore.getState().toasts;
+      expect(toasts.some((t) => t.title === "1 von 2 Sessions gelöscht")).toBe(true);
+    });
+
+    it("changing the selection disarms the confirm step (edge case)", async () => {
+      mockInvoke.mockResolvedValue([
+        { ...mockSession, session_id: "a", title: "A" },
+        { ...mockSession, session_id: "b", title: "B" },
+      ]);
+      render(<SessionHistoryViewer folder="C:\\p" />);
+      await screen.findByText("A");
+      fireEvent.click(screen.getByTitle("Auswahl-Modus"));
+      fireEvent.click(screen.getByRole("checkbox", { name: "Session auswählen: A" }));
+      fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+      expect(screen.getByRole("button", { name: "Wirklich löschen? (1)" })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("checkbox", { name: "Session auswählen: B" }));
+      // Auswahl geändert → Bestätigung entschärft, Button zurück auf "Löschen"
+      expect(screen.getByRole("button", { name: "Löschen" })).toBeInTheDocument();
+    });
+
+    it("group header click selects all non-active sessions of the group", async () => {
+      const today = new Date().toISOString();
+      mockInvoke.mockResolvedValue([
+        { ...mockSession, session_id: "live", title: "Live", started_at: today, ended_at: today },
+        { ...mockSession, session_id: "x", title: "X", started_at: today, ended_at: today },
+      ]);
+      useSessionStore.setState({
+        sessions: [{ id: "s1", claudeSessionId: "live", status: "running" }] as never,
+      });
+      render(<SessionHistoryViewer folder="C:\\p" />);
+      await screen.findByText("Live");
+      fireEvent.click(screen.getByTitle("Auswahl-Modus"));
+      fireEvent.click(screen.getByRole("button", { name: "Gruppe auswählen: Heute" }));
+      // Nur die nicht-aktive Session landet in der Auswahl
+      expect(screen.getByText("1 ausgewählt")).toBeInTheDocument();
+    });
+  });
 });

@@ -8,6 +8,10 @@ import { useSessionStore } from "../../store/sessionStore";
 import { useUIStore } from "../../store/uiStore";
 import { SessionHistoryRow } from "./SessionHistoryRow";
 import {
+  SessionHistorySelectionFooter,
+  SessionHistorySelectionRow,
+} from "./SessionHistorySelection";
+import {
   buildRunningClaudeIds,
   groupSessionsByTime,
   matchesHistoryQuery,
@@ -17,6 +21,7 @@ import {
 const RefreshCw = ICONS.action.refresh;
 const SearchIcon = ICONS.action.search;
 const ClearIcon = ICONS.action.close;
+const CheckIcon = ICONS.tasks.check;
 
 /** Summary + abgeleitete Anzeige-Felder (Override-Titel, Rename-Vorschau). */
 type EnrichedSummary = ClaudeSessionSummary & {
@@ -54,6 +59,12 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
   // Auswahlmodus (Task 6) das Editieren einfach ignorieren/beenden kann.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  // Auswahl-Modus (Task 6): Selektion lebt als Set von session_ids; die
+  // Bestätigungsstufe (confirmArmed) macht aus dem Lösch-Button einen
+  // Zwei-Klick-Vorgang ohne Modal.
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [confirmArmed, setConfirmArmed] = useState(false);
   const sessionTitleOverrides = useSettingsStore((s) => s.sessionTitleOverrides);
   const setSessionTitleOverride = useSettingsStore((s) => s.setSessionTitleOverride);
   const clearSessionTitleOverride = useSettingsStore((s) => s.clearSessionTitleOverride);
@@ -179,6 +190,116 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
     setEditValue("");
   };
 
+  // Bestätigungsstufe entschärfen, sobald sich die Auswahl ändert — der User
+  // soll nie eine andere Menge löschen als die, für die er scharf gestellt hat.
+  useEffect(() => {
+    setConfirmArmed(false);
+  }, [selected]);
+
+  const enterSelectionMode = () => {
+    // Offenes Rename NUR per State beenden (cancelEdit) — niemals das
+    // DOM-Input blur()en: Blur würde commitEdit feuern und mit dem
+    // Moduswechsel racen (latente Rename-Blur-Race-Klasse M1).
+    cancelEdit();
+    setSelectionMode(true);
+  };
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelected(new Set());
+    setConfirmArmed(false);
+  };
+
+  const toggleSelected = (sessionId: string) => {
+    setSelected((cur) => {
+      const next = new Set(cur);
+      if (next.has(sessionId)) {
+        next.delete(sessionId);
+      } else {
+        next.add(sessionId);
+      }
+      return next;
+    });
+  };
+
+  /** Gruppen-Klick fügt additiv hinzu (kein Toggle-Off — bewusst simpel). */
+  const selectAll = (sessionIds: string[]) => {
+    setSelected((cur) => new Set([...cur, ...sessionIds]));
+  };
+
+  /**
+   * Sammel-Löschen: sequentiell statt parallel, damit Papierkorb-Calls sich
+   * nicht gegenseitig stören und Fehler pro Session zuordenbar bleiben.
+   * Optimistic wie handleDelete; Rollback re-inseriert NUR die
+   * fehlgeschlagenen Sessions per funktionalem setSessions an ihrer
+   * Original-Position (siehe handleDelete-Kommentar: ein Snapshot-Rollback
+   * würde parallele optimistische Removals überschreiben). Statt n
+   * Einzel-Toasts gibt es EINEN Sammel-Toast — bei Teil-Erfolg ehrlich als
+   * Fehler-Toast mit „{ok} von {total}".
+   */
+  const handleBulkDelete = async () => {
+    const originals = [...selected]
+      .filter((id) => !runningIds.has(id) && !pendingDeletes.has(id))
+      .map((id) => ({ id, index: sessions.findIndex((s) => s.session_id === id) }))
+      .filter((o) => o.index >= 0)
+      .map((o) => ({ ...o, item: sessions[o.index] }));
+    if (originals.length === 0) return;
+
+    const idSet = new Set(originals.map((o) => o.id));
+    setPendingDeletes((cur) => new Set([...cur, ...idSet]));
+    setSessions((current) => current.filter((s) => !idSet.has(s.session_id)));
+    exitSelectionMode();
+
+    let ok = 0;
+    const failed: typeof originals = [];
+    for (const original of originals) {
+      try {
+        await invoke("delete_claude_session", { folder, sessionId: original.id });
+        removeRestorableSessionByClaudeId(original.id);
+        ok += 1;
+      } catch (err) {
+        logError("SessionHistoryViewer.bulkDeleteSession", err);
+        failed.push(original);
+      }
+    }
+
+    if (failed.length > 0) {
+      setSessions((current) => {
+        const next = [...current];
+        // Aufsteigend nach Original-Index, damit spätere Einfügungen die
+        // Positionen der früheren nicht verschieben.
+        for (const f of [...failed].sort((a, b) => a.index - b.index)) {
+          if (next.some((s) => s.session_id === f.id)) continue;
+          next.splice(Math.min(f.index, next.length), 0, f.item);
+        }
+        return next;
+      });
+    }
+
+    setPendingDeletes((cur) => {
+      const next = new Set(cur);
+      for (const o of originals) next.delete(o.id);
+      return next;
+    });
+
+    const total = originals.length;
+    addToast({
+      type: ok === total ? "success" : "error",
+      title:
+        ok === total
+          ? `${ok} Session${ok === 1 ? "" : "s"} gelöscht`
+          : `${ok} von ${total} Sessions gelöscht`,
+      duration: 8000,
+      action: {
+        label: "Memory prüfen",
+        onClick: () =>
+          invoke("open_detached_window", { view: "library", title: "Bibliothek" }).catch(
+            (err) => logError("SessionHistoryViewer.openLibrary", err),
+          ),
+      },
+    });
+  };
+
   useEffect(() => {
     loadSessions();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload only on folder change
@@ -245,12 +366,35 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3">
         <span className="text-[11px] font-semibold tracking-widest uppercase text-neutral-500">
-          {hasQuery
-            ? `${filtered.length} von ${sessions.length} Sessions`
-            : `${sessions.length} ${sessions.length === 1 ? "Session" : "Sessions"}`}
+          {selectionMode
+            ? "Sessions auswählen"
+            : hasQuery
+              ? `${filtered.length} von ${sessions.length} Sessions`
+              : `${sessions.length} ${sessions.length === 1 ? "Session" : "Sessions"}`}
         </span>
         <div className="flex items-center gap-1">
-          {/* Task 6: Hier kommt der Auswahlmodus-Toggle hin (Mehrfachauswahl + Bulk-Delete). */}
+          <button
+            onClick={selectionMode ? exitSelectionMode : enterSelectionMode}
+            className={
+              "flex items-center justify-center w-6 h-6 rounded transition-colors " +
+              (selectionMode
+                ? "text-accent bg-accent-a15"
+                : "text-neutral-500 hover:text-neutral-200 hover:bg-hover-overlay")
+            }
+            title="Auswahl-Modus"
+            aria-label="Auswahl-Modus"
+          >
+            <CheckIcon className="w-3 h-3" />
+          </button>
+          {selectionMode && (
+            <button
+              onClick={exitSelectionMode}
+              aria-label="Auswahl-Modus verlassen"
+              className="flex items-center justify-center w-6 h-6 rounded text-neutral-500 hover:text-neutral-200 hover:bg-hover-overlay transition-colors"
+            >
+              <ClearIcon className="w-3 h-3" />
+            </button>
+          )}
           <button
             onClick={loadSessions}
             className="text-xs text-neutral-500 hover:text-neutral-200 transition-colors px-2 py-0.5 rounded hover:bg-hover-overlay"
@@ -261,7 +405,10 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
         </div>
       </div>
 
-      {/* Suche */}
+      {/* Suche — bleibt im Auswahl-Modus sichtbar UND aktiv: die Selektion
+          operiert auf der gefilterten Sicht („erst filtern, dann löschen"
+          ist der natürliche Flow). Bewusste Abweichung vom Mockup, das die
+          Suche versteckte. */}
       <div className="mx-3 mb-1 flex items-center gap-2 px-2.5 py-1.5 bg-surface-raised border border-neutral-800 rounded-md">
         <SearchIcon className="w-3 h-3 text-neutral-500 shrink-0" />
         <input
@@ -293,37 +440,83 @@ const SessionHistoryViewer: React.FC<SessionHistoryViewerProps> = ({ folder, onR
       ) : (
         groups.map((group) => (
           <React.Fragment key={group.key}>
-            <div
-              data-testid={`history-group-${group.key}`}
-              className="flex items-baseline gap-1.5 px-4 pt-3 pb-1 text-[10px] font-bold tracking-widest uppercase text-neutral-500"
-            >
-              <span>{group.label}</span>
-              <span className="font-mono font-medium opacity-70">{group.sessions.length}</span>
-            </div>
-            {group.sessions.map((s) => (
-              <SessionHistoryRow
-                key={s.session_id}
-                session={s}
-                effectiveTitle={s.effectiveTitle}
-                preview={s.preview}
-                isActive={runningIds.has(s.session_id)}
-                deletePending={pendingDeletes.has(s.session_id)}
-                onResume={
-                  onResumeSession
-                    ? () => onResumeSession(s.session_id, s.cwd, s.effectiveTitle)
-                    : undefined
+            {selectionMode ? (
+              /* Im Auswahl-Modus wird der Gruppen-Header klickbar und wählt
+                 alle nicht-aktiven Sessions der Gruppe additiv aus. */
+              <button
+                data-testid={`history-group-${group.key}`}
+                onClick={() =>
+                  selectAll(
+                    group.sessions
+                      .filter((s) => !runningIds.has(s.session_id))
+                      .map((s) => s.session_id),
+                  )
                 }
-                onRename={() => startEdit(s.session_id, s.effectiveTitle)}
-                onDelete={() => handleDelete(s.session_id, s.effectiveTitle)}
-                isEditing={editingId === s.session_id}
-                editValue={editValue}
-                onEditChange={setEditValue}
-                onEditCommit={() => commitEdit(s.session_id, s.effectiveTitle, s.title)}
-                onEditCancel={cancelEdit}
-              />
-            ))}
+                aria-label={`Gruppe auswählen: ${group.label}`}
+                className="flex items-baseline gap-1.5 px-4 pt-3 pb-1 w-full text-left text-[10px] font-bold tracking-widest uppercase text-neutral-500 hover:text-neutral-300 transition-colors"
+              >
+                <span>{group.label}</span>
+                <span className="font-mono font-medium opacity-70">{group.sessions.length}</span>
+              </button>
+            ) : (
+              <div
+                data-testid={`history-group-${group.key}`}
+                className="flex items-baseline gap-1.5 px-4 pt-3 pb-1 text-[10px] font-bold tracking-widest uppercase text-neutral-500"
+              >
+                <span>{group.label}</span>
+                <span className="font-mono font-medium opacity-70">{group.sessions.length}</span>
+              </div>
+            )}
+            {group.sessions.map((s) =>
+              selectionMode ? (
+                <SessionHistorySelectionRow
+                  key={s.session_id}
+                  effectiveTitle={s.effectiveTitle}
+                  isActive={runningIds.has(s.session_id)}
+                  checked={selected.has(s.session_id)}
+                  onToggle={() => toggleSelected(s.session_id)}
+                />
+              ) : (
+                <SessionHistoryRow
+                  key={s.session_id}
+                  session={s}
+                  effectiveTitle={s.effectiveTitle}
+                  preview={s.preview}
+                  isActive={runningIds.has(s.session_id)}
+                  deletePending={pendingDeletes.has(s.session_id)}
+                  onResume={
+                    onResumeSession
+                      ? () => onResumeSession(s.session_id, s.cwd, s.effectiveTitle)
+                      : undefined
+                  }
+                  onRename={() => startEdit(s.session_id, s.effectiveTitle)}
+                  onDelete={() => handleDelete(s.session_id, s.effectiveTitle)}
+                  isEditing={editingId === s.session_id}
+                  editValue={editValue}
+                  onEditChange={setEditValue}
+                  onEditCommit={() => commitEdit(s.session_id, s.effectiveTitle, s.title)}
+                  onEditCancel={cancelEdit}
+                />
+              ),
+            )}
           </React.Fragment>
         ))
+      )}
+
+      {/* Footer-Leiste des Auswahl-Modus: Zähler + Abbrechen + zweistufiges Löschen */}
+      {selectionMode && (
+        <SessionHistorySelectionFooter
+          count={selected.size}
+          confirmArmed={confirmArmed}
+          onCancel={exitSelectionMode}
+          onDeleteClick={() => {
+            if (confirmArmed) {
+              void handleBulkDelete();
+            } else {
+              setConfirmArmed(true);
+            }
+          }}
+        />
       )}
     </div>
   );
