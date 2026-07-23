@@ -584,6 +584,57 @@ describe("SlotChip — Uhrzeit-Defaults beim Datum-Wählen", () => {
   });
 });
 
+// ── dateTimeInputToEpoch — Ortszeit-Semantik ──────────────────────────
+//
+// Sichert: Ein date-only-String darf NICHT als UTC interpretiert werden.
+// Wir prüfen das indirekt über die SlotChip-Interaktion: Datum wählen →
+// onUpdate bekommt einen startsAt, der exakt dem lokalen 09:00 entspricht
+// (nicht UTC-Mitternacht, die in UTC-5 auf den Vortag fällt).
+//
+// TZ-agnostisch: expected via `new Date(y, m, d, 9, 0)` (immer lokal).
+
+describe("dateTimeInputToEpoch — lokale Ortszeit (kein UTC-Vortags-Bug)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    // Uhr weit in der Vergangenheit → "heute"-Zweig greift nie für 2026-06-10
+    vi.setSystemTime(new Date("2026-01-01T00:00:00").getTime());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("Datum-Wahl ergibt denselben Kalendertag wie das Eingabefeld (TZ-agnostisch)", () => {
+    const onUpdate = vi.fn();
+    const { container } = render(
+      <TaskMetaChips
+        task={makeTask({ startsAt: null, endsAt: null })}
+        layout="chiprow"
+        availableProjects={PROJECTS}
+        onUpdate={onUpdate}
+        onComplete={vi.fn()}
+        onReopen={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Kein Termin"));
+    const dateInput = container.querySelector('input[type="date"]') as HTMLInputElement;
+    fireEvent.change(dateInput, { target: { value: "2026-06-10" } });
+
+    expect(onUpdate).toHaveBeenCalled();
+    const { startsAt } = onUpdate.mock.calls[0][0] as { startsAt: number; endsAt: number };
+
+    // TZ-agnostisch: erwartetes Datum via lokalen Konstruktor (kein UTC-Epoch-Literal)
+    const localDay = new Date(2026, 5, 10); // Monat 0-basiert → Juni = 5
+    expect(new Date(startsAt).getFullYear()).toBe(localDay.getFullYear());
+    expect(new Date(startsAt).getMonth()).toBe(localDay.getMonth());
+    expect(new Date(startsAt).getDate()).toBe(localDay.getDate()); // ← Kernassert: kein Vortag
+    // Uhrzeit-Default: 09:00 lokal (Zukunftsdatum)
+    expect(new Date(startsAt).getHours()).toBe(9);
+    expect(new Date(startsAt).getMinutes()).toBe(0);
+  });
+});
+
 // ── SlotChip — Termin entfernen (Task 2) ──────────────────────────────
 
 describe("SlotChip — Termin entfernen", () => {

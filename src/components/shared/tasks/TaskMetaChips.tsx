@@ -64,13 +64,19 @@ function epochToTimeInput(epoch: number): string {
 /**
  * Parse a date-input string + optional time-input string to epoch-ms.
  * When timeStr is absent or empty, midnight local time is used.
+ *
+ * Warum `${dateStr}T00:00:00` statt `new Date(dateStr)`:
+ * Eine datums-only-Zeichenkette ("2025-01-10") wird von ECMAScript als UTC
+ * interpretiert. In Zeitzonen mit negativem Offset (z. B. UTC-5) ergibt das
+ * lokal den Vortag (9. statt 10.). Die datetime-Form ohne Offset ("…T00:00:00")
+ * wird hingegen als Ortszeit geparst — was der User im Datum-Feld sieht.
  */
 function dateTimeInputToEpoch(dateStr: string, timeStr: string): number {
   if (!dateStr) return Date.now();
   const [hours, minutes] = timeStr
     ? timeStr.split(":").map(Number)
     : [0, 0];
-  const d = new Date(dateStr);
+  const d = new Date(`${dateStr}T00:00:00`);
   d.setHours(hours ?? 0, minutes ?? 0, 0, 0);
   return d.getTime();
 }
