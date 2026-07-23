@@ -75,6 +75,7 @@ export type ConfigSubTab =
   | "agents"
   | "github"
   | "worktrees"
+  | "tasks"
   | "history"
   | `pin:${string}`;
 

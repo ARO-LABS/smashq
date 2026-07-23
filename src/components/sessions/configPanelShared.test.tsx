@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { CONFIG_TABS } from "./configPanelShared";
 
 describe("CONFIG_TABS", () => {
-  it("defines all eight configuration tabs (kanban moved to its own window)", () => {
-    expect(CONFIG_TABS).toHaveLength(8);
+  it("defines all nine configuration tabs (kanban moved to its own window)", () => {
+    expect(CONFIG_TABS).toHaveLength(9);
   });
 
   it("gives every tab a unique id", () => {

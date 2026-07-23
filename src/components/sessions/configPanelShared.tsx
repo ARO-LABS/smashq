@@ -11,6 +11,7 @@ const Bot = ICONS.library.agent;
 const Github = ICONS.git.github;
 const GitBranch = ICONS.git.branch;
 const Clock = ICONS.tasks.clock;
+const ListChecks = ICONS.tasks.panel;
 
 export const ClaudeMdViewer = lazy(() => import("./ClaudeMdViewer").then(m => ({ default: m.ClaudeMdViewer })));
 export const SkillsViewer = lazy(() => import("./SkillsViewer").then(m => ({ default: m.SkillsViewer })));
@@ -21,6 +22,7 @@ export const GitHubViewer = lazy(() => import("./GitHubViewer").then(m => ({ def
 export const WorktreeViewer = lazy(() => import("./WorktreeViewer").then(m => ({ default: m.WorktreeViewer })));
 export const SessionHistoryViewer = lazy(() => import("./SessionHistoryViewer"));
 export const PinnedDocViewer = lazy(() => import("./PinnedDocViewer").then(m => ({ default: m.PinnedDocViewer })));
+export const ConfigTasksViewer = lazy(() => import("./ConfigTasksViewer"));
 
 export type TabGroup = "context" | "project" | "history";
 
@@ -49,9 +51,10 @@ export const CONFIG_TABS: ConfigTab[] = [
   { id: "hooks",     label: "Hooks",     icon: Webhook,  group: "context", requiresPresence: "hooks" },
   { id: "settings",  label: "Settings",  icon: Settings, group: "context", requiresPresence: "settings" },
   { id: "agents",    label: "Agents",    icon: Bot,      group: "context", requiresPresence: "agents" },
-  { id: "github",    label: "GitHub",    icon: Github,   group: "project", requiresPresence: "github" },
+  { id: "github",    label: "GitHub",    icon: Github,    group: "project", requiresPresence: "github" },
   { id: "worktrees", label: "Worktrees", icon: GitBranch, group: "project", requiresPresence: "git" },
-  { id: "history",   label: "History",   icon: Clock,    group: "history" },
+  { id: "tasks",     label: "Aufgaben",  icon: ListChecks, group: "project" },
+  { id: "history",   label: "History",   icon: Clock,     group: "history" },
 ];
 
 interface ConfigPanelContentProps {
@@ -87,6 +90,8 @@ export function ConfigPanelContent({ folder, activeTab, onResumeSession }: Confi
         <GitHubViewer folder={folder} />
       ) : activeTab === "worktrees" ? (
         <WorktreeViewer folder={folder} />
+      ) : activeTab === "tasks" ? (
+        <ConfigTasksViewer folder={folder} />
       ) : activeTab === "history" ? (
         <SessionHistoryViewer folder={folder} onResumeSession={onResumeSession} />
       ) : null}
