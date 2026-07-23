@@ -171,6 +171,15 @@ Pflicht-Check für jede neue Komponente (Details siehe Single Source):
 - Fokus-Ring nie unterdrücken — `:focus-visible` mit `outline: 2px solid var(--color-accent); outline-offset: 2px`
 - Bei neuen Komponenten: gegen Preview-HTMLs in `docs/design-system/preview/` abgleichen
 
+## Design-Artifacts (Pflicht bei GUI-Änderungen)
+
+Jede Änderung mit sichtbarer Auswirkung in der GUI (neue Komponente, View, Layout-, Farb-, Icon- oder Copy-Änderung) bekommt **vor der Implementierung** ein Artifact: ein realistisches HTML-Mockup des betroffenen App-Bereichs — Ist-Zustand und Soll-Zustand nebeneinander, design-system-treu (Tokens/Regeln aus `docs/design-system/README.md`, echte Panel-Struktur der App, kein generisches Wireframe; relevante Zustände mitzeigen: leer, Fehler, Hover/Fokus wo sinnvoll). **Freigabe durch den User ist das Gate** — erst danach wird Code geschrieben.
+
+**Qualitätsanforderungen an jedes Design-Artifact (Mockups wie sonstige Design-Arbeiten):**
+1. **Ist-Zustand = 1:1 die reale App.** Der gezeigte Ist-Zustand wird aus den echten Komponenten abgeleitet (Quellcode der betroffenen Views LESEN: Labels, Reihenfolge, Icons, Abstände, Zustände) — nicht aus dem Gedächtnis oder von Screenshots Dritter. Nur wenn Ist exakt stimmt, kann der User den Soll-Unterschied eruieren. Abweichungen, die sich nicht verifizieren lassen, explizit im Artifact kennzeichnen.
+2. **Soll-Zustand immer daneben** — gleiche Struktur, gleiche Panel-Breite, damit der Diff visuell springt.
+3. **Vollständig sichtbar, nicht versteckt, nicht verbuggt.** Alles im Artifact muss ohne Interaktion sichtbar sein (keine Inhalte hinter Hover/Klick/Scroll-Fallen, keine abgeschnittenen Panels, keine überlappenden Callouts, kein horizontales Seiten-Scrolling). Vor der Übergabe das gerenderte Artifact selbst prüfen (z.B. Playwright-Screenshot oder Browser-Check): Layout intakt, alle Sektionen erreichbar, keine Renderfehler. Erst dann liefern. In parallelen Wellen: Design-Phase sammelt alle Mockups, Freigabe en bloc, dann läuft die Implementierung ungebremst. Ausnahme: Änderungen ohne visuelle Auswirkung (Refactors, Backend, Tests). Begründung: das Mockup zwingt Design-Entscheidungen (Platzierung, Zustände, Fehlerfälle) an den Anfang, wo eine Korrektur eine Artifact-Iteration kostet statt eines PR-Umbaus.
+
 ## Kommunikation
 
 - Code/Config/Skill LESEN bevor Aussagen machen. Belege mit Dateien und Zeilennummern.

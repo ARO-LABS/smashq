@@ -7,6 +7,14 @@
 
 ## Aktiv (letzte ~30 Tage)
 
+### 2026-07-23 — Design-Artifacts: Ist-Zustand muss 1:1 der realen App entsprechen und alles muss sichtbar sein
+
+**Kontext:** Design-Mockup für Config-Panel (Aufgaben-Tab + History-Redesign). Der Ist-Zustand war aus einem Explorations-Bericht rekonstruiert statt aus den echten Komponenten pixelgenau abgeleitet; der User konnte Ist vs. Soll nicht sauber eruieren und forderte zudem, dass nichts im Artifact versteckt oder verbuggt sein darf.
+
+**Fehler → Korrektur:** Mockup-Ist aus zweiter Hand (Agent-Summary) gebaut, gerendertes Artifact vor Übergabe nicht selbst geprüft. Korrektur: Qualitätsanforderungen als Punkt-Liste in CLAUDE.md-Sektion „Design-Artifacts" verankert (Ist = 1:1 aus dem Quellcode der betroffenen Views, Soll strukturgleich daneben, alles ohne Interaktion sichtbar, Render-Check vor Übergabe).
+
+**Regel:** (1) Vor jedem Mockup die betroffenen Komponenten-Dateien LESEN und den Ist-Zustand daraus ableiten (Labels, Reihenfolge, Icons, Zustände) — nicht verifizierbare Details im Artifact kennzeichnen. (2) Artifact vor Übergabe selbst rendern und prüfen (Playwright-Screenshot/Browser-Check): keine versteckten Inhalte, keine abgeschnittenen Panels, keine überlappenden Callouts, kein horizontales Scrolling. (3) Siehe CLAUDE.md „Design-Artifacts → Qualitätsanforderungen".
+
 ### 2026-07-21 — Lokale Gates ohne Layer-B: `npx vitest run` deckt die Integrationssuite NICHT ab
 
 **Kontext:** PR-#44-Review-Nacharbeit (Session-Neustart). Lokal liefen `tsc`, volle Unit-Suite (2543 Tests) und Build grün — der CI-Lauf brach trotzdem im Step „Run Layer-B integration tests" (`sessionRestoreSync.integration.test.ts`: Shape-Whitelist kannte das neue `permissionMode`-Feld nicht).
