@@ -5,11 +5,12 @@ import {
   type ScrollbackPreset,
 } from "../../store/settingsStore";
 import { Select } from "../ui/Select";
-import { SettingsPanelHeader } from "./shared/SettingsPanelHeader";
 import { SettingsSection } from "./shared/SettingsSection";
 
 /**
- * Settings-UI for xterm-Scrollback-Limit (Phase 1 of scrollback-history-coverage).
+ * Settings-Sektion für das xterm-Scrollback-Limit (Phase 1 of
+ * scrollback-history-coverage) — seit der Tab-Konsolidierung (Issue #52)
+ * Teil des Sessions-Tabs (panels/SessionsPanel).
  *
  * Default 25_000 ist 5× xterm.js-Default und 5× das alte Hard-Coded-Limit.
  * Memory-Kosten ≈ 12 Bytes/Cell × cols × scrollback. Bei 200 cols:
@@ -22,7 +23,7 @@ import { SettingsSection } from "./shared/SettingsSection";
  * ihren aktuellen Buffer (kein Verlust beim Verkleinern, keine Inflation
  * beim Vergrößern).
  */
-export function TerminalScrollbackPanel() {
+export function TerminalScrollbackSection() {
   const scrollbackLines = useSettingsStore(
     (s) => s.preferences.scrollbackLines,
   );
@@ -32,40 +33,37 @@ export function TerminalScrollbackPanel() {
   const showWarning = current >= 50_000;
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-2xl">
-      <SettingsPanelHeader
-        title="Terminal-Verlauf"
-        description="Wie viele Zeilen pro Terminal im Speicher gehalten werden. Höhere Werte = mehr Verlauf zum Hochscrollen, mehr RAM-Verbrauch."
+    <SettingsSection title="Terminal-Verlauf">
+      <p className="text-xs text-neutral-500">
+        Wie viele Zeilen pro Terminal im Speicher gehalten werden. Höhere Werte = mehr Verlauf zum Hochscrollen, mehr RAM-Verbrauch.
+      </p>
+
+      <Select
+        label="Scrollback-Zeilen"
+        value={String(current)}
+        options={SCROLLBACK_PRESETS.map((preset) => ({
+          value: String(preset),
+          label: formatPresetLabel(preset),
+        }))}
+        onChange={(value) => {
+          const next = sanitizeScrollbackLines(Number(value));
+          setPreferences({ scrollbackLines: next });
+        }}
+        className="w-56"
       />
 
-      <SettingsSection title="Terminal-Verlauf">
-        <Select
-          label="Scrollback-Zeilen"
-          value={String(current)}
-          options={SCROLLBACK_PRESETS.map((preset) => ({
-            value: String(preset),
-            label: formatPresetLabel(preset),
-          }))}
-          onChange={(value) => {
-            const next = sanitizeScrollbackLines(Number(value));
-            setPreferences({ scrollbackLines: next });
-          }}
-          className="w-56"
-        />
-
-        {showWarning && (
-          <p className="text-xs text-warning">
-            50 000 Zeilen entsprechen ca. 125 MB pro Terminal. Bei mehreren aktiven
-            Sessions (4 × 50k ≈ 500 MB) kann der RAM-Verbrauch spürbar werden.
-          </p>
-        )}
-
-        <p className="text-xs text-neutral-500">
-          Änderungen wirken auf neu geöffnete Sessions. Bestehende Terminals
-          behalten ihren aktuellen Verlauf.
+      {showWarning && (
+        <p className="text-xs text-warning">
+          50 000 Zeilen entsprechen ca. 125 MB pro Terminal. Bei mehreren aktiven
+          Sessions (4 × 50k ≈ 500 MB) kann der RAM-Verbrauch spürbar werden.
         </p>
-      </SettingsSection>
-    </div>
+      )}
+
+      <p className="text-xs text-neutral-500">
+        Änderungen wirken auf neu geöffnete Sessions. Bestehende Terminals
+        behalten ihren aktuellen Verlauf.
+      </p>
+    </SettingsSection>
   );
 }
 

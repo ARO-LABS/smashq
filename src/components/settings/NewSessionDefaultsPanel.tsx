@@ -6,7 +6,6 @@ import { wrapInvoke } from "../../utils/perfLogger";
 import { ICONS, ICON_SIZE } from "../../utils/icons";
 import { Button } from "../ui/Button";
 import { Select } from "../ui/Select";
-import { SettingsPanelHeader } from "./shared/SettingsPanelHeader";
 import { SettingsSection } from "./shared/SettingsSection";
 
 const FolderOpenIcon = ICONS.action.folderOpen;
@@ -67,7 +66,11 @@ function useDetectedShells(): ShellOption[] | null {
   return detected;
 }
 
-export function NewSessionDefaultsPanel() {
+/**
+ * Sektion "Neue Session" — seit der Tab-Konsolidierung (Issue #52) Teil des
+ * Sessions-Tabs (panels/SessionsPanel).
+ */
+export function NewSessionDefaultsSection() {
   const defaultShell = useSettingsStore((s) => s.defaultShell);
   const defaultProjectPath = useSettingsStore((s) => s.defaultProjectPath);
   const setDefaultShell = useSettingsStore((s) => s.setDefaultShell);
@@ -107,76 +110,67 @@ export function NewSessionDefaultsPanel() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-2xl">
-      <SettingsPanelHeader
-        title="Neue Session"
-        description={
-          <>
-            Diese Werte starten beim Klick auf <span className="text-neutral-300">+ Neue Session</span> sofort eine Sitzung.
-          </>
-        }
-      />
+    <SettingsSection title="Neue Session">
+      <p className="text-xs text-neutral-500">
+        Diese Werte starten beim Klick auf <span className="text-neutral-300">+ Neue Session</span> sofort eine Sitzung.
+      </p>
 
-      {/* Titel dupliziert vorübergehend den Panel-Header — wird durch die
-          Tab-Konsolidierung (Task 7) im selben PR aufgelöst. */}
-      <SettingsSection title="Neue Session">
-        <div className="flex flex-col gap-1.5">
-          <Select
-            label="Standard-Shell"
-            value={defaultShell}
-            options={shellOptions}
-            onChange={(v) => setDefaultShell(v as SettingsState["defaultShell"])}
-          />
-          {detectedShells !== null && (
-            <p className="text-xs text-neutral-500">
-              Angezeigt werden nur Shells, die auf diesem Gerät gefunden wurden.
-            </p>
-          )}
-        </div>
+      <div className="flex flex-col gap-1.5">
+        <Select
+          label="Standard-Shell"
+          value={defaultShell}
+          options={shellOptions}
+          onChange={(v) => setDefaultShell(v as SettingsState["defaultShell"])}
+        />
+        {detectedShells !== null && (
+          <p className="text-xs text-neutral-500">
+            Angezeigt werden nur Shells, die auf diesem Gerät gefunden wurden.
+          </p>
+        )}
+      </div>
 
-        <div className="flex flex-col gap-1.5">
-          <Select
-            label="Permission-Modus"
-            value={defaultPermissionMode}
-            options={PERMISSION_MODE_OPTIONS}
-            onChange={(v) => setDefaultPermissionMode(v as PermissionMode)}
-          />
-          <p className="text-xs text-neutral-500">{activeModeHint}</p>
-        </div>
+      <div className="flex flex-col gap-1.5">
+        <Select
+          label="Permission-Modus"
+          value={defaultPermissionMode}
+          options={PERMISSION_MODE_OPTIONS}
+          onChange={(v) => setDefaultPermissionMode(v as PermissionMode)}
+        />
+        <p className="text-xs text-neutral-500">{activeModeHint}</p>
+      </div>
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-neutral-300">Standard-Projektordner</label>
-          <div className="flex items-center gap-2">
-            <div
-              className="flex-1 min-w-0 rounded-md bg-surface-raised shadow-hairline text-neutral-300 text-xs px-3 py-2 truncate font-mono"
-              title={defaultProjectPath || "Kein Ordner gesetzt"}
-            >
-              {defaultProjectPath || (
-                <span className="text-neutral-500 italic">Kein Ordner gesetzt</span>
-              )}
-            </div>
-            <Button variant="secondary" size="sm" onClick={handlePickFolder} disabled={picking}>
-              <FolderOpenIcon className={ICON_SIZE.card} />
-              <span>Wählen</span>
-            </Button>
-            {defaultProjectPath && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setDefaultProjectPath("")}
-                title="Default zurücksetzen"
-              >
-                Leeren
-              </Button>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-medium text-neutral-300">Standard-Projektordner</label>
+        <div className="flex items-center gap-2">
+          <div
+            className="flex-1 min-w-0 rounded-md bg-surface-raised shadow-hairline text-neutral-300 text-xs px-3 py-2 truncate font-mono"
+            title={defaultProjectPath || "Kein Ordner gesetzt"}
+          >
+            {defaultProjectPath || (
+              <span className="text-neutral-500 italic">Kein Ordner gesetzt</span>
             )}
           </div>
-          {!defaultProjectPath && (
-            <p className="text-xs text-neutral-500">
-              Ohne Default öffnet der Button beim ersten Klick einen Ordner-Picker.
-            </p>
+          <Button variant="secondary" size="sm" onClick={handlePickFolder} disabled={picking}>
+            <FolderOpenIcon className={ICON_SIZE.card} />
+            <span>Wählen</span>
+          </Button>
+          {defaultProjectPath && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDefaultProjectPath("")}
+              title="Default zurücksetzen"
+            >
+              Leeren
+            </Button>
           )}
         </div>
-      </SettingsSection>
-    </div>
+        {!defaultProjectPath && (
+          <p className="text-xs text-neutral-500">
+            Ohne Default öffnet der Button beim ersten Klick einen Ordner-Picker.
+          </p>
+        )}
+      </div>
+    </SettingsSection>
   );
 }

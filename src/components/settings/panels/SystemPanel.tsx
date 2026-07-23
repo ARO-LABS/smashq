@@ -9,6 +9,7 @@ import { SettingsPanelHeader } from "../shared/SettingsPanelHeader";
 import { SettingsSection } from "../shared/SettingsSection";
 import { ToolRow, type ToolStatus } from "../system/ToolRow";
 import { GhAuthSection, type GhAuthStatus } from "../system/GhAuthSection";
+import { DebugLoggingSection } from "../DebugLoggingPanel";
 
 const RefreshIcon = ICONS.action.refresh;
 const LoadingIcon = ICONS.action.loading;
@@ -116,6 +117,8 @@ export function SystemPanel() {
           jederzeit möglich.
         </p>
       </SettingsSection>
+
+      <DebugLoggingSection />
     </div>
   );
 }

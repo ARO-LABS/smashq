@@ -226,6 +226,25 @@ describe("SystemPanel — Layer-B", () => {
     expect(toggle).not.toBeChecked();
   });
 
+  // ── Debug-Logging-Sektion (Tab-Konsolidierung, Issue #52) ───────────
+
+  it("rendert die Debug-Logging-Sektion als vierte Sektion", async () => {
+    installRealIPC({ check_prerequisites: allFoundPrerequisites });
+
+    render(<SystemPanel />);
+
+    expect(
+      screen.getByRole("heading", { level: 4, name: "Debug-Logging" }),
+    ).toBeTruthy();
+    // Frühere Panel-Header-Beschreibung lebt als erster Absatz weiter.
+    expect(screen.getByText(/Standardmäßig aus, um RAM und Disk/)).toBeTruthy();
+    expect(screen.getByText("Log-Datei (NDJSON)")).toBeTruthy();
+    // Async-Mount des Panels sauber abwarten, bevor der Test endet.
+    await waitFor(() => {
+      expect(screen.getByText("/usr/local/bin/claude")).toBeTruthy();
+    });
+  });
+
   // macOS branch of `claudeInstallHint()` has no coverage otherwise: jsdom's UA
   // is never Mac. Stub the UA so the hint takes the macOS path, then restore.
   it("appends the .zprofile hint on macOS", () => {
