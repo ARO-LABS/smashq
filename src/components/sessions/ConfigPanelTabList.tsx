@@ -5,12 +5,14 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useUIStore, type ConfigSubTab } from "../../store/uiStore";
 import { useSettingsStore, normalizeProjectKey } from "../../store/settingsStore";
 import { logError } from "../../utils/errorLogger";
-import { CONFIG_TABS, type PresenceKey } from "./configPanelShared";
+import { CONFIG_TABS } from "./configPanelShared";
+import {
+  getCachedPresence,
+  setCachedPresence,
+  presenceEquals,
+  type Presence,
+} from "./configPresenceCache";
 import { useTasksStore, selectOpenTaskCountForProject } from "../../store/tasksStore";
-
-// Single source of truth: derive the presence map shape from PresenceKey so a
-// new presence-gated tab forces a compile error here until setPresence supplies it.
-type Presence = Record<PresenceKey, boolean>;
 
 const X = ICONS.action.close;
 const Plus = ICONS.action.newSession;
@@ -96,13 +98,23 @@ export function ConfigPanelTabList({ folder, size = "md", isPrimary = true }: Co
 
   // ── Presence detection ─────────────────────────────────────────────────
   // Check which context artifacts exist in the folder so we can hide empty tabs.
-  // While detection is in flight (presence === null), all tabs remain visible to
-  // avoid a layout flash on first render.
-  const [presence, setPresence] = useState<Presence | null>(null);
+  // Das Panel wird beim Zuklappen unmountet — deshalb startet jeder Mount aus
+  // dem Modul-Cache (letzter bekannter Stand pro Projekt) und refresht still im
+  // Hintergrund: nur eine echte Änderung löst einen Re-Render aus. Erst-Öffnen
+  // eines Ordners (Cache leer, presence === null) zeigt weiterhin alle Tabs,
+  // bis die Erkennung auflöst — das kleinere Übel gegenüber leerer Leiste.
+  const [presence, setPresence] = useState<Presence | null>(() =>
+    getCachedPresence(normalizeProjectKey(folder))
+  );
 
   useEffect(() => {
     let cancelled = false;
-    if (!folder) { setPresence(null); return; }
+    const projectKey = normalizeProjectKey(folder);
+    // Re-Seed bei Ordnerwechsel: der useState-Initializer läuft nur beim Mount,
+    // also hier sofort auf den Cache-Stand (oder null) des NEUEN Ordners
+    // umschalten — nie die Tab-Leiste des vorherigen Ordners stehen lassen.
+    setPresence(getCachedPresence(projectKey));
+    if (!folder) return;
 
     (async () => {
       // Resolve to the main working tree root — worktree sessions may point to a
@@ -132,7 +144,7 @@ export function ConfigPanelTabList({ folder, size = "md", isPrimary = true }: Co
         hasHooks = !!hooksObj && typeof hooksObj === "object" && Object.keys(hooksObj).length > 0;
       } catch { /* not valid JSON — no hooks */ }
 
-      setPresence({
+      const next: Presence = {
         claudeMd: !!claudeMdText,
         skills: (skillDirs as unknown[]).length > 0,
         agents: agentFiles.length > 0,
@@ -140,7 +152,11 @@ export function ConfigPanelTabList({ folder, size = "md", isPrimary = true }: Co
         settings: !!settingsText,
         git: projectPresence.has_git,
         github: projectPresence.has_github,
-      });
+      };
+      setCachedPresence(projectKey, next);
+      // Gleiche Referenz zurückgeben, wenn nichts geändert hat — React bailt
+      // dann aus dem Re-Render aus (kein sichtbares Zucken bei jedem Öffnen).
+      setPresence((prev) => (presenceEquals(prev, next) ? prev : next));
     })();
 
     return () => { cancelled = true; };

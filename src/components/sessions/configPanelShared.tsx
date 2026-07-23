@@ -69,8 +69,19 @@ export function ConfigPanelContent({ folder, activeTab, onResumeSession }: Confi
   return (
     <Suspense
       fallback={
-        <div className="flex-1 flex items-center justify-center text-neutral-500 py-8">
-          Laden...
+        // Ruhiges Panel-Skeleton statt Text-Blitzer: gleiche Bausteine wie der
+        // History-Loading-Zustand (statische Balken, bg-hover-overlay, keine
+        // Animation) — der Chunk-Load beim ersten Öffnen wirkt so wie Layout,
+        // nicht wie ein Zwischenzustand.
+        <div
+          className="flex-1 flex flex-col gap-1.5 p-4"
+          role="status"
+          aria-label="Ansicht wird geladen"
+        >
+          <div className="h-[11px] w-3/5 rounded bg-hover-overlay" />
+          <div className="h-[9px] w-11/12 rounded bg-hover-overlay" />
+          <div className="h-[9px] w-4/5 rounded bg-hover-overlay" />
+          <div className="h-[9px] w-2/5 rounded bg-hover-overlay" />
         </div>
       }
     >

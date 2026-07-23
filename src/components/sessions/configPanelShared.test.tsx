@@ -1,5 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { CONFIG_TABS } from "./configPanelShared";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import { CONFIG_TABS, ConfigPanelContent } from "./configPanelShared";
+
+// Lazy-Viewer stumpf mocken: vi.mock fängt auch den dynamic import ab — der
+// Suspense-Fallback ist damit im synchronen Erst-Render sichtbar, ohne den
+// echten ClaudeMdViewer (Tauri-IPC on mount) in jsdom zu ziehen.
+vi.mock("./ClaudeMdViewer", () => ({ ClaudeMdViewer: () => null }));
 
 describe("CONFIG_TABS", () => {
   it("defines all nine configuration tabs (kanban moved to its own window)", () => {
@@ -41,4 +47,21 @@ describe("CONFIG_TABS", () => {
 
   // (The former "does not include a kanban tab" test is now enforced by the
   // type system itself — "kanban" was removed from the ConfigSubTab union.)
+});
+
+describe("ConfigPanelContent Suspense-Fallback", () => {
+  it("zeigt ein stilles Panel-Skeleton (role=status) statt Text „Laden...“", async () => {
+    render(<ConfigPanelContent folder="/test" activeTab="claude-md" />);
+
+    // Erst-Render: lazy-Chunk noch nicht aufgelöst → Fallback sichtbar.
+    const status = screen.getByRole("status");
+    expect(status.getAttribute("aria-label")).toBe("Ansicht wird geladen");
+    expect(screen.queryByText("Laden...")).toBeNull();
+
+    // Lazy-Auflösung noch im Test abwarten (vermeidet die act-Warnung) und
+    // gleichzeitig festnageln: das Skeleton verschwindet, sobald der Viewer da ist.
+    await waitFor(() => {
+      expect(screen.queryByRole("status")).toBeNull();
+    });
+  });
 });

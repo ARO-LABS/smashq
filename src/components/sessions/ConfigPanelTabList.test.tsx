@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { ConfigPanelTabList } from "./ConfigPanelTabList";
+import { clearPresenceCacheForTests } from "./configPresenceCache";
 import { useTasksStore } from "../../store/tasksStore";
 
 // Mock Tauri dialog plugin
@@ -167,6 +168,9 @@ describe("ConfigPanelTabList", () => {
     mockInvoke.mockReset();
     mockDialogOpen.mockReset();
     resetMockStores();
+    // Presence-Cache ist Modul-State — ohne Reset leakt der Stand eines Tests
+    // in den nächsten (erste-Mount-Tests würden dann nicht mehr null sehen).
+    clearPresenceCacheForTests();
     // Default: empty project, no git, no github.
     mockInvoke.mockImplementation(makeInvokeImpl({}));
   });
@@ -658,6 +662,69 @@ describe("ConfigPanelTabList", () => {
     expect(screen.getByTitle("History")).toBeTruthy();
     expect(mockInvoke).not.toHaveBeenCalled();
   });
+
+  // ── Presence-Cache pro Projekt (Remount-Flash, Issue: Doppel-Rendern) ──
+
+  it("remount renders the resolved tab subset immediately (no all-tabs flash)", async () => {
+    // Erst-Mount: Presence löst auf — CLAUDE.md vorhanden, Hooks/Agents fehlen.
+    mockInvoke.mockImplementation(makeInvokeImplDetailed({ claudeMd: "# Projekt" }));
+    const first = render(<ConfigPanelTabList folder="/test" />);
+    await waitFor(() => {
+      expect(screen.queryByTitle("Hooks")).toBeNull();
+    });
+    expect(screen.queryByTitle("Agents")).toBeNull();
+    first.unmount();
+
+    // Remount mit NIE auflösendem IPC: der gecachte Stand muss die Tabs sofort
+    // gaten — sonst flackert die Leiste bei jedem Öffnen erst mit allen Tabs.
+    mockInvoke.mockImplementation(() => new Promise(() => {}));
+    render(<ConfigPanelTabList folder="/test" />);
+
+    expect(screen.queryByTitle("Hooks")).toBeNull();
+    expect(screen.queryByTitle("Agents")).toBeNull();
+    expect(screen.getByTitle("CLAUDE.md")).toBeTruthy();
+    expect(screen.getByTitle("History")).toBeTruthy();
+  });
+
+  it("folder switch does not show the previous folder's tabs", async () => {
+    // Ordner A auflösen lassen — Subset ohne Hooks.
+    mockInvoke.mockImplementation(makeInvokeImplDetailed({}));
+    const { rerender } = render(<ConfigPanelTabList folder="/projekt-a" />);
+    await waitFor(() => {
+      expect(screen.queryByTitle("Hooks")).toBeNull();
+    });
+
+    // Wechsel auf unbekannten Ordner B mit hängendem IPC: sofort auf B-Stand
+    // re-seeden (Cache leer → anti-flash alle Tabs), NIE A-Subset stehen lassen.
+    mockInvoke.mockImplementation(() => new Promise(() => {}));
+    rerender(<ConfigPanelTabList folder="/projekt-b" />);
+
+    expect(screen.getByTitle("Hooks")).toBeTruthy();
+  });
+
+  it("background refresh updates tabs when presence actually changed", async () => {
+    // Cache seeden: Subset ohne Hooks.
+    mockInvoke.mockImplementation(makeInvokeImplDetailed({}));
+    const first = render(<ConfigPanelTabList folder="/test" />);
+    await waitFor(() => {
+      expect(screen.queryByTitle("Hooks")).toBeNull();
+    });
+    first.unmount();
+
+    // Remount: Backend meldet jetzt Hooks — Start aus Cache (ohne Hooks), …
+    mockInvoke.mockImplementation(
+      makeInvokeImplDetailed({
+        settings: JSON.stringify({ hooks: { PreToolUse: [{ matcher: "*" }] } }),
+      }),
+    );
+    render(<ConfigPanelTabList folder="/test" />);
+    expect(screen.queryByTitle("Hooks")).toBeNull();
+
+    // … der stille Hintergrund-Refresh bringt den Hooks-Tab nach.
+    await waitFor(() => {
+      expect(screen.getByTitle("Hooks")).toBeTruthy();
+    });
+  });
 });
 
 describe("Aufgaben-Tab", () => {
@@ -665,6 +732,7 @@ describe("Aufgaben-Tab", () => {
     mockInvoke.mockReset();
     mockDialogOpen.mockReset();
     resetMockStores();
+    clearPresenceCacheForTests();
     mockInvoke.mockImplementation(makeInvokeImpl({}));
     // Reset tasks store between tests to prevent localStorage bleed-over.
     useTasksStore.setState({ tasks: [] });

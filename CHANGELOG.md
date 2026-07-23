@@ -21,6 +21,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - Seitenleisten-Rails (Navigation + Config-Panel): Klick klappt das geöffnete Panel jetzt auch zu — bisher öffnete Klick nur; Ziehen zum Anpassen bleibt unverändert (4px-Schwelle trennt Klick von Drag).
 
 ### Behoben
+- Config-Panel: Sichtbares Doppel-Rendern beim Öffnen behoben — die Tab-Leiste startet beim erneuten Öffnen sofort mit dem letzten bekannten Stand (Presence-Cache pro Projekt, stiller Hintergrund-Refresh), und der Lade-Fallback ist ein ruhiges Skeleton statt Text.
 - Config-Panel History: ASCII-Ersatzformen in Oberflächentexten durch echte Umlaute ersetzt („Session löschen", „Session gelöscht", „für").
 
 ### Sicherheit
